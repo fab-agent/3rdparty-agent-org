@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3rdParty Agent Org • Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+    
+    :root {
+      --primary: #0f172a;
+    }
+    
+    body {
+      font-family: 'Inter', system_ui, sans-serif;
+    }
+    
+    .font-display {
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+      font-weight: 600;
+    }
+
+    .org-card {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .org-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+
+    .agent-badge {
+      font-size: 0.75rem;
+      padding: 1px 8px;
+      border-radius: 9999px;
+    }
+
+    .nav-active {
+      background-color: #0f172a;
+      color: white;
+      border-radius: 6px;
+    }
+
+    .md-preview {
+      font-size: 0.875rem;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body class="bg-slate-50">
+  <!-- Top Navigation -->
+  <div class="border-b bg-white">
+    <div class="max-w-screen-2xl mx-auto">
+      <div class="flex items-center justify-between px-8 h-14">
+        <div class="flex items-center gap-x-3">
+          <div class="flex items-center gap-x-2">
+            <div class="w-8 h-8 bg-slate-900 rounded-xl flex items-center justify-center">
+              <i class="fa-solid fa-robot text-white text-lg"></i>
+            </div>
+            <div>
+              <span class="font-display text-xl font-semibold tracking-tight">3rdParty</span>
+              <span class="font-display text-xl font-semibold tracking-tight text-slate-400">Agent</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-x-4">
+          <div class="flex items-center gap-x-2 text-sm">
+            <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
+            <span class="text-slate-600">Acme Corp</span>
+          </div>
+          <div class="flex items-center gap-x-1.5">
+            <img src="https://i.pravatar.cc/28?img=47" class="w-7 h-7 rounded-full ring-2 ring-white">
+            <span class="text-sm font-medium">Kuntay Kunt</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-screen-2xl mx-auto flex">
+    
+    <!-- Sidebar -->
+    <div class="w-60 border-r bg-white min-h-screen p-4">
+      <div class="space-y-1">
+        <div class="flex items-center gap-x-3 px-3 py-2.5 text-sm font-medium rounded-xl bg-slate-900 text-white">
+          <i class="fa-solid fa-chart-line w-4"></i>
+          <span>Dashboard</span>
+        </div>
+        <div class="flex items-center gap-x-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">
+          <i class="fa-solid fa-sitemap w-4"></i>
+          <span>Organizasyon</span>
+        </div>
+        <div class="flex items-center gap-x-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">
+          <i class="fa-solid fa-users w-4"></i>
+          <span>Personel</span>
+        </div>
+        <div class="flex items-center gap-x-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">
+          <i class="fa-solid fa-robot w-4"></i>
+          <span>Ajanlar</span>
+        </div>
+      </div>
+
+      <div class="mt-8 px-3">
+        <div class="text-xs font-semibold text-slate-400 tracking-widest mb-2 px-3">ORGANİZASYON</div>
+        <div class="px-3 py-2 bg-slate-100 rounded-xl text-sm">
+          <div class="font-medium">Acme Corp</div>
+          <div class="text-xs text-slate-500">12 personel • 8 ajan</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 p-8">
+      
+      <!-- Header -->
+      <div class="flex items-end justify-between mb-8">
+        <div>
+          <h1 class="font-display text-3xl font-semibold tracking-tight">Organizasyon</h1>
+          <p class="text-slate-500 mt-1">Acme Corp • 12 personel, 8 aktif ajan</p>
+        </div>
+        <button onclick="showNewPersonModal()"
+                class="inline-flex items-center gap-x-2 bg-slate-900 hover:bg-black transition-colors text-white px-4 h-10 rounded-2xl text-sm font-medium">
+          <i class="fa-solid fa-plus"></i>
+          <span>Yeni Personel</span>
+        </button>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-4 gap-4 mb-8">
+        <div class="bg-white border rounded-3xl p-5">
+          <div class="text-sm text-slate-500">Toplam Personel</div>
+          <div class="text-4xl font-semibold mt-2 tracking-tighter">12</div>
+        </div>
+        <div class="bg-white border rounded-3xl p-5">
+          <div class="text-sm text-slate-500">Aktif Ajan</div>
+          <div class="text-4xl font-semibold mt-2 tracking-tighter text-emerald-600">8</div>
+        </div>
+        <div class="bg-white border rounded-3xl p-5">
+          <div class="text-sm text-slate-500">Departman</div>
+          <div class="text-4xl font-semibold mt-2 tracking-tighter">4</div>
+        </div>
+        <div class="bg-white border rounded-3xl p-5">
+          <div class="text-sm text-slate-500">Policy Dosyası</div>
+          <div class="text-4xl font-semibold mt-2 tracking-tighter">9</div>
+        </div>
+      </div>
+
+      <!-- Company.md Card -->
+      <div class="bg-white border rounded-3xl p-6 mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-x-3">
+            <i class="fa-solid fa-building text-xl text-slate-400"></i>
+            <div>
+              <div class="font-semibold">company.md</div>
+              <div class="text-xs text-slate-500">Vizyon • Misyon • Değerler • Hedefler</div>
+            </div>
+          </div>
+          <button class="text-xs px-3 py-1.5 rounded-2xl border text-slate-600 hover:bg-slate-50 flex items-center gap-x-2">
+            <i class="fa-solid fa-edit"></i>
+            <span>Düzenle</span>
+          </button>
+        </div>
+        
+        <div class="prose prose-sm max-w-none text-slate-600 md-preview">
+          <div class="font-medium text-slate-900 mb-1">Acme Corp</div>
+          <div><strong>Vizyon:</strong> Teknoloji ile iş süreçlerini dönüştüren lider organizasyon olmak.</div>
+          <div class="mt-3"><strong>Current Goals (Q2 2026):</strong></div>
+          <ul class="text-sm mt-1 space-y-1">
+            <li class="flex items-center gap-x-2"><input type="checkbox" checked class="accent-slate-900"> Agentic süreçleri 3 departmanda devreye almak</li>
+            <li class="flex items-center gap-x-2"><input type="checkbox" class="accent-slate-900"> 15 aktif ajan oluşturmak</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Organization Chart Preview -->
+      <div class="mb-8">
+        <div class="flex items-center justify-between mb-4 px-1">
+          <div class="font-semibold flex items-center gap-x-2">
+            <span>Organizasyon Şeması</span>
+          </div>
+          <button class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-x-1.5">
+            <span>Tam görünüm</span> <i class="fa-solid fa-arrow-right text-xs"></i>
+          </button>
+        </div>
+        
+        <!-- Mini Org Chart -->
+        <div class="bg-white border rounded-3xl p-8">
+          <div class="flex flex-col items-center">
+            <!-- CEO -->
+            <div class="org-card bg-white border px-5 py-3 rounded-2xl w-64 shadow-sm">
+              <div class="flex justify-between items-start">
+                <div>
+                  <div class="font-semibold">Jane Smith</div>
+                  <div class="text-xs text-slate-500">CEO</div>
+                </div>
+                <div>
+                  <span class="agent-badge bg-emerald-100 text-emerald-700">Active</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connector -->
+            <div class="h-6 w-px bg-slate-200 my-1"></div>
+            
+            <div class="flex gap-x-8">
+              <!-- CTO -->
+              <div class="org-card bg-white border px-4 py-3 rounded-2xl w-52 shadow-sm">
+                <div class="flex justify-between">
+                  <div>
+                    <div class="font-medium text-sm">John Doe</div>
+                    <div class="text-xs text-slate-500">CTO</div>
+                  </div>
+                  <span class="agent-badge bg-emerald-100 text-emerald-700 text-[10px]">Active</span>
+                </div>
+              </div>
+
+              <!-- CFO -->
+              <div class="org-card bg-white border px-4 py-3 rounded-2xl w-52 shadow-sm">
+                <div class="flex justify-between">
+                  <div>
+                    <div class="font-medium text-sm">Alice Brown</div>
+                    <div class="text-xs text-slate-500">CFO</div>
+                  </div>
+                  <span class="agent-badge bg-amber-100 text-amber-700 text-[10px]">Draft</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Personnel Grid -->
+      <div>
+        <div class="flex items-center justify-between mb-4 px-1">
+          <div class="font-semibold">Personel (12)</div>
+          <div class="text-sm text-slate-500">8 ajan aktif</div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <!-- Personel Card 1 -->
+          <div class="org-card bg-white border rounded-3xl p-5">
+            <div class="flex justify-between">
+              <div class="flex gap-x-3">
+                <img src="https://i.pravatar.cc/40?img=12" class="w-9 h-9 rounded-2xl">
+                <div>
+                  <div class="font-semibold">John Doe</div>
+                  <div class="text-xs text-slate-500">Senior Software Engineer</div>
+                </div>
+              </div>
+              <span class="agent-badge bg-emerald-100 text-emerald-700">Active</span>
+            </div>
+            <div class="mt-4 text-xs flex items-center gap-x-2 text-slate-400">
+              <i class="fa-solid fa-robot"></i>
+              <span>claude-sonnet-4-6</span>
+            </div>
+          </div>
+
+          <!-- Personel Card 2 -->
+          <div class="org-card bg-white border rounded-3xl p-5">
+            <div class="flex justify-between">
+              <div class="flex gap-x-3">
+                <img src="https://i.pravatar.cc/40?img=28" class="w-9 h-9 rounded-2xl">
+                <div>
+                  <div class="font-semibold">Sarah Chen</div>
+                  <div class="text-xs text-slate-500">Head of Marketing</div>
+                </div>
+              </div>
+              <span class="agent-badge bg-emerald-100 text-emerald-700">Active</span>
+            </div>
+            <div class="mt-4 text-xs flex items-center gap-x-2 text-slate-400">
+              <i class="fa-solid fa-robot"></i>
+              <span>claude-sonnet-4-6</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- New Person Modal -->
+  <div id="modal" onclick="hideModal()" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div onclick="event.stopImmediatePropagation()" class="bg-white w-full max-w-md rounded-3xl p-6">
+      <div class="font-semibold text-lg mb-4">Yeni Personel Ekle</div>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-slate-500">Ad Soyad</label>
+          <input type="text" class="w-full border rounded-2xl px-4 h-11 mt-1.5" placeholder="Ahmet Yılmaz">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500">Ünvan</label>
+          <input type="text" class="w-full border rounded-2xl px-4 h-11 mt-1.5" placeholder="Satış Müdürü">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500">Departman</label>
+          <select class="w-full border rounded-2xl px-4 h-11 mt-1.5">
+            <option>Satış</option>
+            <option>Pazarlama</option>
+            <option>Mühendislik</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="mt-6 flex gap-x-3">
+        <button onclick="hideModal()" class="flex-1 h-11 rounded-2xl border text-sm">İptal</button>
+        <button onclick="addPerson()" class="flex-1 h-11 rounded-2xl bg-slate-900 text-white text-sm">Personel Ekle</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showNewPersonModal() {
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('modal').classList.add('flex');
+    }
+    
+    function hideModal() {
+      document.getElementById('modal').classList.add('hidden');
+      document.getElementById('modal').classList.remove('flex');
+    }
+    
+    function addPerson() {
+      alert('Prototip: Personel eklendi (gerçek uygulamada API çağrısı yapılacak)');
+      hideModal();
+    }
+  </script>
+</body>
+</html>
