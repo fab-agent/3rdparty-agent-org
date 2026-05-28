@@ -62,7 +62,7 @@ def get_organization(org_id: str):
 
 # Personnel Endpoints
 @app.post("/personnel")
-def create_personnel(organization_id: str, name: str, slug: str, role: str):
+def create_personnel(organization_id: str, name: str, slug: str, role: str = None):
     with Session(engine) as session:
         person = Personnel(
             organization_id=organization_id,
@@ -75,8 +75,14 @@ def create_personnel(organization_id: str, name: str, slug: str, role: str):
         session.refresh(person)
         return person
 
+@app.get("/personnel")
+def list_personnel():
+    with Session(engine) as session:
+        personnel = session.exec(select(Personnel)).all()
+        return personnel
+
 @app.get("/organizations/{org_id}/personnel")
-def list_personnel(org_id: str):
+def list_personnel_by_org(org_id: str):
     with Session(engine) as session:
         personnel = session.exec(
             select(Personnel).where(Personnel.organization_id == org_id)

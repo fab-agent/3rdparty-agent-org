@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.env
+
+# Node
+node_modules/
+.svelte-kit/
+dist/
+build/
+
+# Data
+data/*.db
+*.db
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

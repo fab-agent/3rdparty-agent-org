@@ -14,8 +14,6 @@ services:
     environment:
       - DATABASE_URL=sqlite:///./data/app.db
       - ENVIRONMENT=development
-    depends_on:
-      - frontend
     restart: unless-stopped
 
   frontend:
@@ -30,6 +28,8 @@ services:
       - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:
