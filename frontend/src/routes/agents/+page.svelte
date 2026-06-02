@@ -1,53 +1,25 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Badge from '$lib/components/ui/badge.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Table from '$lib/components/ui/table.svelte';
-	import { Plus, Pencil, Trash2, Bot, Sparkles, X, Check, ChevronDown } from '@lucide/svelte';
+	import { Plus, Pencil, Trash2, Bot, Sparkles, X, Check, Loader, GitPullRequest } from '@lucide/svelte';
+	import { personnel as personnelApi, type PersonnelItem } from '$lib/api/personnel';
+	import { departments as deptApi, type Department } from '$lib/api/departments';
+	import { companyStore } from '$lib/stores/company.svelte';
+	import { changeRequests as crApi } from '$lib/api/change_requests';
+	import { t } from '$lib/i18n/index.svelte';
 
-	// ── Types ──────────────────────────────────────────────────────────────────
-	type Skill = { name: string; version: string; description: string };
-
-	type Agent = {
-		id: number;
-		name: string;
-		slug: string;
-		title: string;
-		model: string;
-		modelVersion: string;
-		status: 'active' | 'draft' | 'inactive';
-		department: string;
-		responsibleHuman: string;
-		jobDescription: string;
-		skills: Skill[];
-		policies: string[];
-	};
-
-	// ── Static data ────────────────────────────────────────────────────────────
+	// ── Static config ─────────────────────────────────────────────────────────
 	const MODELS = [
-		{ value: 'claude-sonnet-4',  label: 'Claude Sonnet 4'  },
-		{ value: 'claude-opus-4',    label: 'Claude Opus 4'    },
-		{ value: 'gpt-4o',           label: 'GPT-4o'           },
-		{ value: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro'   },
-		{ value: 'grok-4.3',         label: 'Grok 4.3'         },
+		{ value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+		{ value: 'claude-opus-4-7',   label: 'Claude Opus 4.7'   },
+		{ value: 'gpt-4o',            label: 'GPT-4o'            },
+		{ value: 'gemini-2.5-pro',    label: 'Gemini 2.5 Pro'    },
+		{ value: 'grok-4.3',          label: 'Grok 4.3'          },
 	];
 
-	const DEPARTMENTS = [
-		'Yazılım Geliştirme',
-		'Kalite Güvence',
-		'Pazarlama',
-		'Finans',
-		'İnsan Kaynakları',
-		'Operasyon',
-		'Yönetim',
-	];
-
-	const HUMANS = [
-		'Kuntay Kunt', 'Ahmet Şahin', 'Elif Yıldız',
-		'Burak Demir', 'Selin Kaya', 'Mert Arslan',
-	];
-
-	/** Policy kütüphanesi: departmana göre önerilen policy'ler */
 	const DEPT_POLICIES: Record<string, string[]> = {
 		'Yazılım Geliştirme': ['Yazılım Kalite Politikası', 'Güvenlik Politikası', 'Code Review SLA', 'Deployment Politikası'],
 		'Kalite Güvence':     ['QA Politikası', 'Test Coverage SLA', 'Bug Raporlama Prosedürü'],
@@ -58,27 +30,27 @@
 		'Yönetim':            ['Şirket Politikası', 'Etik Kurallar', 'Karar Yetki Matrisi'],
 	};
 
-	/** Skill kütüphanesi */
-	const SKILL_LIBRARY: Skill[] = [
-		{ name: 'Code Review',    version: '2.1', description: 'PR inceleme ve best practice kontrolü' },
-		{ name: 'TypeScript',     version: '5.x', description: 'Tip güvenliği analizi ve refactor' },
-		{ name: 'Git Workflow',   version: '1.0', description: 'Branch stratejisi ve commit standardı' },
+	type LocalSkill = { name: string; version: string; description: string };
+
+	const SKILL_LIBRARY: LocalSkill[] = [
+		{ name: 'Code Review',    version: '2.1',  description: 'PR inceleme ve best practice kontrolü' },
+		{ name: 'TypeScript',     version: '5.x',  description: 'Tip güvenliği analizi ve refactor' },
+		{ name: 'Git Workflow',   version: '1.0',  description: 'Branch stratejisi ve commit standardı' },
 		{ name: 'Docker',         version: '24.x', description: 'Container build ve orchestration' },
-		{ name: 'GitHub Actions', version: '3.x', description: 'CI/CD pipeline yönetimi' },
-		{ name: 'Monitoring',     version: '1.2', description: 'Deploy sonrası sağlık kontrolü' },
-		{ name: 'Test Generation',version: '1.3', description: 'Otomatik test yazımı (Playwright/Vitest)' },
-		{ name: 'Bug Triage',     version: '1.0', description: 'Hata önceliklendirme ve analiz' },
-		{ name: 'Copywriting',    version: '2.0', description: 'Blog ve landing page içerik üretimi' },
-		{ name: 'SEO',            version: '1.4', description: 'Anahtar kelime ve içerik optimizasyonu' },
-		{ name: 'Social Media',   version: '1.1', description: 'Çoklu platform içerik takvimi' },
-		{ name: 'Data Analysis',  version: '1.0', description: 'GA4, Mixpanel ve SQL raporlama' },
-		{ name: 'Visualization',  version: '0.9', description: 'Dashboard ve performans raporları' },
-		{ name: 'Forecasting',    version: '1.2', description: 'Nakit akışı ve senaryo analizi' },
-		{ name: 'Reporting',      version: '2.0', description: 'Aylık/çeyreklik finansal raporlar' },
-		{ name: 'Compliance',     version: '1.0', description: 'Vergi ve yasal uyumluluk kontrolü' },
+		{ name: 'GitHub Actions', version: '3.x',  description: 'CI/CD pipeline yönetimi' },
+		{ name: 'Monitoring',     version: '1.2',  description: 'Deploy sonrası sağlık kontrolü' },
+		{ name: 'Test Generation',version: '1.3',  description: 'Otomatik test yazımı (Playwright/Vitest)' },
+		{ name: 'Bug Triage',     version: '1.0',  description: 'Hata önceliklendirme ve analiz' },
+		{ name: 'Copywriting',    version: '2.0',  description: 'Blog ve landing page içerik üretimi' },
+		{ name: 'SEO',            version: '1.4',  description: 'Anahtar kelime ve içerik optimizasyonu' },
+		{ name: 'Social Media',   version: '1.1',  description: 'Çoklu platform içerik takvimi' },
+		{ name: 'Data Analysis',  version: '1.0',  description: 'GA4, Mixpanel ve SQL raporlama' },
+		{ name: 'Visualization',  version: '0.9',  description: 'Dashboard ve performans raporları' },
+		{ name: 'Forecasting',    version: '1.2',  description: 'Nakit akışı ve senaryo analizi' },
+		{ name: 'Reporting',      version: '2.0',  description: 'Aylık/çeyreklik finansal raporlar' },
+		{ name: 'Compliance',     version: '1.0',  description: 'Vergi ve yasal uyumluluk kontrolü' },
 	];
 
-	/** Keyword → skill önerisi haritası */
 	const KEYWORD_MAP: Array<[RegExp, string[]]> = [
 		[/kod|yazılım|geliştirme|backend|frontend|typescript/i, ['Code Review', 'TypeScript', 'Git Workflow']],
 		[/deploy|ci|cd|docker|container|kubernetes/i,           ['Docker', 'GitHub Actions', 'Monitoring']],
@@ -86,6 +58,20 @@
 		[/pazarlama|içerik|blog|sosyal|marka|seo/i,             ['Copywriting', 'SEO', 'Social Media']],
 		[/veri|analiz|analitik|dashboard|rapor|sql/i,           ['Data Analysis', 'Visualization']],
 		[/finans|muhasebe|bütçe|fatura|vergi/i,                 ['Forecasting', 'Reporting', 'Compliance']],
+	];
+
+	const SKILL_TYPES = [
+		{ value: 'builtin',  label: 'Dahili',   hint: 'Platform hazır araçları' },
+		{ value: 'mcp',      label: 'MCP',       hint: 'Model Context Protocol sunucusu' },
+		{ value: 'http',     label: 'HTTP API',  hint: 'REST webhook veya API' },
+		{ value: 'function', label: 'Fonksiyon', hint: 'Özel Python kodu' },
+	];
+
+	const BUILTIN_FUNCTIONS = [
+		{ value: 'web_search',     label: 'Web Arama' },
+		{ value: 'code_execution', label: 'Kod Çalıştırma' },
+		{ value: 'file_read',      label: 'Dosya Okuma' },
+		{ value: 'text_to_chart',  label: 'Grafik Üretimi' },
 	];
 
 	function slugify(text: string): string {
@@ -96,106 +82,62 @@
 			.replace(/\s+/g,'-').replace(/-+/g,'-');
 	}
 
-	// ── Agent listesi (mock) ────────────────────────────────────────────────────
-	let agents: Agent[] = $state([
-		{
-			id: 1, name: 'CodeGuard', slug: 'codeguard',
-			title: 'Code Review Agent', model: 'claude-sonnet-4', modelVersion: '4.6',
-			status: 'active', department: 'Yazılım Geliştirme', responsibleHuman: 'Elif Yıldız',
-			jobDescription: 'Kod kalitesini artırmak, PR incelemek ve güvenlik açıklarını tespit etmek',
-			skills: [
-				{ name: 'Code Review', version: '2.1', description: 'PR inceleme ve best practice kontrolü' },
-				{ name: 'TypeScript', version: '5.x', description: 'Tip güvenliği analizi ve refactor' },
-				{ name: 'Git Workflow', version: '1.0', description: 'Branch stratejisi ve commit standardı' },
-			],
-			policies: ['Yazılım Kalite Politikası', 'Güvenlik Politikası', 'Code Review SLA'],
-		},
-		{
-			id: 2, name: 'DeployBot', slug: 'deploybot',
-			title: 'Deploy & CI Agent', model: 'gpt-4o', modelVersion: '2024-11',
-			status: 'active', department: 'Yazılım Geliştirme', responsibleHuman: 'Elif Yıldız',
-			jobDescription: 'CI/CD pipeline yönetmek, deployment süreçlerini otomatize etmek',
-			skills: [
-				{ name: 'Docker', version: '24.x', description: 'Container build ve orchestration' },
-				{ name: 'GitHub Actions', version: '3.x', description: 'CI/CD pipeline yönetimi' },
-				{ name: 'Monitoring', version: '1.2', description: 'Deploy sonrası sağlık kontrolü' },
-			],
-			policies: ['Deployment Politikası', 'Güvenlik Politikası'],
-		},
-		{
-			id: 3, name: 'TestMind', slug: 'testmind',
-			title: 'QA Automation Agent', model: 'claude-sonnet-4', modelVersion: '4.6',
-			status: 'active', department: 'Kalite Güvence', responsibleHuman: 'Burak Demir',
-			jobDescription: 'Otomatik test yazımı, hata tespiti ve QA süreçlerini yönetmek',
-			skills: [
-				{ name: 'Test Generation', version: '1.3', description: 'Otomatik test yazımı' },
-				{ name: 'Bug Triage', version: '1.0', description: 'Hata önceliklendirme ve analiz' },
-			],
-			policies: ['QA Politikası', 'Test Coverage SLA'],
-		},
-		{
-			id: 4, name: 'ContentFlow', slug: 'contentflow',
-			title: 'Content & SEO Agent', model: 'claude-sonnet-4', modelVersion: '4.6',
-			status: 'active', department: 'Pazarlama', responsibleHuman: 'Selin Kaya',
-			jobDescription: 'İçerik üretimi, SEO optimizasyonu ve sosyal medya takvimi',
-			skills: [
-				{ name: 'Copywriting', version: '2.0', description: 'Blog ve landing page içerik üretimi' },
-				{ name: 'SEO', version: '1.4', description: 'Anahtar kelime ve içerik optimizasyonu' },
-				{ name: 'Social Media', version: '1.1', description: 'Çoklu platform içerik takvimi' },
-			],
-			policies: ['İçerik Politikası', 'Marka Politikası', 'KVKK Uyumluluk'],
-		},
-		{
-			id: 5, name: 'DataLens', slug: 'datalens',
-			title: 'Analytics Agent', model: 'gemini-2.5-pro', modelVersion: '2025-05',
-			status: 'draft', department: 'Pazarlama', responsibleHuman: 'Selin Kaya',
-			jobDescription: 'Veri analizi, dashboard oluşturma ve pazarlama raporları',
-			skills: [
-				{ name: 'Data Analysis', version: '1.0', description: 'GA4 ve SQL raporlama' },
-				{ name: 'Visualization', version: '0.9', description: 'Dashboard ve performans raporları' },
-			],
-			policies: ['Analitik Veri Politikası'],
-		},
-		{
-			id: 6, name: 'LedgerAI', slug: 'ledgerai',
-			title: 'Finance & Reporting Agent', model: 'gpt-4o', modelVersion: '2024-11',
-			status: 'active', department: 'Finans', responsibleHuman: 'Mert Arslan',
-			jobDescription: 'Finansal raporlama, nakit akışı tahmini ve uyumluluk kontrolleri',
-			skills: [
-				{ name: 'Forecasting', version: '1.2', description: 'Nakit akışı ve senaryo analizi' },
-				{ name: 'Reporting', version: '2.0', description: 'Aylık/çeyreklik finansal raporlar' },
-				{ name: 'Compliance', version: '1.0', description: 'Vergi ve yasal uyumluluk kontrolü' },
-			],
-			policies: ['Finans Politikası', 'Uyumluluk Politikası', 'Veri Güvenliği'],
-		},
-	]);
+	// ── API data ──────────────────────────────────────────────────────────────
+	let agents = $state<PersonnelItem[]>([]);
+	let depts = $state<Department[]>([]);
+	let humanPersonnel = $state<PersonnelItem[]>([]);
+	let loading = $state(true);
+	let error: string | null = $state(null);
+	let saving = $state(false);
+
+	async function load() {
+		loading = true;
+		error = null;
+		try {
+			[agents, depts, humanPersonnel] = await Promise.all([
+				personnelApi.list({ type: 'agent', company_id: companyStore.active?.id }),
+				deptApi.list(companyStore.active?.id),
+				personnelApi.list({ type: 'human', company_id: companyStore.active?.id }),
+			]);
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			loading = false;
+		}
+	}
+
+	onMount(load);
+
+	$effect(() => {
+		if (companyStore.active) load();
+	});
 
 	// ── Form state ─────────────────────────────────────────────────────────────
-	let showPanel      = $state(false);
-	let editingAgent: Agent | null = $state(null);
+	let showPanel = $state(false);
+	let editingId: string | null = $state(null);
 
 	const emptyForm = () => ({
 		name: '', slug: '', title: '',
-		model: 'claude-sonnet-4', modelVersion: '',
-		status: 'draft' as Agent['status'],
-		department: '', responsibleHuman: '',
+		model: 'claude-sonnet-4-6',
+		status: 'draft' as 'active' | 'draft' | 'inactive',
+		department_id: '',
+		responsible_id: '',
 		jobDescription: '',
-		selectedSkills: [] as Skill[],
+		selectedSkills: [] as LocalSkill[],
 		selectedPolicies: [] as string[],
 	});
 
 	let form = $state(emptyForm());
 
-	// Slug otomatik üret (sadece yeni ajan)
+	const selectedDeptName = $derived(depts.find(d => d.id === form.department_id)?.name ?? '');
+
 	$effect(() => {
-		if (!editingAgent) form.slug = slugify(form.name);
+		if (editingId === null) form.slug = slugify(form.name);
 	});
 
-	// Departman değişince önerilen policy'leri otomatik seç
 	$effect(() => {
-		if (!form.department) return;
-		const suggested = DEPT_POLICIES[form.department] ?? [];
-		// Mevcut seçili policy'leri koru, yenileri ekle (duplicate olmadan)
+		if (!selectedDeptName) return;
+		const suggested = DEPT_POLICIES[selectedDeptName] ?? [];
 		for (const p of suggested) {
 			if (!form.selectedPolicies.includes(p)) {
 				form.selectedPolicies = [...form.selectedPolicies, p];
@@ -204,26 +146,30 @@
 	});
 
 	function openCreate() {
-		editingAgent = null;
+		editingId = null;
 		form = emptyForm();
 		suggestedSkills = [];
 		showPanel = true;
 	}
 
-	function openEdit(agent: Agent) {
-		editingAgent = agent;
+	function openEdit(agent: PersonnelItem) {
+		editingId = agent.id;
+		const cfg = agent.agent_config;
 		form = {
-			name:            agent.name,
-			slug:            agent.slug,
-			title:           agent.title,
-			model:           agent.model,
-			modelVersion:    agent.modelVersion,
-			status:          agent.status,
-			department:      agent.department,
-			responsibleHuman: agent.responsibleHuman,
-			jobDescription:  agent.jobDescription,
-			selectedSkills:  [...agent.skills],
-			selectedPolicies: [...agent.policies],
+			name: agent.name,
+			slug: agent.slug,
+			title: agent.title ?? '',
+			model: cfg?.model ?? 'claude-sonnet-4-6',
+			status: cfg?.status ?? 'draft',
+			department_id: agent.department_id ?? '',
+			responsible_id: cfg?.responsible_id ?? '',
+			jobDescription: agent.role ?? '',
+			selectedSkills: (cfg?.skills ?? []).map(s => ({
+				name: s.name,
+				version: s.version,
+				description: s.description ?? '',
+			})),
+			selectedPolicies: [],
 		};
 		suggestedSkills = [];
 		showPanel = true;
@@ -231,53 +177,92 @@
 
 	function closePanel() {
 		showPanel = false;
-		editingAgent = null;
+		editingId = null;
 	}
 
-	function saveAgent() {
+	async function saveAgent() {
 		if (!form.name || !form.title) return;
+		saving = true;
+		try {
+			const personnelPayload = {
+				name: form.name,
+				slug: form.slug,
+				title: form.title || undefined,
+				role: form.jobDescription || undefined,
+				type: 'agent' as const,
+				department_id: form.department_id || undefined,
+			};
+			const configPayload = {
+				model: form.model,
+				status: form.status,
+				responsible_id: form.responsible_id || undefined,
+			};
 
-		const agentData: Agent = {
-			id:               editingAgent?.id ?? Math.max(0, ...agents.map(a => a.id)) + 1,
-			name:             form.name,
-			slug:             form.slug,
-			title:            form.title,
-			model:            form.model,
-			modelVersion:     form.modelVersion,
-			status:           form.status,
-			department:       form.department,
-			responsibleHuman: form.responsibleHuman,
-			jobDescription:   form.jobDescription,
-			skills:           form.selectedSkills,
-			policies:         form.selectedPolicies,
-		};
-
-		if (editingAgent) {
-			agents = agents.map(a => a.id === editingAgent!.id ? agentData : a);
-		} else {
-			agents = [...agents, agentData];
+			if (editingId) {
+				await personnelApi.update(editingId, personnelPayload);
+				await personnelApi.updateAgentConfig(editingId, configPayload);
+				const existingSkills = agents.find(a => a.id === editingId)?.agent_config?.skills ?? [];
+				for (const s of existingSkills) {
+					try { await personnelApi.deleteSkill(editingId, s.id); } catch {}
+				}
+				for (const s of form.selectedSkills) {
+					await personnelApi.addSkill(editingId, s);
+				}
+			} else {
+				const created = await personnelApi.create(personnelPayload);
+				await personnelApi.createAgentConfig(created.id, configPayload);
+				for (const s of form.selectedSkills) {
+					await personnelApi.addSkill(created.id, s);
+				}
+			}
+			await load();
+			closePanel();
+		} catch (e) {
+			alert((e as Error).message);
+		} finally {
+			saving = false;
 		}
-		closePanel();
 	}
 
-	// ── Delete ─────────────────────────────────────────────────────────────────
-	let deleteTarget: Agent | null = $state(null);
+	// ── Delete ────────────────────────────────────────────────────────────────
+	let deleteTarget: PersonnelItem | null = $state(null);
 	let showDeleteDialog = $state(false);
+	let deleting = $state(false);
 
-	function requestDelete(agent: Agent) { deleteTarget = agent; showDeleteDialog = true; }
-	function cancelDelete()              { deleteTarget = null; showDeleteDialog = false; }
-	function confirmDelete() {
+	function requestDelete(agent: PersonnelItem) { deleteTarget = agent; showDeleteDialog = true; }
+	function cancelDelete() { deleteTarget = null; showDeleteDialog = false; }
+
+	async function confirmDelete() {
 		if (!deleteTarget) return;
-		agents = agents.filter(a => a.id !== deleteTarget!.id);
-		cancelDelete();
+		deleting = true;
+		try {
+			await personnelApi.delete(deleteTarget.id);
+			agents = agents.filter(a => a.id !== deleteTarget!.id);
+			cancelDelete();
+		} catch (e) {
+			alert((e as Error).message);
+		} finally {
+			deleting = false;
+		}
 	}
 
-	// ── Skill kütüphanesi toggle ───────────────────────────────────────────────
+	// ── Stats ─────────────────────────────────────────────────────────────────
+	const totalActive = $derived(agents.filter(a => a.agent_config?.status === 'active').length);
+	const totalDraft  = $derived(agents.filter(a => a.agent_config?.status === 'draft').length);
+
+	const STATUS_BADGE: Record<string, 'default' | 'secondary' | 'destructive'> = {
+		active: 'default', draft: 'secondary', inactive: 'destructive'
+	};
+	const STATUS_LABEL: Record<string, string> = {
+		active: 'Aktif', draft: 'Taslak', inactive: 'Pasif'
+	};
+
+	// ── Skill helpers ─────────────────────────────────────────────────────────
 	function isSkillSelected(name: string): boolean {
 		return form.selectedSkills.some(s => s.name === name);
 	}
 
-	function toggleLibrarySkill(skill: Skill) {
+	function toggleLibrarySkill(skill: LocalSkill) {
 		if (isSkillSelected(skill.name)) {
 			form.selectedSkills = form.selectedSkills.filter(s => s.name !== skill.name);
 		} else {
@@ -285,42 +270,46 @@
 		}
 	}
 
-	// ── Custom skill ──────────────────────────────────────────────────────────
-	let customSkill = $state({ name: '', version: '', description: '' });
+	let customSkill = $state({
+		name: '', version: '', description: '',
+		skill_type: 'builtin' as string,
+		mcp_url: '', mcp_transport: 'sse', mcp_auth_type: 'none', mcp_auth_value: '',
+		http_url: '', http_method: 'POST',
+		builtin_fn: 'web_search',
+		fn_code: '',
+	});
 
 	function addCustomSkill() {
 		const { name, version, description } = customSkill;
 		if (!name.trim()) return;
 		if (isSkillSelected(name)) return;
-		form.selectedSkills = [...form.selectedSkills, { name: name.trim(), version: version.trim() || '1.0', description: description.trim() }];
-		customSkill = { name: '', version: '', description: '' };
+		form.selectedSkills = [...form.selectedSkills, {
+			name: name.trim(),
+			version: version.trim() || '1.0',
+			description: description.trim(),
+		}];
+		customSkill = { ...customSkill, name: '', version: '', description: '', mcp_url: '', http_url: '', fn_code: '' };
 	}
 
-	// ── AI Skill önerisi (simülasyon) ─────────────────────────────────────────
-	let isAnalyzing     = $state(false);
-	let suggestedSkills: Skill[] = $state([]);
+	// ── AI skill suggestion ───────────────────────────────────────────────────
+	let isAnalyzing = $state(false);
+	let suggestedSkills: LocalSkill[] = $state([]);
 
 	async function analyzeJobDescription() {
 		if (!form.jobDescription.trim()) return;
 		isAnalyzing = true;
 		suggestedSkills = [];
-
 		await new Promise(r => setTimeout(r, 1600));
-
 		const text = form.jobDescription;
 		const found = new Set<string>();
 		for (const [pattern, skills] of KEYWORD_MAP) {
 			if (pattern.test(text)) skills.forEach(s => found.add(s));
 		}
-
-		// Zaten seçili olanları çıkar
-		suggestedSkills = SKILL_LIBRARY.filter(
-			s => found.has(s.name) && !isSkillSelected(s.name)
-		);
+		suggestedSkills = SKILL_LIBRARY.filter(s => found.has(s.name) && !isSkillSelected(s.name));
 		isAnalyzing = false;
 	}
 
-	function acceptSuggestion(skill: Skill) {
+	function acceptSuggestion(skill: LocalSkill) {
 		form.selectedSkills = [...form.selectedSkills, { ...skill }];
 		suggestedSkills = suggestedSkills.filter(s => s.name !== skill.name);
 	}
@@ -329,7 +318,7 @@
 		suggestedSkills = suggestedSkills.filter(s => s.name !== skillName);
 	}
 
-	// ── Policy toggle ─────────────────────────────────────────────────────────
+	// ── Policy helpers ────────────────────────────────────────────────────────
 	function togglePolicy(policy: string) {
 		if (form.selectedPolicies.includes(policy)) {
 			form.selectedPolicies = form.selectedPolicies.filter(p => p !== policy);
@@ -346,20 +335,57 @@
 		customPolicy = '';
 	}
 
-	// ── Helpers ───────────────────────────────────────────────────────────────
-	const STATUS_BADGE: Record<string, 'default' | 'secondary' | 'destructive'> = {
-		active: 'default', draft: 'secondary', inactive: 'destructive'
-	};
-	const STATUS_LABEL: Record<string, string> = {
-		active: 'Aktif', draft: 'Taslak', inactive: 'Pasif'
-	};
+	// ── Change Request dialog ─────────────────────────────────────────────────
+	let crTarget: PersonnelItem | null = $state(null);
+	let showCrDialog = $state(false);
+	let crForm = $state({ change_type: 'agent_config' as 'agent_config' | 'skill' | 'policy', title: '', proposed_json: '' });
+	let crSaving = $state(false);
 
-	const totalActive = $derived(agents.filter(a => a.status === 'active').length);
-	const totalDraft  = $derived(agents.filter(a => a.status === 'draft').length);
+	function openCrDialog(agent: PersonnelItem) {
+		crTarget = agent;
+		const cfg = agent.agent_config;
+		crForm = {
+			change_type: 'agent_config',
+			title: `${agent.name} - Yapılandırma Değişikliği`,
+			proposed_json: JSON.stringify({ model: cfg?.model, status: cfg?.status, responsible_id: cfg?.responsible_id }, null, 2),
+		};
+		showCrDialog = true;
+	}
+
+	function setCrType(t: typeof crForm.change_type) {
+		crForm.change_type = t;
+		if (!crTarget) return;
+		const cfg = crTarget.agent_config;
+		if (t === 'agent_config') {
+			crForm.proposed_json = JSON.stringify({ model: cfg?.model, status: cfg?.status, responsible_id: cfg?.responsible_id }, null, 2);
+		} else if (t === 'skill') {
+			crForm.proposed_json = JSON.stringify({ name: '', version: '1.0', description: '' }, null, 2);
+		} else {
+			crForm.proposed_json = JSON.stringify({ policy_name: '', content: '' }, null, 2);
+		}
+	}
+
+	async function submitCr() {
+		if (!crTarget || !crForm.title) return;
+		crSaving = true;
+		try {
+			let proposed: Record<string, unknown>;
+			try { proposed = JSON.parse(crForm.proposed_json); } catch { proposed = { raw: crForm.proposed_json }; }
+			await crApi.create({
+				personnel_id: crTarget.id,
+				change_type: crForm.change_type,
+				title: crForm.title,
+				proposed,
+			}, companyStore.active?.id ?? '');
+			showCrDialog = false;
+			crTarget = null;
+		} catch (e) { alert((e as Error).message); }
+		finally { crSaving = false; }
+	}
 </script>
 
 <svelte:head>
-	<title>Ajanlar • 3rdParty Agent</title>
+	<title>Ajanlar • fab.engineering</title>
 </svelte:head>
 
 <!-- ── Page ──────────────────────────────────────────────────────────────── -->
@@ -368,43 +394,52 @@
 	<!-- Header -->
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<div>
-			<h1 class="font-display text-3xl tracking-tight">Ajanlar</h1>
-			<p class="text-muted-foreground mt-1">Ajan oluştur, düzenle ve yapılandır</p>
+			<h1 class="font-display text-3xl tracking-tight">{t('agent_title')}</h1>
+			<p class="text-muted-foreground mt-1">{t('agent_subtitle')}</p>
 		</div>
 		<Button onclick={openCreate} class="w-full sm:w-auto">
 			<Plus class="h-4 w-4" />
-			Yeni Ajan
+			{t('agent_new')}
 		</Button>
 	</div>
 
 	<!-- Stats -->
 	<div class="grid grid-cols-3 gap-3">
 		<div class="rounded-xl border bg-card px-4 py-3">
-			<div class="text-xs text-muted-foreground">Toplam</div>
+			<div class="text-xs text-muted-foreground">{t('agent_stat_total')}</div>
 			<div class="text-2xl font-semibold tracking-tight mt-0.5">{agents.length}</div>
 		</div>
 		<div class="rounded-xl border bg-card px-4 py-3">
-			<div class="text-xs text-muted-foreground">Aktif</div>
+			<div class="text-xs text-muted-foreground">{t('agent_stat_active')}</div>
 			<div class="text-2xl font-semibold tracking-tight mt-0.5 text-emerald-600">{totalActive}</div>
 		</div>
 		<div class="rounded-xl border bg-card px-4 py-3">
-			<div class="text-xs text-muted-foreground">Taslak</div>
+			<div class="text-xs text-muted-foreground">{t('agent_stat_draft')}</div>
 			<div class="text-2xl font-semibold tracking-tight mt-0.5 text-amber-500">{totalDraft}</div>
 		</div>
 	</div>
 
-	<!-- Table -->
-	{#if agents.length === 0}
+	<!-- Loading / Error / Table -->
+	{#if loading}
+		<div class="flex items-center justify-center py-20 text-muted-foreground gap-2">
+			<Loader class="w-5 h-5 animate-spin" />
+			<span class="text-sm">{t('loading')}</span>
+		</div>
+	{:else if error}
+		<div class="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+			{error}
+		</div>
+	{:else if agents.length === 0}
 		<div class="rounded-xl border bg-card flex flex-col items-center justify-center py-20 text-center gap-3">
 			<div class="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
 				<Bot class="w-6 h-6 text-violet-600" />
 			</div>
 			<div>
-				<p class="font-medium">Henüz ajan yok</p>
-				<p class="text-sm text-muted-foreground mt-1">İlk ajanı oluşturmak için butona tıklayın.</p>
+				<p class="font-medium">{t('agent_empty')}</p>
+				<p class="text-sm text-muted-foreground mt-1">{t('agent_empty_subtitle')}</p>
 			</div>
 			<Button onclick={openCreate} size="sm" class="mt-2">
-				<Plus class="h-4 w-4" /> Yeni Ajan
+				<Plus class="h-4 w-4" /> {t('agent_new')}
 			</Button>
 		</div>
 	{:else}
@@ -412,12 +447,12 @@
 			<Table>
 				<thead>
 					<tr class="border-b bg-muted/50 text-left text-sm font-medium text-muted-foreground">
-						<th class="h-12 px-4">Ajan</th>
-						<th class="h-12 px-4 hidden md:table-cell">Model</th>
-						<th class="h-12 px-4 hidden lg:table-cell">Sorumlu</th>
-						<th class="h-12 px-4 hidden lg:table-cell">Departman</th>
-						<th class="h-12 px-4">Durum</th>
-						<th class="h-12 w-[88px] px-4 text-right">İşlemler</th>
+						<th class="h-12 px-4">{t('agent_col_agent')}</th>
+						<th class="h-12 px-4 hidden md:table-cell">{t('agent_col_model')}</th>
+						<th class="h-12 px-4 hidden lg:table-cell">{t('agent_col_responsible')}</th>
+						<th class="h-12 px-4 hidden lg:table-cell">{t('agent_col_dept')}</th>
+						<th class="h-12 px-4">{t('agent_col_status')}</th>
+						<th class="h-12 w-[120px] px-4 text-right">{t('agent_col_actions')}</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y">
@@ -430,26 +465,33 @@
 									</div>
 									<div>
 										<div class="font-medium text-sm">{agent.name}</div>
-										<div class="text-xs text-muted-foreground">{agent.title}</div>
+										<div class="text-xs text-muted-foreground">{agent.title ?? agent.role ?? ''}</div>
 									</div>
 								</div>
 							</td>
 							<td class="px-4 py-3 hidden md:table-cell">
 								<span class="text-xs font-mono bg-violet-50 text-violet-700 border border-violet-200 rounded-md px-2 py-0.5">
-									{agent.model}
+									{agent.agent_config?.model ?? '—'}
 								</span>
 							</td>
-							<td class="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{agent.responsibleHuman}</td>
-							<td class="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{agent.department}</td>
+							<td class="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">
+								{agent.agent_config?.responsible_name ?? '—'}
+							</td>
+							<td class="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">
+								{agent.department_name ?? '—'}
+							</td>
 							<td class="px-4 py-3">
-								<Badge variant={STATUS_BADGE[agent.status]}>{STATUS_LABEL[agent.status]}</Badge>
+								<Badge variant={STATUS_BADGE[agent.agent_config?.status ?? 'draft']}>{(() => { const s = agent.agent_config?.status ?? 'draft'; return s === 'active' ? t('status_active') : s === 'draft' ? t('status_draft') : t('status_inactive'); })()}</Badge>
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex justify-end gap-1">
-									<Button variant="ghost" size="icon" onclick={() => openEdit(agent)} aria-label="Düzenle">
+									<Button variant="ghost" size="icon" onclick={() => openCrDialog(agent)} aria-label={t('agent_cr_btn')} title={t('agent_cr_tooltip')} class="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
+										<GitPullRequest class="h-4 w-4" />
+									</Button>
+									<Button variant="ghost" size="icon" onclick={() => openEdit(agent)} aria-label={t('edit')}>
 										<Pencil class="h-4 w-4" />
 									</Button>
-									<Button variant="ghost" size="icon" onclick={() => requestDelete(agent)} aria-label="Sil"
+									<Button variant="ghost" size="icon" onclick={() => requestDelete(agent)} aria-label={t('delete')}
 										class="text-destructive hover:text-destructive hover:bg-destructive/10">
 										<Trash2 class="h-4 w-4" />
 									</Button>
@@ -465,23 +507,22 @@
 
 <!-- ── Form Panel ────────────────────────────────────────────────────────── -->
 {#if showPanel}
-	<!-- Backdrop -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="fixed inset-0 bg-black/30 z-30 lg:hidden" onclick={closePanel} aria-hidden="true"></div>
 
-	<aside class="agent-panel" aria-label="Ajan Formu">
+	<aside class="agent-panel" aria-label={t('agent_title')}>
 
 		<!-- Panel Header -->
 		<div class="panel-hdr">
 			<div>
 				<h2 class="font-display text-lg tracking-tight">
-					{editingAgent ? 'Ajanı Düzenle' : 'Yeni Ajan Oluştur'}
+					{editingId ? t('agent_edit_title') : t('agent_create_title')}
 				</h2>
 				<p class="text-xs text-muted-foreground mt-0.5">
-					{editingAgent ? 'Ajan yapılandırmasını güncelleyin.' : 'Yeni bir AI ajan tanımlayın.'}
+					{editingId ? t('agent_edit_subtitle') : t('agent_create_subtitle')}
 				</p>
 			</div>
-			<Button variant="ghost" size="icon" onclick={closePanel} aria-label="Kapat">
+			<Button variant="ghost" size="icon" onclick={closePanel} aria-label={t('close')}>
 				<X class="w-4 h-4" />
 			</Button>
 		</div>
@@ -491,26 +532,26 @@
 
 			<!-- ① Temel Bilgiler -->
 			<section class="form-section">
-				<div class="section-title">Temel Bilgiler</div>
+				<div class="section-title">{t('agent_basic_info')}</div>
 				<div class="space-y-3">
 					<div class="field">
-						<label for="ag-name">Ajan Adı</label>
+						<label for="ag-name">{t('agent_name_label')}</label>
 						<Input id="ag-name" bind:value={form.name} placeholder="CodeGuard" autocomplete="off" />
 					</div>
 					<div class="field">
-						<label for="ag-slug">Slug</label>
+						<label for="ag-slug">{t('agent_slug_label')}</label>
 						<Input id="ag-slug" bind:value={form.slug} placeholder="codeguard" class="font-mono text-xs" autocomplete="off" />
 					</div>
 					<div class="field">
-						<label for="ag-title">Ünvan / Rol</label>
+						<label for="ag-title">{t('agent_title_label')}</label>
 						<Input id="ag-title" bind:value={form.title} placeholder="Code Review Agent" autocomplete="off" />
 					</div>
 					<div class="field">
-						<label for="ag-status">Durum</label>
+						<label for="ag-status">{t('agent_status_label')}</label>
 						<select id="ag-status" class="select-input" bind:value={form.status}>
-							<option value="draft">Taslak</option>
-							<option value="active">Aktif</option>
-							<option value="inactive">Pasif</option>
+							<option value="draft">{t('status_draft')}</option>
+							<option value="active">{t('status_active')}</option>
+							<option value="inactive">{t('status_inactive')}</option>
 						</select>
 					</div>
 				</div>
@@ -518,42 +559,38 @@
 
 			<!-- ② Model & Bağlantılar -->
 			<section class="form-section">
-				<div class="section-title">Model & Bağlantılar</div>
+				<div class="section-title">{t('agent_model_section')}</div>
 				<div class="space-y-3">
 					<div class="grid grid-cols-2 gap-3">
 						<div class="field">
-							<label for="ag-model">LLM Model</label>
+							<label for="ag-model">{t('agent_model_label')}</label>
 							<select id="ag-model" class="select-input" bind:value={form.model}>
 								{#each MODELS as m}
 									<option value={m.value}>{m.label}</option>
 								{/each}
 							</select>
 						</div>
-						<div class="field">
-							<label for="ag-ver">Versiyon</label>
-							<Input id="ag-ver" bind:value={form.modelVersion} placeholder="4.6" class="font-mono text-xs" autocomplete="off" />
-						</div>
 					</div>
 					<div class="field">
-						<label for="ag-human">Sorumlu Çalışan</label>
-						<select id="ag-human" class="select-input" bind:value={form.responsibleHuman}>
-							<option value="">— Seçiniz —</option>
-							{#each HUMANS as h}
-								<option value={h}>{h}</option>
+						<label for="ag-human">{t('agent_responsible_label')}</label>
+						<select id="ag-human" class="select-input" bind:value={form.responsible_id}>
+							<option value="">{t('select_placeholder')}</option>
+							{#each humanPersonnel as p}
+								<option value={p.id}>{p.name}</option>
 							{/each}
 						</select>
 					</div>
 					<div class="field">
-						<label for="ag-dept">Departman</label>
-						<select id="ag-dept" class="select-input" bind:value={form.department}>
-							<option value="">— Seçiniz —</option>
-							{#each DEPARTMENTS as d}
-								<option value={d}>{d}</option>
+						<label for="ag-dept">{t('agent_dept_label')}</label>
+						<select id="ag-dept" class="select-input" bind:value={form.department_id}>
+							<option value="">{t('select_placeholder')}</option>
+							{#each depts as d}
+								<option value={d.id}>{d.name}</option>
 							{/each}
 						</select>
-						{#if form.department}
+						{#if form.department_id}
 							<p class="text-xs text-muted-foreground mt-1">
-								Departman policy'leri otomatik eklendi ↓
+								{t('agent_dept_policies_hint')}
 							</p>
 						{/if}
 					</div>
@@ -563,7 +600,7 @@
 			<!-- ③ İş Tanımı & Skill Önerisi -->
 			<section class="form-section">
 				<div class="section-title flex items-center justify-between">
-					<span>İş Tanımı</span>
+					<span>{t('agent_job_section')}</span>
 					<button
 						class="suggest-btn"
 						onclick={analyzeJobDescription}
@@ -572,10 +609,10 @@
 					>
 						{#if isAnalyzing}
 							<span class="spinner"></span>
-							Analiz ediliyor...
+							{t('agent_analyzing')}
 						{:else}
 							<Sparkles class="w-3.5 h-3.5" />
-							Skill Öner
+							{t('agent_skill_suggest_btn')}
 						{/if}
 					</button>
 				</div>
@@ -586,21 +623,20 @@
 					rows="3"
 				></textarea>
 
-				<!-- Önerilen skill'ler -->
 				{#if suggestedSkills.length > 0}
 					<div class="suggestion-box">
 						<div class="text-xs font-semibold text-violet-700 mb-2 flex items-center gap-1.5">
 							<Sparkles class="w-3 h-3" />
-							Önerilen Yetenekler
+							{t('agent_suggested_skills')}
 						</div>
 						<div class="flex flex-wrap gap-2">
 							{#each suggestedSkills as skill}
 								<div class="suggestion-chip">
 									<span>{skill.name}</span>
-									<button onclick={() => acceptSuggestion(skill)} type="button" aria-label="Ekle">
+									<button onclick={() => acceptSuggestion(skill)} type="button" aria-label={t('add')}>
 										<Check class="w-3 h-3" />
 									</button>
-									<button onclick={() => dismissSuggestion(skill.name)} type="button" aria-label="Kapat">
+									<button onclick={() => dismissSuggestion(skill.name)} type="button" aria-label={t('close')}>
 										<X class="w-3 h-3" />
 									</button>
 								</div>
@@ -612,11 +648,10 @@
 
 			<!-- ④ Skill Kütüphanesi -->
 			<section class="form-section">
-				<div class="section-title">Yetenekler</div>
+				<div class="section-title">{t('agent_skills_section')}</div>
 
-				<!-- Library chips -->
 				<div class="mb-3">
-					<div class="text-xs text-muted-foreground mb-2">Kütüphaneden seç:</div>
+					<div class="text-xs text-muted-foreground mb-2">{t('agent_skills_library')}</div>
 					<div class="flex flex-wrap gap-1.5">
 						{#each SKILL_LIBRARY as skill}
 							{@const selected = isSkillSelected(skill.name)}
@@ -637,23 +672,87 @@
 
 				<!-- Custom skill -->
 				<div class="custom-skill-form">
-					<div class="text-xs text-muted-foreground mb-2">Özel yetenek ekle:</div>
+					<div class="text-xs text-muted-foreground mb-2">{t('agent_custom_skill')}</div>
+
+					<div class="flex gap-1.5 mb-3 flex-wrap">
+						{#each SKILL_TYPES as st}
+							<button
+								type="button"
+								class="type-chip"
+								class:type-chip-on={customSkill.skill_type === st.value}
+								onclick={() => (customSkill.skill_type = st.value)}
+								title={st.hint}
+							>
+								{st.label}
+							</button>
+						{/each}
+					</div>
+
 					<div class="grid grid-cols-2 gap-2 mb-2">
-						<Input bind:value={customSkill.name}        placeholder="Adı"      class="text-xs h-8" />
-						<Input bind:value={customSkill.version}     placeholder="Versiyon" class="text-xs h-8 font-mono" />
+						<Input bind:value={customSkill.name}    placeholder={t('agent_skill_name_ph')}    class="text-xs h-8" />
+						<Input bind:value={customSkill.version} placeholder={t('agent_skill_version_ph')} class="text-xs h-8 font-mono" />
 					</div>
-					<div class="flex gap-2">
-						<Input bind:value={customSkill.description} placeholder="Kısa açıklama" class="text-xs h-8 flex-1" />
-						<Button size="sm" variant="outline" onclick={addCustomSkill} disabled={!customSkill.name.trim()} class="h-8 px-3 text-xs">
-							Ekle
-						</Button>
+					<div class="mb-2">
+						<Input bind:value={customSkill.description} placeholder={t('agent_skill_desc_ph')} class="text-xs h-8" />
 					</div>
+
+					{#if customSkill.skill_type === 'builtin'}
+						<select class="select-input text-xs h-8 mb-2" bind:value={customSkill.builtin_fn}>
+							{#each BUILTIN_FUNCTIONS as f}
+								<option value={f.value}>{f.label}</option>
+							{/each}
+						</select>
+					{/if}
+
+					{#if customSkill.skill_type === 'mcp'}
+						<div class="space-y-2 mb-2">
+							<Input bind:value={customSkill.mcp_url} placeholder="MCP Sunucu URL (https://...)" class="text-xs h-8 font-mono" />
+							<div class="grid grid-cols-2 gap-2">
+								<select class="select-input text-xs h-8" bind:value={customSkill.mcp_transport}>
+									<option value="sse">SSE</option>
+									<option value="http">HTTP</option>
+									<option value="stdio">stdio</option>
+								</select>
+								<select class="select-input text-xs h-8" bind:value={customSkill.mcp_auth_type}>
+									<option value="none">Auth yok</option>
+									<option value="api_key">API Key</option>
+									<option value="bearer">Bearer Token</option>
+								</select>
+							</div>
+							{#if customSkill.mcp_auth_type !== 'none'}
+								<Input bind:value={customSkill.mcp_auth_value} placeholder="API Key / Token değeri" class="text-xs h-8 font-mono" />
+							{/if}
+						</div>
+					{/if}
+
+					{#if customSkill.skill_type === 'http'}
+						<div class="space-y-2 mb-2">
+							<Input bind:value={customSkill.http_url} placeholder="Endpoint URL (https://...)" class="text-xs h-8 font-mono" />
+							<select class="select-input text-xs h-8" bind:value={customSkill.http_method}>
+								<option value="POST">POST</option>
+								<option value="GET">GET</option>
+								<option value="PUT">PUT</option>
+							</select>
+						</div>
+					{/if}
+
+					{#if customSkill.skill_type === 'function'}
+						<textarea
+							class="textarea-input text-xs font-mono mb-2"
+							bind:value={customSkill.fn_code}
+							placeholder="def run(params: dict) -> dict:&#10;    result = ...&#10;    return result"
+							rows="5"
+						></textarea>
+					{/if}
+
+					<Button size="sm" variant="outline" onclick={addCustomSkill} disabled={!customSkill.name.trim()} class="h-8 px-3 text-xs w-full">
+						<Plus class="w-3 h-3" /> {t('add')}
+					</Button>
 				</div>
 
-				<!-- Seçili skill listesi -->
 				{#if form.selectedSkills.length > 0}
 					<div class="mt-3 space-y-1.5">
-						<div class="text-xs text-muted-foreground">Seçili ({form.selectedSkills.length}):</div>
+						<div class="text-xs text-muted-foreground">{t('agent_selected_skills')} ({form.selectedSkills.length}):</div>
 						{#each form.selectedSkills as skill}
 							<div class="selected-skill-row">
 								<div class="flex items-center gap-2 min-w-0">
@@ -664,7 +763,7 @@
 									type="button"
 									onclick={() => { form.selectedSkills = form.selectedSkills.filter(s => s.name !== skill.name); }}
 									class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-									aria-label="Kaldır"
+									aria-label={t('remove')}
 								>
 									<X class="w-3.5 h-3.5" />
 								</button>
@@ -676,13 +775,13 @@
 
 			<!-- ⑤ Policy'ler -->
 			<section class="form-section">
-				<div class="section-title">Policy'ler</div>
+				<div class="section-title">{t('agent_policies_section')}</div>
 
-				{#if form.department && (DEPT_POLICIES[form.department]?.length ?? 0) > 0}
+				{#if selectedDeptName && (DEPT_POLICIES[selectedDeptName]?.length ?? 0) > 0}
 					<div class="mb-3">
-						<div class="text-xs text-muted-foreground mb-2">{form.department} policy'leri:</div>
+						<div class="text-xs text-muted-foreground mb-2">{selectedDeptName} policy'leri:</div>
 						<div class="space-y-1.5">
-							{#each DEPT_POLICIES[form.department] as policy}
+							{#each DEPT_POLICIES[selectedDeptName] as policy}
 								{@const active = form.selectedPolicies.includes(policy)}
 								<button
 									type="button"
@@ -698,28 +797,26 @@
 							{/each}
 						</div>
 					</div>
-				{:else if !form.department}
-					<p class="text-xs text-muted-foreground mb-3 italic">Departman seçilince ilgili policy'ler otomatik görünür.</p>
+				{:else if !form.department_id}
+					<p class="text-xs text-muted-foreground mb-3 italic">{t('agent_dept_policies_hint2')}</p>
 				{/if}
 
-				<!-- Custom policy -->
 				<div class="flex gap-2">
 					<Input
 						bind:value={customPolicy}
-						placeholder="Policy adı ekle..."
+						placeholder={t('agent_policy_input_ph')}
 						class="text-xs h-8"
 						onkeydown={(e) => e.key === 'Enter' && addCustomPolicy()}
 					/>
 					<Button size="sm" variant="outline" onclick={addCustomPolicy} disabled={!customPolicy.trim()} class="h-8 px-3 text-xs">
-						Ekle
+						{t('add')}
 					</Button>
 				</div>
 
-				<!-- Seçili policy'ler (departman dışındakiler) -->
-				{#each [form.selectedPolicies.filter(p => !(DEPT_POLICIES[form.department] ?? []).includes(p))] as extraPolicies}
+				{#each [form.selectedPolicies.filter(p => !(DEPT_POLICIES[selectedDeptName] ?? []).includes(p))] as extraPolicies}
 					{#if extraPolicies.length > 0}
 						<div class="mt-3 space-y-1.5">
-							<div class="text-xs text-muted-foreground">Ek policy'ler:</div>
+							<div class="text-xs text-muted-foreground">{t('agent_extra_policies')}</div>
 							{#each extraPolicies as policy}
 								<div class="selected-skill-row">
 									<span class="text-sm">{policy}</span>
@@ -727,7 +824,7 @@
 										type="button"
 										onclick={() => { form.selectedPolicies = form.selectedPolicies.filter(p => p !== policy); }}
 										class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-										aria-label="Kaldır"
+										aria-label={t('remove')}
 									>
 										<X class="w-3.5 h-3.5" />
 									</button>
@@ -742,9 +839,9 @@
 
 		<!-- Panel Footer -->
 		<div class="panel-footer">
-			<Button variant="outline" onclick={closePanel} class="flex-1 sm:flex-none">İptal</Button>
-			<Button onclick={saveAgent} disabled={!form.name || !form.title} class="flex-1 sm:flex-none">
-				{editingAgent ? 'Güncelle' : 'Oluştur'}
+			<Button variant="outline" onclick={closePanel} class="flex-1 sm:flex-none">{t('cancel')}</Button>
+			<Button onclick={saveAgent} disabled={!form.name || !form.title || saving} class="flex-1 sm:flex-none">
+				{#if saving}{t('saving')}{:else}{editingId ? t('update') : t('create')}{/if}
 			</Button>
 		</div>
 	</aside>
@@ -755,13 +852,68 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-backdrop" onclick={cancelDelete}>
 		<div class="bg-background w-full max-w-sm rounded-xl border p-6 shadow-lg mx-4 animate-dialog" onclick={(e) => e.stopPropagation()}>
-			<h2 class="font-display text-xl tracking-tight">Ajanı Sil</h2>
+			<h2 class="font-display text-xl tracking-tight">{t('agent_delete_title')}</h2>
 			<p class="text-sm text-muted-foreground mt-1">
-				<strong class="text-foreground">{deleteTarget?.name}</strong> ajanını kalıcı olarak silmek istediğinize emin misiniz?
+				<strong class="text-foreground">{deleteTarget?.name}</strong> {t('agent_delete_confirm')}
 			</p>
 			<div class="flex gap-3 justify-end mt-5">
-				<Button variant="outline" onclick={cancelDelete}>İptal</Button>
-				<Button variant="destructive" onclick={confirmDelete}>Sil</Button>
+				<Button variant="outline" onclick={cancelDelete}>{t('cancel')}</Button>
+				<Button variant="destructive" onclick={confirmDelete} disabled={deleting}>
+					{deleting ? t('deleting') : t('delete')}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ── Change Request Dialog ─────────────────────────────────────────────── -->
+{#if showCrDialog}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-backdrop" onclick={() => (showCrDialog = false)}>
+		<div class="bg-background w-full max-w-lg rounded-xl border p-6 shadow-lg mx-4 animate-dialog space-y-4" onclick={(e) => e.stopPropagation()} role="dialog">
+			<div class="flex items-start justify-between gap-2">
+				<div>
+					<h2 class="font-display text-xl tracking-tight">{t('agent_cr_title')}</h2>
+					<p class="text-sm text-muted-foreground mt-0.5">{crTarget?.name}</p>
+				</div>
+				<button onclick={() => (showCrDialog = false)} class="text-muted-foreground hover:text-foreground mt-0.5">
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<div class="space-y-1">
+				<label class="text-xs font-medium text-muted-foreground">{t('agent_cr_type_label')}</label>
+				<div class="flex gap-2">
+					{#each [{ v: 'agent_config', l: t('agent_cr_type_config') }, { v: 'skill', l: t('agent_cr_type_skill') }, { v: 'policy', l: t('agent_cr_type_policy') }] as crType}
+						<button
+							onclick={() => setCrType(crType.v as typeof crForm.change_type)}
+							class={['flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors', crForm.change_type === crType.v ? 'bg-amber-50 border-amber-300 text-amber-800' : 'border-input text-muted-foreground hover:text-foreground'].join(' ')}
+						>
+							{crType.l}
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<div class="space-y-1">
+				<label class="text-xs font-medium text-muted-foreground">{t('agent_cr_title_label')} *</label>
+				<input bind:value={crForm.title} class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring" placeholder="Değişikliği kısaca açıklayın..." />
+			</div>
+
+			<div class="space-y-1">
+				<label class="text-xs font-medium text-muted-foreground">{t('agent_cr_proposed_label')}</label>
+				<textarea
+					bind:value={crForm.proposed_json}
+					rows={6}
+					class="w-full px-3 py-2 text-xs font-mono rounded-lg border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+				></textarea>
+			</div>
+
+			<div class="flex gap-3 justify-end pt-1">
+				<Button variant="outline" onclick={() => (showCrDialog = false)}>{t('cancel')}</Button>
+				<Button onclick={submitCr} disabled={crSaving || !crForm.title} class="bg-amber-600 hover:bg-amber-700 text-white">
+					{crSaving ? t('agent_cr_submitting') : t('agent_cr_submit')}
+				</Button>
 			</div>
 		</div>
 	</div>
@@ -949,6 +1101,21 @@
 		padding: 0.75rem;
 	}
 
+	.type-chip {
+		font-size: 0.6875rem; font-weight: 600;
+		padding: 0.2rem 0.625rem;
+		border-radius: 999px;
+		border: 1px solid hsl(var(--border));
+		background: hsl(var(--background));
+		color: hsl(var(--muted-foreground));
+		cursor: pointer; transition: all 0.12s;
+	}
+	.type-chip:hover { border-color: #a78bfa; color: #6d28d9; }
+	.type-chip-on {
+		background: #ede9fe; border-color: #7c3aed;
+		color: #5b21b6;
+	}
+
 	/* ── Selected skill row ── */
 	.selected-skill-row {
 		display: flex; align-items: center;
@@ -997,4 +1164,10 @@
 		background: #22c55e;
 		border-color: #22c55e;
 	}
+
+	/* ── Dialog animations ── */
+	.animate-backdrop { animation: fadeIn 0.15s ease; }
+	.animate-dialog   { animation: scaleIn 0.2s cubic-bezier(0.32,0.72,0,1); }
+	@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+	@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 </style>

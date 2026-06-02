@@ -24,6 +24,9 @@ export type PersonnelItem = {
 	title: string | null;
 	role: string | null;
 	type: 'human' | 'agent';
+	email: string | null;
+	user_id: string | null;
+	has_user: boolean;
 	department_id: string | null;
 	department_name: string | null;
 	manager_id: string | null;
@@ -38,6 +41,7 @@ export type PersonnelCreate = {
 	title?: string;
 	role?: string;
 	type?: 'human' | 'agent';
+	email?: string;
 	department_id?: string;
 	manager_id?: string;
 };
@@ -45,10 +49,11 @@ export type PersonnelCreate = {
 export type PersonnelUpdate = Partial<PersonnelCreate>;
 
 export const personnel = {
-	list:   (params?: { department_id?: string; type?: string }) => {
+	list:   (params?: { department_id?: string; type?: string; company_id?: string }) => {
 		const qs = new URLSearchParams();
 		if (params?.department_id) qs.set('department_id', params.department_id);
 		if (params?.type)          qs.set('type', params.type);
+		if (params?.company_id)    qs.set('company_id', params.company_id);
 		const query = qs.toString() ? `?${qs}` : '';
 		return api.get<PersonnelItem[]>(`/personnel${query}`);
 	},

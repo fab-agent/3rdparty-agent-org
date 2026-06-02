@@ -1,0 +1,271 @@
+"""
+Task Request API — user submits a task, system routes to nearest agent.
+
+Routing logic:
+  1. Filter agents in company by skill_filter (if given)
+  2. Prefer agents in the requested department, then parent departments
+  3. Assign to first match → notify responsible human via Inbox
+"""
+
+from datetime import datetime
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlmodel import select
+
+from api.auth import get_current_user
+from database import get_session
+from models import (
+    AgentConfig, CompanyMember, Department, InboxMessage,
+    Personnel, Skill, TaskRequest, User,
+)
+from services.flow_runner import _call_llm, _build_system_prompt
+from core.security import decrypt
+from models import ProviderKey
+
+router = APIRouter(prefix="/task-requests", tags=["task-requests"])
+
+
+class TaskRequestCreate(BaseModel):
+    company_id: str
+    department_id: Optional[str] = None
+    skill_filter: Optional[str] = None
+    title: str
+    body: str
+
+
+class TaskRequestAction(BaseModel):
+    human_note: Optional[str] = None
+
+
+def _to_dict(t: TaskRequest) -> dict:
+    return {
+        "id": t.id,
+        "company_id": t.company_id,
+        "requester_user_id": t.requester_user_id,
+        "department_id": t.department_id,
+        "skill_filter": t.skill_filter,
+        "assigned_agent_id": t.assigned_agent_id,
+        "responsible_user_id": t.responsible_user_id,
+        "title": t.title,
+        "body": t.body,
+        "human_note": t.human_note,
+        "status": t.status,
+        "result": t.result,
+        "created_at": t.created_at.isoformat(),
+        "updated_at": t.updated_at.isoformat(),
+    }
+
+
+def _route_agent(session, company_id: str, department_id: Optional[str], skill_filter: Optional[str]) -> Optional[AgentConfig]:
+    """Find best matching agent. Dept first → parent dept → company-wide."""
+    dept_ids_to_try: list[Optional[str]] = []
+    if department_id:
+        dept_ids_to_try.append(department_id)
+        # Walk up parent chain
+        dept = session.get(Department, department_id)
+        while dept and dept.parent_id:
+            dept_ids_to_try.append(dept.parent_id)
+            dept = session.get(Department, dept.parent_id)
+    dept_ids_to_try.append(None)  # company-wide fallback
+
+    for dept_id in dept_ids_to_try:
+        q = (
+            select(AgentConfig)
+            .join(Personnel, AgentConfig.personnel_id == Personnel.id)
+            .where(Personnel.company_id == company_id)
+            .where(Personnel.type == "agent")
+            .where(AgentConfig.status == "active")
+        )
+        if dept_id:
+            q = q.where(Personnel.department_id == dept_id)
+        else:
+            pass  # company-wide
+
+        candidates = session.exec(q).all()
+
+        if skill_filter:
+            # Filter to agents that have the skill
+            matched = []
+            for cfg in candidates:
+                skills = session.exec(
+                    select(Skill).where(Skill.agent_id == cfg.id).where(Skill.is_active == True)
+                ).all()
+                if any(skill_filter.lower() in s.name.lower() for s in skills):
+                    matched.append(cfg)
+            candidates = matched
+
+        if candidates:
+            return candidates[0]
+
+    return None
+
+
+@router.get("")
+def list_task_requests(
+    company_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    with get_session() as session:
+        q = select(TaskRequest)
+        # Show tasks the user submitted OR tasks assigned to them as responsible
+        q = q.where(
+            (TaskRequest.requester_user_id == current_user.id) |
+            (TaskRequest.responsible_user_id == current_user.id)
+        )
+        if company_id:
+            q = q.where(TaskRequest.company_id == company_id)
+        if status:
+            q = q.where(TaskRequest.status == status)
+        q = q.order_by(TaskRequest.created_at.desc())
+        return [_to_dict(t) for t in session.exec(q).all()]
+
+
+@router.post("", status_code=201)
+def create_task_request(body: TaskRequestCreate, current_user: User = Depends(get_current_user)):
+    with get_session() as session:
+        agent_cfg = _route_agent(session, body.company_id, body.department_id, body.skill_filter)
+
+        responsible_user_id: Optional[str] = None
+        if agent_cfg:
+            if agent_cfg.responsible_id:
+                resp_personnel = session.get(Personnel, agent_cfg.responsible_id)
+                if resp_personnel and resp_personnel.user_id:
+                    responsible_user_id = resp_personnel.user_id
+
+        task = TaskRequest(
+            company_id=body.company_id,
+            requester_user_id=current_user.id,
+            department_id=body.department_id,
+            skill_filter=body.skill_filter,
+            assigned_agent_id=agent_cfg.personnel_id if agent_cfg else None,
+            responsible_user_id=responsible_user_id,
+            title=body.title,
+            body=body.body,
+            status="assigned" if agent_cfg else "pending",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        # Notify responsible human via inbox
+        if responsible_user_id and agent_cfg:
+            agent = session.get(Personnel, agent_cfg.personnel_id)
+            msg = InboxMessage(
+                company_id=body.company_id,
+                recipient_user_id=responsible_user_id,
+                source_type="task_request",
+                source_id=task.id,
+                title=f"[İş Talebi] {body.title}",
+                body=f"**Talep:** {body.title}\n\n{body.body}\n\n---\n*Ajan: {agent.name if agent else '?'}*",
+                created_at=datetime.utcnow(),
+            )
+            session.add(msg)
+            session.commit()
+
+        return _to_dict(task)
+
+
+@router.post("/{task_id}/run")
+def run_task(task_id: str, body: TaskRequestAction, current_user: User = Depends(get_current_user)):
+    """Responsible human reviews, optionally adds a note, and triggers agent execution."""
+    with get_session() as session:
+        task = session.get(TaskRequest, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if task.responsible_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only the responsible user can trigger this task")
+        if task.status not in ("assigned", "pending"):
+            raise HTTPException(status_code=400, detail=f"Task is in '{task.status}' status")
+
+        if body.human_note:
+            task.human_note = body.human_note
+
+        task.status = "running"
+        task.updated_at = datetime.utcnow()
+        session.add(task)
+        session.commit()
+
+        try:
+            agent = session.get(Personnel, task.assigned_agent_id)
+            agent_cfg = session.exec(
+                select(AgentConfig).where(AgentConfig.personnel_id == task.assigned_agent_id)
+            ).first()
+            if not agent or not agent_cfg:
+                raise ValueError("Agent or config not found")
+
+            # Find active provider key
+            provider_key = None
+            for prov in ("anthropic", "openai", "google", "mistral"):
+                pk = session.exec(
+                    select(ProviderKey).where(ProviderKey.provider == prov).where(ProviderKey.status == "active")
+                ).first()
+                if pk:
+                    provider_key = pk
+                    break
+
+            if not provider_key:
+                raise ValueError("No active provider key")
+
+            api_key = decrypt(provider_key.encrypted_key)
+            system_prompt = _build_system_prompt(agent, agent_cfg)
+            user_prompt = task.body
+            if task.human_note:
+                user_prompt += f"\n\n**Sorumlu notu:** {task.human_note}"
+
+            result = _call_llm(
+                provider=provider_key.provider,
+                model=agent_cfg.model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                api_key=api_key,
+            )
+
+            task.result = result
+            task.status = "completed"
+            task.updated_at = datetime.utcnow()
+            session.add(task)
+
+            # Deliver result to requester's inbox
+            msg = InboxMessage(
+                company_id=task.company_id,
+                recipient_user_id=task.requester_user_id,
+                source_type="task_result",
+                source_id=task.id,
+                title=f"[Sonuç] {task.title}",
+                body=result,
+                created_at=datetime.utcnow(),
+            )
+            session.add(msg)
+            session.commit()
+            session.refresh(task)
+
+        except Exception as e:
+            task.status = "assigned"   # revert to allow retry
+            task.result = f"Hata: {str(e)}"
+            task.updated_at = datetime.utcnow()
+            session.add(task)
+            session.commit()
+            session.refresh(task)
+
+        return _to_dict(task)
+
+
+@router.post("/{task_id}/reject")
+def reject_task(task_id: str, body: TaskRequestAction, current_user: User = Depends(get_current_user)):
+    with get_session() as session:
+        task = session.get(TaskRequest, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if task.responsible_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only the responsible user can reject this task")
+        task.status = "rejected"
+        task.human_note = body.human_note
+        task.updated_at = datetime.utcnow()
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+        return _to_dict(task)

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "dompurify": "^3.4.7",
+    "marked": "^18.0.4",
+    "mermaid": "^11.15.0"
+  },
+  "devDependencies": {
+    "@types/dompurify": "^3.0.5"
+  }
+}

@@ -12,9 +12,12 @@
 		Target,
 		ShieldCheck,
 		AlertCircle,
-		Loader
+		Loader,
+		ChevronRight,
 	} from '@lucide/svelte';
 	import { departments as deptApi, type Department } from '$lib/api/departments';
+	import { companyStore } from '$lib/stores/company.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	// ── State ─────────────────────────────────────────────────────────────────
 	let departments: Department[] = $state([]);
@@ -25,7 +28,7 @@
 		try {
 			loading = true;
 			error = null;
-			departments = await deptApi.list();
+			departments = await deptApi.list(companyStore.active?.id);
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -35,8 +38,14 @@
 
 	onMount(loadDepartments);
 
+	$effect(() => {
+		if (companyStore.active) loadDepartments();
+	});
+
 	// ── Derived stats ──────────────────────────────────────────────────────────
 	const activeDepts = $derived(departments.filter((d) => d.status === 'Active').length);
+	const rootDepts = $derived(departments.filter((d) => !d.parent_id));
+	const subDepts = $derived(departments.filter((d) => !!d.parent_id));
 
 	// ── Panel state ───────────────────────────────────────────────────────────
 	let panelOpen    = $state(false);
@@ -46,6 +55,7 @@
 	type FormData = {
 		name: string;
 		slug: string;
+		parent_id: string | null;
 		description: string;
 		goals: string;
 		policies: string[];
@@ -55,6 +65,7 @@
 	let form: FormData = $state({
 		name: '',
 		slug: '',
+		parent_id: null,
 		description: '',
 		goals: '',
 		policies: [],
@@ -83,7 +94,7 @@
 
 	function openCreate() {
 		editingDept = null;
-		form = { name: '', slug: '', description: '', goals: '', policies: [], status: 'Active' };
+		form = { name: '', slug: '', parent_id: null, description: '', goals: '', policies: [], status: 'Active' };
 		newPolicyInput = '';
 		panelOpen = true;
 	}
@@ -93,6 +104,7 @@
 		form = {
 			name: dept.name,
 			slug: dept.slug,
+			parent_id: dept.parent_id,
 			description: dept.description ?? '',
 			goals: dept.goals ?? '',
 			policies: [...dept.policies],
@@ -114,6 +126,7 @@
 			if (editingDept) {
 				const updated = await deptApi.update(editingDept.id, {
 					name: form.name, slug: form.slug,
+					parent_id: form.parent_id,
 					description: form.description || null,
 					goals: form.goals || null,
 					policies: form.policies,
@@ -123,11 +136,12 @@
 			} else {
 				const created = await deptApi.create({
 					name: form.name, slug: form.slug,
+					parent_id: form.parent_id,
 					description: form.description || null,
 					goals: form.goals || null,
 					policies: form.policies,
 					status: form.status,
-				});
+				}, companyStore.active?.id);
 				departments = [...departments, created];
 			}
 			closePanel();
@@ -175,10 +189,17 @@
 	function goalCount(goals: string | null): number {
 		return (goals ?? '').split('\n').filter((l) => l.trim()).length;
 	}
+
+	// Available parents: exclude self and descendants
+	const availableParents = $derived(
+		editingDept
+			? departments.filter((d) => d.id !== editingDept!.id && d.parent_id !== editingDept!.id)
+			: departments
+	);
 </script>
 
 <svelte:head>
-	<title>Departmanlar • 3rdParty Agent</title>
+	<title>Departmanlar • fab.engineering</title>
 </svelte:head>
 
 <div class={['space-y-6 transition-all duration-200', panelOpen ? 'lg:mr-[608px]' : ''].join(' ')}>
@@ -186,24 +207,28 @@
 	<!-- Header -->
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<div>
-			<h1 class="font-display text-3xl tracking-tight">Departmanlar</h1>
-			<p class="text-muted-foreground mt-1">Şirket departmanlarını, hedefleri ve politikaları yönet</p>
+			<h1 class="font-display text-3xl tracking-tight">{t('dept_title')}</h1>
+			<p class="text-muted-foreground mt-1">{t('dept_subtitle')}</p>
 		</div>
 		<Button onclick={openCreate} class="w-full sm:w-auto">
 			<Plus class="h-4 w-4" />
-			Yeni Departman
+			{t('dept_new')}
 		</Button>
 	</div>
 
 	<!-- Stats -->
-	<div class="grid grid-cols-2 gap-4 sm:grid-cols-2">
+	<div class="grid grid-cols-3 gap-4">
 		<div class="rounded-xl border bg-card p-4">
 			<div class="text-2xl font-bold">{departments.length}</div>
-			<div class="text-xs text-muted-foreground mt-0.5">Toplam Departman</div>
+			<div class="text-xs text-muted-foreground mt-0.5">{t('dept_stat_total')}</div>
 		</div>
 		<div class="rounded-xl border bg-card p-4">
 			<div class="text-2xl font-bold text-emerald-600">{activeDepts}</div>
-			<div class="text-xs text-muted-foreground mt-0.5">Aktif</div>
+			<div class="text-xs text-muted-foreground mt-0.5">{t('dept_stat_active')}</div>
+		</div>
+		<div class="rounded-xl border bg-card p-4">
+			<div class="text-2xl font-bold text-indigo-600">{subDepts.length}</div>
+			<div class="text-xs text-muted-foreground mt-0.5">{t('dept_stat_sub')}</div>
 		</div>
 	</div>
 
@@ -212,7 +237,7 @@
 		<div class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 flex items-center gap-2 text-sm text-destructive">
 			<AlertCircle class="w-4 h-4 flex-shrink-0" />
 			{error}
-			<button onclick={loadDepartments} class="ml-auto underline text-xs">Tekrar dene</button>
+			<button onclick={loadDepartments} class="ml-auto underline text-xs">{t('retry')}</button>
 		</div>
 	{/if}
 
@@ -220,7 +245,7 @@
 	{#if loading}
 		<div class="rounded-xl border bg-card flex items-center justify-center py-20 gap-2 text-muted-foreground">
 			<Loader class="w-4 h-4 animate-spin" />
-			<span class="text-sm">Yükleniyor...</span>
+			<span class="text-sm">{t('loading')}</span>
 		</div>
 	{:else if departments.length === 0}
 		<div class="rounded-xl border bg-card flex flex-col items-center justify-center py-20 text-center gap-3">
@@ -228,12 +253,12 @@
 				<Layers class="w-6 h-6 text-muted-foreground" />
 			</div>
 			<div>
-				<p class="font-medium">Henüz departman yok</p>
-				<p class="text-sm text-muted-foreground mt-1">İlk departmanı oluşturmak için butona tıklayın.</p>
+				<p class="font-medium">{t('dept_empty')}</p>
+				<p class="text-sm text-muted-foreground mt-1">{t('dept_empty_subtitle')}</p>
 			</div>
 			<Button onclick={openCreate} size="sm" class="mt-2">
 				<Plus class="h-4 w-4" />
-				Yeni Departman
+				{t('dept_new')}
 			</Button>
 		</div>
 	{:else}
@@ -241,12 +266,12 @@
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b bg-muted/50 text-left text-sm font-medium text-muted-foreground">
-						<th class="h-12 px-4">Departman</th>
-						<th class="h-12 px-4 hidden md:table-cell">Hedef</th>
-						<th class="h-12 px-4 hidden lg:table-cell">Politika</th>
-
-						<th class="h-12 px-4">Durum</th>
-						<th class="h-12 w-[90px] px-4 text-right">İşlem</th>
+						<th class="h-12 px-4">{t('dept_col_dept')}</th>
+						<th class="h-12 px-4 hidden sm:table-cell">{t('dept_col_parent')}</th>
+						<th class="h-12 px-4 hidden md:table-cell">{t('dept_col_goal')}</th>
+						<th class="h-12 px-4 hidden lg:table-cell">{t('dept_col_policy')}</th>
+						<th class="h-12 px-4">{t('status')}</th>
+						<th class="h-12 w-[90px] px-4 text-right">{t('dept_col_action')}</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y">
@@ -255,21 +280,38 @@
 							<!-- Dept name + description -->
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-2.5">
-									<div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-										<Layers class="w-4 h-4 text-indigo-600" />
+									<div class="w-8 h-8 rounded-lg {dept.parent_id ? 'bg-violet-100' : 'bg-indigo-100'} flex items-center justify-center flex-shrink-0">
+										<Layers class="w-4 h-4 {dept.parent_id ? 'text-violet-600' : 'text-indigo-600'}" />
 									</div>
 									<div class="min-w-0">
-										<div class="font-medium truncate">{dept.name}</div>
+										<div class="font-medium truncate flex items-center gap-1">
+											{#if dept.parent_id}
+												<span class="text-muted-foreground">↳</span>
+											{/if}
+											{dept.name}
+										</div>
 										<div class="text-xs text-muted-foreground font-mono">/{dept.slug}</div>
 									</div>
 								</div>
+							</td>
+
+							<!-- Parent -->
+							<td class="px-4 py-3 hidden sm:table-cell">
+								{#if dept.parent_name}
+									<div class="flex items-center gap-1 text-muted-foreground text-xs">
+										<ChevronRight class="w-3 h-3" />
+										<span>{dept.parent_name}</span>
+									</div>
+								{:else}
+									<span class="text-xs text-muted-foreground/50">—</span>
+								{/if}
 							</td>
 
 							<!-- Goal count -->
 							<td class="px-4 py-3 hidden md:table-cell">
 								<div class="flex items-center gap-1.5 text-muted-foreground">
 									<Target class="w-3.5 h-3.5 flex-shrink-0" />
-									<span>{goalCount(dept.goals)} hedef</span>
+									<span>{goalCount(dept.goals)} {t('dept_goal_count')}</span>
 								</div>
 							</td>
 
@@ -277,14 +319,14 @@
 							<td class="px-4 py-3 hidden lg:table-cell">
 								<div class="flex items-center gap-1.5 text-muted-foreground">
 									<ShieldCheck class="w-3.5 h-3.5 flex-shrink-0" />
-									<span>{dept.policies.length} politika</span>
+									<span>{dept.policies.length} {t('dept_policy_count')}</span>
 								</div>
 							</td>
 
 							<!-- Status -->
 							<td class="px-4 py-3">
 								<Badge variant={dept.status === 'Active' ? 'default' : 'secondary'}>
-									{dept.status === 'Active' ? 'Aktif' : 'Pasif'}
+									{dept.status === 'Active' ? t('dept_active') : t('dept_inactive')}
 								</Badge>
 							</td>
 
@@ -295,7 +337,7 @@
 										variant="ghost"
 										size="icon"
 										onclick={() => openEdit(dept)}
-										aria-label="Düzenle"
+										aria-label={t('edit')}
 									>
 										<Pencil class="h-4 w-4" />
 									</Button>
@@ -303,7 +345,7 @@
 										variant="ghost"
 										size="icon"
 										onclick={() => requestDelete(dept)}
-										aria-label="Sil"
+										aria-label={t('delete')}
 										class="text-destructive hover:text-destructive hover:bg-destructive/10"
 									>
 										<Trash2 class="h-4 w-4" />
@@ -334,7 +376,7 @@
 		'flex flex-col transition-transform duration-200 ease-out',
 		panelOpen ? 'translate-x-0' : 'translate-x-full'
 	].join(' ')}
-	aria-label="Departman formu"
+	aria-label={t('dept_title')}
 >
 	<!-- Panel Header -->
 	<div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
@@ -343,11 +385,11 @@
 				<Layers class="w-4 h-4 text-indigo-600" />
 			</div>
 			<div>
-				<div class="font-semibold text-sm">{editingDept ? 'Departmanı Düzenle' : 'Yeni Departman'}</div>
-				<div class="text-xs text-muted-foreground">{editingDept ? editingDept.name : 'Departman bilgilerini girin'}</div>
+				<div class="font-semibold text-sm">{editingDept ? t('dept_edit_title') : t('dept_create_title')}</div>
+				<div class="text-xs text-muted-foreground">{editingDept ? editingDept.name : t('dept_form_subtitle')}</div>
 			</div>
 		</div>
-		<Button variant="ghost" size="icon" onclick={closePanel} aria-label="Kapat">
+		<Button variant="ghost" size="icon" onclick={closePanel} aria-label={t('close')}>
 			<X class="w-4 h-4" />
 		</Button>
 	</div>
@@ -359,40 +401,55 @@
 		<section class="space-y-4">
 			<div class="flex items-center gap-2 text-xs font-semibold text-muted-foreground tracking-widest uppercase">
 				<span class="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">1</span>
-				Temel Bilgiler
+				{t('dept_basic_info')}
 			</div>
 
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<div class="space-y-1.5 sm:col-span-2">
-					<label class="text-sm font-medium" for="dept-name">Departman Adı <span class="text-destructive">*</span></label>
+					<label class="text-sm font-medium" for="dept-name">{t('dept_name_label')} <span class="text-destructive">*</span></label>
 					<Input id="dept-name" bind:value={form.name} placeholder="Yazılım Geliştirme" autocomplete="off" />
 				</div>
 
 				<div class="space-y-1.5">
-					<label class="text-sm font-medium" for="dept-slug">Slug</label>
+					<label class="text-sm font-medium" for="dept-slug">{t('dept_slug_label')}</label>
 					<Input id="dept-slug" bind:value={form.slug} placeholder="yazilim-gelistirme" autocomplete="off" class="font-mono text-xs" />
-					<p class="text-xs text-muted-foreground">Otomatik oluşturulur</p>
+					<p class="text-xs text-muted-foreground">{t('dept_slug_hint')}</p>
 				</div>
 
 				<div class="space-y-1.5">
-					<label class="text-sm font-medium" for="dept-status">Durum</label>
+					<label class="text-sm font-medium" for="dept-status">{t('dept_status_label')}</label>
 					<select
 						id="dept-status"
 						bind:value={form.status}
 						class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 					>
-						<option value="Active">Aktif</option>
-						<option value="Inactive">Pasif</option>
+						<option value="Active">{t('dept_active')}</option>
+						<option value="Inactive">{t('dept_inactive')}</option>
 					</select>
 				</div>
 
 				<div class="space-y-1.5 sm:col-span-2">
-					<label class="text-sm font-medium" for="dept-desc">Açıklama</label>
+					<label class="text-sm font-medium" for="dept-parent">{t('dept_parent_label')}</label>
+					<select
+						id="dept-parent"
+						bind:value={form.parent_id}
+						class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+					>
+						<option value={null}>{t('dept_parent_none')}</option>
+						{#each availableParents as parent (parent.id)}
+							<option value={parent.id}>{parent.name}</option>
+						{/each}
+					</select>
+					<p class="text-xs text-muted-foreground">{t('dept_parent_hint')}</p>
+				</div>
+
+				<div class="space-y-1.5 sm:col-span-2">
+					<label class="text-sm font-medium" for="dept-desc">{t('dept_desc_label')}</label>
 					<textarea
 						id="dept-desc"
 						class="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
 						bind:value={form.description}
-						placeholder="Departmanın sorumluluklarını kısaca açıklayın..."
+						placeholder={t('dept_desc_placeholder')}
 					></textarea>
 				</div>
 			</div>
@@ -402,18 +459,18 @@
 		<section class="space-y-4">
 			<div class="flex items-center gap-2 text-xs font-semibold text-muted-foreground tracking-widest uppercase">
 				<span class="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">2</span>
-				Departman Hedefleri
+				{t('dept_goals_section')}
 			</div>
 
 			<div class="space-y-1.5">
-				<label class="text-sm font-medium" for="dept-goals">Hedefler / OKR</label>
+				<label class="text-sm font-medium" for="dept-goals">{t('dept_goals_label')}</label>
 				<textarea
 					id="dept-goals"
 					class="flex min-h-[140px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y font-mono text-xs leading-relaxed"
 					bind:value={form.goals}
 					placeholder="Her satıra bir hedef yazın:&#10;Q2 sonuna kadar CI/CD pipeline otomasyonunu tamamlamak&#10;Kod kalitesi metriklerini %90 üzerinde tutmak&#10;..."
 				></textarea>
-				<p class="text-xs text-muted-foreground">Her satır ayrı bir hedef olarak sayılır • {goalCount(form.goals)} hedef</p>
+				<p class="text-xs text-muted-foreground">{t('dept_goals_hint')} • {goalCount(form.goals)} {t('dept_goal_count')}</p>
 			</div>
 		</section>
 
@@ -421,13 +478,13 @@
 		<section class="space-y-4">
 			<div class="flex items-center gap-2 text-xs font-semibold text-muted-foreground tracking-widest uppercase">
 				<span class="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">3</span>
-				Departman Politikaları
+				{t('dept_policies_section')}
 			</div>
 
 			<!-- Existing policies -->
 			{#if form.policies.length > 0}
 				<div class="space-y-1.5">
-					{#each form.policies as policy, i (policy)}
+					{#each form.policies as policy (policy)}
 						<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/60 border border-border/50 group/policy">
 							<ShieldCheck class="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
 							<span class="text-sm flex-1 truncate">{policy}</span>
@@ -435,7 +492,7 @@
 								type="button"
 								onclick={() => removePolicy(policy)}
 								class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0 opacity-0 group-hover/policy:opacity-100"
-								aria-label="Kaldır"
+								aria-label={t('remove')}
 							>
 								<X class="w-3.5 h-3.5" />
 							</button>
@@ -448,18 +505,18 @@
 			<div class="flex gap-2">
 				<Input
 					bind:value={newPolicyInput}
-					placeholder="Yeni politika ekle..."
+					placeholder={t('dept_policy_input')}
 					onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addPolicy(); } }}
 					class="flex-1"
 				/>
 				<Button variant="outline" onclick={addPolicy} disabled={!newPolicyInput.trim()}>
 					<Plus class="w-3.5 h-3.5" />
-					Ekle
+					{t('add')}
 				</Button>
 			</div>
 
 			{#if form.policies.length === 0}
-				<p class="text-xs text-muted-foreground">Henüz politika eklenmedi. Bu departmana bağlı tüm ajanlar bu politikalara tabi olacaktır.</p>
+				<p class="text-xs text-muted-foreground">{t('dept_no_policies')}</p>
 			{/if}
 		</section>
 
@@ -467,9 +524,9 @@
 
 	<!-- Panel Footer -->
 	<div class="border-t px-6 py-4 flex gap-3 justify-end flex-shrink-0 bg-background">
-		<Button variant="outline" onclick={closePanel}>İptal</Button>
-		<Button onclick={saveDepartment} disabled={!form.name || !form.slug}>
-			{editingDept ? 'Güncelle' : 'Oluştur'}
+		<Button variant="outline" onclick={closePanel}>{t('cancel')}</Button>
+		<Button onclick={saveDepartment} disabled={saving || !form.name || !form.slug}>
+			{saving ? t('saving') : editingDept ? t('update') : t('create')}
 		</Button>
 	</div>
 </div>
@@ -486,16 +543,15 @@
 			onclick={(e) => e.stopPropagation()}
 			role="dialog"
 			aria-modal="true"
-			aria-label="Departmanı Sil"
+			aria-label={t('dept_delete_title')}
 		>
-			<h2 class="font-display text-xl tracking-tight">Departmanı Sil</h2>
+			<h2 class="font-display text-xl tracking-tight">{t('dept_delete_title')}</h2>
 			<p class="text-sm text-muted-foreground mt-1">
-				<strong class="text-foreground">{deleteTarget?.name}</strong> departmanını kalıcı olarak silmek istediğinize emin misiniz?
-				Bu işlem geri alınamaz.
+				<strong class="text-foreground">{deleteTarget?.name}</strong> {t('dept_delete_confirm')}
 			</p>
 			<div class="flex gap-3 justify-end mt-5">
-				<Button variant="outline" onclick={() => { showDeleteDialog = false; deleteTarget = null; }}>İptal</Button>
-				<Button variant="destructive" onclick={confirmDelete}>Sil</Button>
+				<Button variant="outline" onclick={() => { showDeleteDialog = false; deleteTarget = null; }}>{t('cancel')}</Button>
+				<Button variant="destructive" onclick={confirmDelete}>{t('delete')}</Button>
 			</div>
 		</div>
 	</div>

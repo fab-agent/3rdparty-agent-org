@@ -1,0 +1,24 @@
+{
+  "name": "@3rdpartyagent/cli",
+  "version": "0.1.0",
+  "description": "3rdParty Agent Platform — Kurulum CLI",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "bin": { "3pa": "./bin/3pa.js" },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.8",
+    "chalk": "^5",
+    "execa": "^9"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "keywords": ["ai", "agents", "self-hosted", "cli"],
+  "license": "MIT"
+}
