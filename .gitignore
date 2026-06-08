@@ -24,3 +24,9 @@ package-lock.json
 
 # Data
 data/
+
+# Internal planning docs
+docs/
+plan.md
+TODO.md
+prototype.html
