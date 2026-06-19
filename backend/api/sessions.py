@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import select
 
@@ -10,6 +10,7 @@ from database import get_session
 from models import AgentSession, SessionMessage, Personnel
 from schemas import SessionCreate, MessageCreate
 from services.agent_runtime import run_session
+from services.memory_service import generate_session_summary
 
 router = APIRouter(tags=["sessions"])
 
@@ -97,7 +98,7 @@ def get_session_detail(session_id: str):
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
-def close_session(session_id: str):
+async def close_session(session_id: str, background_tasks: BackgroundTasks):
     with get_session() as session:
         sess = session.get(AgentSession, session_id)
         if not sess:
@@ -106,6 +107,7 @@ def close_session(session_id: str):
         sess.updated_at = datetime.utcnow()
         session.add(sess)
         session.commit()
+    background_tasks.add_task(generate_session_summary, session_id)
 
 
 # ── Message streaming ─────────────────────────────────────────────────────────

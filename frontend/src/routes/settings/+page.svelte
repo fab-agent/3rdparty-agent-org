@@ -20,12 +20,14 @@
 		ArrowDown,
 		ArrowUp,
 		AlertTriangle,
-		Loader2
+		Loader2,
+		Clock,
+		User
 	} from '@lucide/svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	// ── Tabs ─────────────────────────────────────────────────────────────────
-	let tab = $state<'providers' | 'git'>('providers');
+	let tab = $state<'providers' | 'git' | 'audit'>('providers');
 
 	// ── Provider state ────────────────────────────────────────────────────────
 	type ProviderCard = ProviderStatus & {
@@ -191,6 +193,30 @@
 		}
 	}
 
+	// ── Audit log state ───────────────────────────────────────────────────────
+	let auditLogs = $state<any[]>([]);
+	let auditLoading = $state(false);
+	let auditEntityFilter = $state('');
+
+	async function loadAuditLogs() {
+		auditLoading = true;
+		try {
+			const company = companyStore.active;
+			const params = new URLSearchParams({ limit: '100' });
+			if (company?.id) params.set('company_id', company.id);
+			if (auditEntityFilter) params.set('entity_type', auditEntityFilter);
+			const resp = await fetch(`${import.meta.env.VITE_API_URL}/audit?${params}`);
+			auditLogs = await resp.json();
+		} finally {
+			auditLoading = false;
+		}
+	}
+
+	function switchTab(newTab: 'providers' | 'git' | 'audit') {
+		tab = newTab;
+		if (newTab === 'audit') loadAuditLogs();
+	}
+
 	// ── Helpers ───────────────────────────────────────────────────────────────
 	function relativeTime(iso: string | null): string {
 		if (!iso) return '—';
@@ -236,7 +262,7 @@
 					? 'border-primary text-foreground'
 					: 'border-transparent text-muted-foreground hover:text-foreground'
 			].join(' ')}
-			onclick={() => (tab = 'providers')}
+			onclick={() => switchTab('providers')}
 		>
 			<Cpu class="w-4 h-4" />
 			{t('settings_providers')}
@@ -248,10 +274,22 @@
 					? 'border-primary text-foreground'
 					: 'border-transparent text-muted-foreground hover:text-foreground'
 			].join(' ')}
-			onclick={() => (tab = 'git')}
+			onclick={() => switchTab('git')}
 		>
 			<GitBranch class="w-4 h-4" />
 			{t('settings_git')}
+		</button>
+		<button
+			class={[
+				'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-x-2',
+				tab === 'audit'
+					? 'border-primary text-foreground'
+					: 'border-transparent text-muted-foreground hover:text-foreground'
+			].join(' ')}
+			onclick={() => switchTab('audit')}
+		>
+			<Clock class="w-4 h-4" />
+			Audit Log
 		</button>
 	</div>
 
@@ -684,5 +722,73 @@
 				</div>
 			</div>
 		{/if}
+	{/if}
+
+	<!-- ── AUDIT LOG TAB ─────────────────────────────────────────────────── -->
+	{#if tab === 'audit'}
+	<div class="space-y-4">
+		<div class="flex items-center gap-3">
+			<select
+				bind:value={auditEntityFilter}
+				onchange={loadAuditLogs}
+				class="h-9 rounded-md border border-border bg-background px-3 py-1 text-sm"
+			>
+				<option value="">All types</option>
+				<option value="department">Departments</option>
+				<option value="personnel">Personnel</option>
+				<option value="agent_config">Agent Config</option>
+				<option value="skill">Skills</option>
+				<option value="flow">Flows</option>
+				<option value="change_request">Change Requests</option>
+				<option value="provider_key">Provider Keys</option>
+			</select>
+			<button onclick={loadAuditLogs} class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm hover:bg-muted">
+				<RefreshCw class="h-3.5 w-3.5" />
+				Refresh
+			</button>
+		</div>
+
+		{#if auditLoading}
+			<div class="flex justify-center py-8">
+				<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+			</div>
+		{:else if auditLogs.length === 0}
+			<div class="text-center py-8 text-muted-foreground text-sm">No audit logs found.</div>
+		{:else}
+			<div class="rounded-md border border-border overflow-hidden">
+				<table class="w-full text-sm">
+					<thead class="bg-muted/50">
+						<tr>
+							<th class="text-left px-4 py-2.5 font-medium text-muted-foreground">Time</th>
+							<th class="text-left px-4 py-2.5 font-medium text-muted-foreground">Action</th>
+							<th class="text-left px-4 py-2.5 font-medium text-muted-foreground">Type</th>
+							<th class="text-left px-4 py-2.5 font-medium text-muted-foreground">Entity</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each auditLogs as log}
+							<tr class="border-t border-border hover:bg-muted/30">
+								<td class="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+									{new Date(log.created_at).toLocaleString()}
+								</td>
+								<td class="px-4 py-2.5">
+									<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+										{log.action === 'create' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+										 log.action === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+										 log.action === 'approve' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+										 log.action === 'reject' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+										 'bg-muted text-muted-foreground'}">
+										{log.action}
+									</span>
+								</td>
+								<td class="px-4 py-2.5 text-muted-foreground">{log.entity_type}</td>
+								<td class="px-4 py-2.5 font-medium">{log.entity_name || log.entity_id || '—'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	</div>
 	{/if}
 </div>

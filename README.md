@@ -1,53 +1,53 @@
 # 3rdParty Agent Organization
 
-Self-hosted, açık kaynak — şirketlerin yapay zeka ajanlarını organize biçimde yönetmesini sağlayan platform.
+Self-hosted, open-source platform for companies to manage AI agents in a structured way.
 
-Her personele model + skill + policy ataması yapılır; organizasyon şeması görselleştirilir; tüm konfigürasyon YAML dosyaları üzerinden Git'e senkronize edilir.
+Assign model + skills + policies to each personnel member, visualize the org chart, and sync all configuration to Git via YAML files.
 
 ---
 
-## Özellikler
+## Features
 
-| Özellik | Durum |
+| Feature | Status |
 |---|---|
-| Çoklu şirket yönetimi | ✅ |
-| Departman + personel CRUD | ✅ |
-| Ajan yapılandırması (model, skill, status) | ✅ |
-| Organizasyon şeması (ağaç görünümü) | ✅ |
-| AI sağlayıcı anahtar yönetimi (Anthropic, OpenAI, Google, Mistral) | ✅ |
-| Git entegrasyonu (GitHub / GitLab / Gitea) | ✅ |
-| CLI kurulum sihirbazı (`3pa init`) | ✅ |
-| Çok dil desteği (TR / EN / DE / ES) | ✅ |
+| Multi-company management | ✅ |
+| Department + personnel CRUD | ✅ |
+| Agent configuration (model, skills, status) | ✅ |
+| Org chart visualization (tree view) | ✅ |
+| AI provider key management (Anthropic, OpenAI, Google, Mistral) | ✅ |
+| Git integration (GitHub / GitLab / Gitea) | ✅ |
+| CLI setup wizard (`3pa init`) | ✅ |
+| Multi-language support (TR / EN / DE / ES) | ✅ |
 
 ---
 
-## Hızlı Başlangıç
+## Quick Start
 
-### Gereksinimler
+### Requirements
 
-- Docker + Docker Compose **veya** Python 3.11+ ve Node.js 20+
-- (Opsiyonel) AI sağlayıcı API anahtarı: Anthropic / OpenAI / Google / Mistral
+- Docker + Docker Compose **or** Python 3.11+ and Node.js 20+
+- (Optional) AI provider API key: Anthropic / OpenAI / Google / Mistral
 
 ---
 
-### Seçenek A — Docker ile (Önerilen)
+### Option A — Docker (Recommended)
 
 ```bash
 git clone https://github.com/fab-agent/3rdparty-agent-org.git
 cd 3rdparty-agent-org
 
 cp .env.example .env
-# .env dosyasını düzenle (AI anahtarları, opsiyonel)
+# Edit .env (AI keys, optional)
 
 docker compose up --build
 ```
 
-Arayüz → `http://localhost:5173`  
+UI → `http://localhost:5173`  
 API → `http://localhost:8000`
 
 ---
 
-### Seçenek B — Manuel (Geliştirme)
+### Option B — Manual (Development)
 
 **Backend:**
 
@@ -58,7 +58,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-**Frontend (ayrı terminalde):**
+**Frontend (separate terminal):**
 
 ```bash
 cd frontend
@@ -69,117 +69,117 @@ npm run dev                   # http://localhost:5173
 
 ---
 
-### Seçenek C — CLI Sihirbazı
+### Option C — CLI Wizard
 
 ```bash
 cd packages/cli
 npm install
 npm run build
 
-# Sihirbazı başlat
+# Start the wizard
 npx 3pa init
 ```
 
-Adım adım yönlendirmeler:
-1. Şirket adı + sektör
-2. AI sağlayıcı seçimi ve API anahtarı girişi
-3. Git entegrasyonu (opsiyonel)
-4. Uygulamayı başlat
+Step-by-step prompts:
+1. Company name + industry
+2. AI provider selection and API key entry
+3. Git integration (optional)
+4. Start the application
 
 ---
 
-## İlk Kurulumdan Sonra
+## After Initial Setup
 
-Platform ilk açılışta örnek veri ile gelir:
+The platform ships with sample data on first launch:
 
-- **Fabrika Yazılım** — 6 departman, 10 insan, 9 ajan
-- **Demo Corp** — 1 departman, 3 kişi, 1 ajan
+- **Fabrika Yazılım** — 6 departments, 10 humans, 9 agents
+- **Demo Corp** — 1 department, 3 people, 1 agent
 
-Bu verileri şablon olarak kullanabilir ya da silebilirsiniz.
-
----
-
-## Kullanım Kılavuzu
-
-### 1. Şirket Yönetimi
-
-Kenar çubukta (sol alt) aktif şirket gösterilir.  
-Şirkete tıklayarak listeden başka bir şirkete geçiş yapabilir ya da **"Şirket Ekle"** butonu ile yeni şirket oluşturabilirsiniz.
-
-Her şirket kendi departmanlarına, personeline ve ajanlarına sahiptir.
+Use this data as a template or delete it.
 
 ---
 
-### 2. Departman Yönetimi
+## Usage Guide
 
-**Departmanlar** sayfasında:
-- Yeni departman ekle (ad, slug, açıklama, hedefler, politikalar)
-- Mevcut departmanı düzenle / sil
-- Departman durumunu Aktif / Pasif olarak ayarla
+### 1. Company Management
 
-Departmanlara bağlı policy listesi tanımlanabilir (örneğin "Code Review SLA", "Deployment Onay Politikası").
+The active company is shown in the sidebar (bottom left).  
+Click the company name to switch between companies or create a new one with the **"Add Company"** button.
 
----
-
-### 3. Personel Yönetimi
-
-**Personel** sayfasında hem insan çalışanlar hem de ajanlar listelenir.
-
-Yeni personel eklerken:
-- **Tür:** İnsan veya Ajan seçilir
-- **Departman** ve **yönetici** atanır
-- Ajan türündeyse arka planda `AgentConfig` oluşturulur
+Each company has its own departments, personnel, and agents.
 
 ---
 
-### 4. Ajan Yapılandırması
+### 2. Department Management
 
-Bir personelin ajan yapılandırması için:
-1. Personeli seçin → `PATCH /personnel/{id}/agent-config`
-2. **Model** seçin (claude-sonnet-4-6, gpt-4o, gemini-2.5-pro, ...)
-3. **Model versiyonu** ve **durum** belirleyin (draft / active / inactive)
-4. **Skill** ekleyin: ad, versiyon, kısa açıklama
+On the **Departments** page:
+- Add a new department (name, slug, description, goals, policies)
+- Edit / delete existing departments
+- Set department status to Active / Inactive
 
----
-
-### 5. Organizasyon Şeması
-
-**Org Haritası** sayfası aktif şirketin hiyerarşisini ağaç yapısında gösterir.  
-Bir ajana tıklayarak sağ panelde model, skill listesi ve sorumlu kişiyi görüntüleyebilirsiniz.
+Policy lists can be defined per department (e.g. "Code Review SLA", "Deployment Approval Policy").
 
 ---
 
-### 6. AI Sağlayıcı Yönetimi
+### 3. Personnel Management
 
-**Ayarlar → AI Sağlayıcıları** sekmesinde:
+The **Personnel** page lists both human employees and agents.
 
-| Sağlayıcı | Test Desteği |
+When adding new personnel:
+- **Type:** Human or Agent
+- Assign a **department** and **manager**
+- For agents, an `AgentConfig` is automatically created in the background
+
+---
+
+### 4. Agent Configuration
+
+To configure an agent for a personnel member:
+1. Select the personnel → `PATCH /personnel/{id}/agent-config`
+2. Choose a **model** (claude-sonnet-4-6, gpt-4o, gemini-2.5-pro, ...)
+3. Set the **model version** and **status** (draft / active / inactive)
+4. Add **skills**: name, version, short description
+
+---
+
+### 5. Org Chart
+
+The **Org Chart** page displays the active company's hierarchy as a tree.  
+Click an agent node to view its model, skill list, and responsible person in the right panel.
+
+---
+
+### 6. AI Provider Management
+
+Under **Settings → AI Providers**:
+
+| Provider | Test Support |
 |---|---|
 | Anthropic (Claude) | ✅ |
 | OpenAI (GPT) | ✅ |
 | Google (Gemini) | ✅ |
 | Mistral | ✅ |
 
-API anahtarı girdikten sonra **Test** butonu ile anahtarın geçerliliği doğrulanır.  
-Anahtarlar AES-256 (Fernet) ile şifrelenmiş olarak saklanır — hiçbir zaman düz metin dönmez.
+After entering an API key, use the **Test** button to verify it.  
+Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text.
 
 ---
 
-### 7. Git Entegrasyonu
+### 7. Git Integration
 
-**Ayarlar → Git Entegrasyonu** sekmesinde:
+Under **Settings → Git Integration**:
 
-1. **Sağlayıcı** seçin: GitHub / GitLab / Gitea
-2. **Repo URL**, **branch** ve **access token** girin
-3. **Bağlan** butonuna basın
+1. Select a **provider**: GitHub / GitLab / Gitea
+2. Enter the **repo URL**, **branch**, and **access token**
+3. Click **Connect**
 
-Bağlandıktan sonra:
-- **Pull** — Repo'dan YAML dosyalarını veritabanına aktar
-- **Push** — Veritabanını YAML dosyalarına çevir ve commit et
-- **Farklar** — Bekleyen değişiklikleri görüntüle
-- **Otomatik PR** — Push yerine pull request oluşturma (opsiyonel)
+Once connected:
+- **Pull** — Import YAML files from the repo into the database
+- **Push** — Export the database to YAML files and commit
+- **Diff** — View pending changes
+- **Auto PR** — Open a pull request instead of pushing directly (optional)
 
-YAML formatı (`agents/codeguard/agent.yaml`):
+YAML format (`agents/codeguard/agent.yaml`):
 ```yaml
 id: codeguard
 name: CodeGuard
@@ -192,61 +192,61 @@ responsible: elif-yildiz
 skills:
   - name: Code Review
     version: '2.1'
-    description: PR inceleme ve güvenlik taraması
+    description: PR review and security scanning
 updated_at: '2026-06-01'
 ```
 
 ---
 
-### 8. Dil Değiştirme
+### 8. Language Switching
 
-Sağ üst köşede bayrak ikonu ile arayüz dili değiştirilebilir:  
-🇹🇷 Türkçe · 🇬🇧 English · 🇩🇪 Deutsch · 🇪🇸 Español
+Use the flag icon in the top right to change the UI language:  
+🇹🇷 Turkish · 🇬🇧 English · 🇩🇪 German · 🇪🇸 Spanish
 
 ---
 
-## Mimari
+## Architecture
 
 ```
 3rdparty-agent-org/
 ├── backend/                    # FastAPI + SQLModel (SQLite)
-│   ├── main.py                 # Uygulama başlatma, router kaydı
-│   ├── models.py               # SQLModel tabloları
-│   ├── schemas.py              # Pydantic istek/yanıt şemaları
+│   ├── main.py                 # App startup, router registration
+│   ├── models.py               # SQLModel tables
+│   ├── schemas.py              # Pydantic request/response schemas
 │   ├── database.py             # Engine + session
-│   ├── seed.py                 # Örnek veri (2 şirket, 7 dept, 19 personel)
+│   ├── seed.py                 # Sample data (2 companies, 7 depts, 19 personnel)
 │   ├── api/
-│   │   ├── companies.py        # Şirket CRUD + istatistikler
-│   │   ├── departments.py      # Departman CRUD
-│   │   ├── personnel.py        # Personel + ajan config + skill CRUD
-│   │   ├── providers.py        # AI sağlayıcı anahtar yönetimi
+│   │   ├── companies.py        # Company CRUD + stats
+│   │   ├── departments.py      # Department CRUD
+│   │   ├── personnel.py        # Personnel + agent config + skill CRUD
+│   │   ├── providers.py        # AI provider key management
 │   │   └── git_sync.py         # Git pull/push/diff/logs
 │   ├── core/
-│   │   └── security.py         # Fernet şifreleme
+│   │   └── security.py         # Fernet encryption
 │   └── services/
-│       ├── provider_service.py # Sağlayıcı test + model listesi
-│       └── git_service.py      # GitPython işlemleri + YAML dışa/içe aktarma
+│       ├── provider_service.py # Provider testing + model listing
+│       └── git_service.py      # GitPython operations + YAML export/import
 │
 ├── frontend/                   # SvelteKit 5 + Tailwind
 │   └── src/
 │       ├── lib/
-│       │   ├── api/            # Tip güvenli fetch istemcileri
-│       │   ├── components/ui/  # Bespoke bileşenler (Button, Dialog, Badge...)
-│       │   ├── i18n/           # TR/EN/DE/ES çeviri sözlükleri
-│       │   └── stores/         # company.svelte.ts (aktif şirket)
+│       │   ├── api/            # Type-safe fetch clients
+│       │   ├── components/ui/  # Bespoke components (Button, Dialog, Badge...)
+│       │   ├── i18n/           # TR/EN/DE/ES translation dictionaries
+│       │   └── stores/         # company.svelte.ts (active company)
 │       └── routes/
-│           ├── +layout.svelte  # Şirket switcher, dil seçici, nav
-│           ├── departments/    # Departman yönetimi
-│           ├── personnel/      # Personel + ajan listesi
-│           ├── org-chart/      # Görsel org şeması
-│           └── settings/       # AI sağlayıcılar + Git
+│           ├── +layout.svelte  # Company switcher, language selector, nav
+│           ├── departments/    # Department management
+│           ├── personnel/      # Personnel + agent list
+│           ├── org-chart/      # Visual org chart
+│           └── settings/       # AI providers + Git
 │
-├── packages/cli/               # `3pa` CLI sihirbazı (TypeScript)
-├── data/                       # SQLite DB + Git repo önbelleği
+├── packages/cli/               # `3pa` CLI wizard (TypeScript)
+├── data/                       # SQLite DB + Git repo cache
 └── docker-compose.yml
 ```
 
-### Veri Modeli
+### Data Model
 
 ```
 Company ──< Department ──< Personnel ──── AgentConfig ──< Skill
@@ -256,37 +256,37 @@ Company ──< Department ──< Personnel ──── AgentConfig ──< Sk
 
 ---
 
-## API Referansı
+## API Reference
 
-Sunucu çalışırken tam dokümantasyon:
+Full documentation when the server is running:
 
 - Swagger UI → `http://localhost:8000/docs`
 - ReDoc → `http://localhost:8000/redoc`
 
-### Temel Endpoint'ler
+### Core Endpoints
 
-| Method | Endpoint | Açıklama |
+| Method | Endpoint | Description |
 |---|---|---|
-| GET | `/companies` | Şirket listesi + istatistikler |
-| POST | `/companies` | Yeni şirket |
-| GET | `/departments?company_id=` | Departman listesi (şirkete göre filtreli) |
-| GET | `/personnel?company_id=` | Personel listesi (şirkete göre filtreli) |
-| GET | `/org-tree?company_id=` | Hiyerarşik ağaç |
-| GET | `/providers/status` | AI sağlayıcı durumları |
-| POST | `/providers/{p}/key` | API anahtarı kaydet |
-| POST | `/providers/{p}/test` | API anahtarını test et |
-| GET | `/git/config` | Git bağlantı ayarları |
-| POST | `/git/pull` | Repo'dan çek |
-| POST | `/git/push` | Repo'ya gönder |
+| GET | `/companies` | Company list + stats |
+| POST | `/companies` | Create company |
+| GET | `/departments?company_id=` | Department list (filtered by company) |
+| GET | `/personnel?company_id=` | Personnel list (filtered by company) |
+| GET | `/org-tree?company_id=` | Hierarchical tree |
+| GET | `/providers/status` | AI provider statuses |
+| POST | `/providers/{p}/key` | Save API key |
+| POST | `/providers/{p}/test` | Test API key |
+| GET | `/git/config` | Git connection settings |
+| POST | `/git/pull` | Pull from repo |
+| POST | `/git/push` | Push to repo |
 
 ---
 
-## Ortam Değişkenleri
+## Environment Variables
 
-`.env.example` dosyasını kopyalayarak başlayın:
+Start by copying `.env.example`:
 
 ```bash
-# AI Sağlayıcılar (opsiyonel — Ayarlar sayfasından da eklenebilir)
+# AI Providers (optional — can also be added from the Settings page)
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 GOOGLE_API_KEY=AIza...
@@ -298,21 +298,21 @@ VITE_API_URL=http://localhost:8000
 
 ---
 
-## Geliştirme
+## Development
 
 ```bash
-# Backend tip kontrolü (opsiyonel)
+# Backend type check (optional)
 cd backend && mypy .
 
-# Frontend tip kontrolü
+# Frontend type check
 cd frontend && npm run check
 
-# Sadece frontend build
+# Frontend build only
 cd frontend && npm run build
 ```
 
 ---
 
-## Lisans
+## License
 
-MIT — Ticari kullanım, fork ve katkı serbesttir.
+MIT — Free for commercial use, forking, and contributions.

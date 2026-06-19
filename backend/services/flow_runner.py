@@ -12,7 +12,7 @@ from sqlmodel import Session, select
 
 from core.security import decrypt
 from database import get_session
-from models import AgentConfig, Flow, InboxMessage, Personnel, ProviderKey, User, CompanyMember
+from models import AgentConfig, Flow, InboxMessage, Personnel, ProviderKey, User, CompanyMember, Skill
 
 
 def _call_llm(provider: str, model: str, system_prompt: str, user_prompt: str, api_key: str) -> str:
@@ -57,6 +57,124 @@ def _build_system_prompt(agent: Personnel, agent_cfg: AgentConfig) -> str:
         f"Görevin: {agent.title or agent.role or 'Ajan'}\n"
         "Verilen görevi eksiksiz ve öz bir şekilde tamamla."
     )
+
+
+def _get_anthropic_tool_definitions(skills: list) -> list[dict]:
+    """Convert active skills to Anthropic tool definitions."""
+    _BUILTIN_TOOLS = {
+        "web_search": {
+            "description": "Search the web for information",
+            "input_schema": {
+                "type": "object",
+                "properties": {"query": {"type": "string", "description": "Search query"}},
+                "required": ["query"],
+            },
+        },
+        "text_to_chart": {
+            "description": "Generate a chart from data",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "data": {"type": "string"},
+                    "chart_type": {"type": "string"},
+                    "title": {"type": "string"},
+                },
+                "required": ["data"],
+            },
+        },
+    }
+    tools = []
+    for s in skills:
+        if not s.is_active:
+            continue
+        cfg = {}
+        if s.config_json:
+            import json as _json
+            try:
+                cfg = _json.loads(s.config_json)
+            except Exception:
+                pass
+        if s.skill_type == "builtin":
+            fn_name = cfg.get("function_name", s.name)
+            if fn_name in _BUILTIN_TOOLS:
+                tools.append({"name": fn_name, **_BUILTIN_TOOLS[fn_name]})
+            else:
+                tools.append({
+                    "name": fn_name,
+                    "description": s.description or s.name,
+                    "input_schema": {"type": "object", "properties": {}, "required": []},
+                })
+        elif s.skill_type == "http" and cfg.get("url"):
+            tools.append({
+                "name": s.name.lower().replace(" ", "_"),
+                "description": s.description or s.name,
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"input": {"type": "string", "description": "Input to the tool"}},
+                    "required": ["input"],
+                },
+            })
+    return tools
+
+
+def _execute_flow_tool(tool_name: str, tool_input: dict) -> str:
+    """Execute a tool call during flow execution. Returns string result."""
+    if tool_name == "web_search":
+        try:
+            from services.mcp_client import execute_builtin
+            import asyncio
+            result = asyncio.run(execute_builtin("web_search", tool_input))
+            return str(result)
+        except Exception as e:
+            return f"Search error: {e}"
+    return f"Tool '{tool_name}' called with input: {tool_input}"
+
+
+def _call_llm_with_tools(
+    provider: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    api_key: str,
+    tools: list[dict],
+) -> str:
+    """Multi-turn LLM call with tool use loop. Returns final text response."""
+    if provider != "anthropic" or not tools:
+        return _call_llm(provider, model, system_prompt, user_prompt, api_key)
+
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+    messages = [{"role": "user", "content": user_prompt}]
+
+    for _iteration in range(8):
+        resp = client.messages.create(
+            model=model,
+            max_tokens=4096,
+            system=system_prompt,
+            messages=messages,
+            tools=tools,
+        )
+
+        if resp.stop_reason != "tool_use":
+            return "".join(
+                block.text for block in resp.content if hasattr(block, "text")
+            )
+
+        # Collect tool use blocks and results
+        messages.append({"role": "assistant", "content": resp.content})
+        tool_results = []
+        for block in resp.content:
+            if block.type == "tool_use":
+                result_text = _execute_flow_tool(block.name, block.input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result_text,
+                })
+        messages.append({"role": "user", "content": tool_results})
+
+    # Fallback: extract any text from last response
+    return "".join(block.text for block in resp.content if hasattr(block, "text")) or "[max tool iterations reached]"
 
 
 def _find_responsible_user_id(session: Session, agent_cfg: AgentConfig) -> Optional[str]:
@@ -119,12 +237,21 @@ def run_flow(flow_id: str) -> None:
 
             api_key = decrypt(provider_key.encrypted_key)
             system_prompt = _build_system_prompt(agent, agent_cfg)
-            output = _call_llm(
+
+            # Load agent skills for tool use
+            from sqlmodel import select as sql_select
+            skills = session.exec(
+                sql_select(Skill).where(Skill.agent_id == agent_cfg.id).where(Skill.is_active == True)
+            ).all()
+
+            tools = _get_anthropic_tool_definitions(list(skills)) if provider_key.provider == "anthropic" else []
+            output = _call_llm_with_tools(
                 provider=provider_key.provider,
                 model=agent_cfg.model,
                 system_prompt=system_prompt,
                 user_prompt=flow.prompt,
                 api_key=api_key,
+                tools=tools,
             )
 
             # Deliver to inbox

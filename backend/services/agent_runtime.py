@@ -16,6 +16,7 @@ from database import get_session
 from models import Personnel, Department, AgentConfig, Skill, ProviderKey, AgentSession, SessionMessage
 from core.security import decrypt
 from services.mcp_client import call_mcp_sse_tool, call_http_tool, execute_builtin
+from services.memory_service import load_agent_memories
 
 
 # ── System prompt builder ─────────────────────────────────────────────────────
@@ -42,6 +43,16 @@ def build_system_prompt(person: Personnel, dept: Department | None, skills: list
         active_skills = [s for s in skills if s.is_active]
         if active_skills:
             lines.append("\nAvailable tools/skills: " + ", ".join(s.name for s in active_skills))
+
+    # Inject agent memory from past sessions
+    try:
+        memories = load_agent_memories(person.id, limit=3)
+        if memories:
+            lines.append("\nContext from your previous sessions:")
+            for mem in memories:
+                lines.append(f"  - {mem}")
+    except Exception:
+        pass  # Never block session start due to memory failure
 
     lines.append("\nRespond helpfully and concisely. Use tools when they would help.")
     return "\n".join(lines)

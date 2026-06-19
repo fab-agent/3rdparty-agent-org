@@ -285,3 +285,29 @@ class TaskRequest(SQLModel, table=True):
     result: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ── Audit Log ─────────────────────────────────────────────────────────────────
+
+class AuditLog(SQLModel, table=True):
+    """Immutable record of every significant platform action."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    company_id: Optional[str] = Field(default=None, foreign_key="company.id", index=True)
+    user_id: Optional[str] = Field(default=None, foreign_key="user.id", index=True)
+    action: str          # "create" | "update" | "delete" | "approve" | "reject" | "test" | "sync"
+    entity_type: str     # "department" | "personnel" | "agent_config" | "skill" | "flow" | "change_request" | "provider_key" | "git_config"
+    entity_id: Optional[str] = None
+    entity_name: Optional[str] = None
+    details_json: Optional[str] = None  # JSON with relevant before/after or context
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ── Agent Memory ──────────────────────────────────────────────────────────────
+
+class AgentMemory(SQLModel, table=True):
+    """LLM-generated summary of a closed session, used as long-term agent memory."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    personnel_id: str = Field(foreign_key="personnel.id", index=True)
+    session_id: Optional[str] = Field(default=None, foreign_key="agentsession.id")
+    summary: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
