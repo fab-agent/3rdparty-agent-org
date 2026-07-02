@@ -144,6 +144,7 @@ def _sync_env_provider_keys():
         "openai":    "OPENAI_API_KEY",
         "google":    "GOOGLE_API_KEY",
         "mistral":   "MISTRAL_API_KEY",
+        "qwen":      "QWEN_API_KEY",
     }
 
     with get_session() as session:
