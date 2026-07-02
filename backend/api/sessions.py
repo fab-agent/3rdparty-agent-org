@@ -2,12 +2,13 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import select
 
+from api.auth import get_current_user
 from database import get_session
-from models import AgentSession, SessionMessage, Personnel
+from models import AgentSession, SessionMessage, Personnel, User
 from schemas import SessionCreate, MessageCreate
 from services.agent_runtime import run_session
 from services.memory_service import generate_session_summary
@@ -45,7 +46,8 @@ def _message_to_dict(m: SessionMessage) -> dict:
 # ── Session CRUD ──────────────────────────────────────────────────────────────
 
 @router.get("/sessions")
-def list_sessions(personnel_id: Optional[str] = None, status: Optional[str] = None):
+def list_sessions(personnel_id: Optional[str] = None, status: Optional[str] = None,
+                  _: User = Depends(get_current_user)):
     with get_session() as session:
         q = select(AgentSession).order_by(AgentSession.updated_at.desc())
         if personnel_id:
@@ -68,7 +70,7 @@ def list_sessions(personnel_id: Optional[str] = None, status: Optional[str] = No
 
 
 @router.post("/sessions", status_code=201)
-def create_session(body: SessionCreate):
+def create_session(body: SessionCreate, _: User = Depends(get_current_user)):
     with get_session() as session:
         person = session.get(Personnel, body.personnel_id)
         if not person:
@@ -84,7 +86,7 @@ def create_session(body: SessionCreate):
 
 
 @router.get("/sessions/{session_id}")
-def get_session_detail(session_id: str):
+def get_session_detail(session_id: str, _: User = Depends(get_current_user)):
     with get_session() as session:
         sess = session.get(AgentSession, session_id)
         if not sess:
@@ -98,7 +100,8 @@ def get_session_detail(session_id: str):
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
-async def close_session(session_id: str, background_tasks: BackgroundTasks):
+async def close_session(session_id: str, background_tasks: BackgroundTasks,
+                        _: User = Depends(get_current_user)):
     with get_session() as session:
         sess = session.get(AgentSession, session_id)
         if not sess:
@@ -113,7 +116,8 @@ async def close_session(session_id: str, background_tasks: BackgroundTasks):
 # ── Message streaming ─────────────────────────────────────────────────────────
 
 @router.post("/sessions/{session_id}/messages")
-async def send_message(session_id: str, body: MessageCreate):
+async def send_message(session_id: str, body: MessageCreate,
+                       _: User = Depends(get_current_user)):
     """Send a message to an agent and stream the response via SSE."""
     with get_session() as db:
         sess = db.get(AgentSession, session_id)

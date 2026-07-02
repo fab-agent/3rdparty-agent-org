@@ -13,11 +13,12 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import select
 
+from api.auth import get_current_user
 from database import get_session
-from models import A2ARequest, AgentConfig, AgentSession, Personnel, SessionMessage
+from models import A2ARequest, AgentConfig, AgentSession, Personnel, SessionMessage, User
 from schemas import A2AApprove, A2AReject, A2ARequestCreate, A2AResultApprove
 
 router = APIRouter(prefix="/a2a", tags=["a2a"])
@@ -69,6 +70,7 @@ def list_requests(
     status: Optional[str] = None,
     from_agent_id: Optional[str] = None,
     to_agent_id: Optional[str] = None,
+    _: User = Depends(get_current_user),
 ):
     from sqlalchemy import or_
     with get_session() as session:
@@ -96,7 +98,7 @@ def list_requests(
 
 
 @router.get("/requests/pending-count")
-def pending_count(company_id: Optional[str] = None):
+def pending_count(company_id: Optional[str] = None, _: User = Depends(get_current_user)):
     """Returns count of requests awaiting approval (for notification badge)."""
     from sqlalchemy import or_
     with get_session() as session:
@@ -117,7 +119,7 @@ def pending_count(company_id: Optional[str] = None):
 
 
 @router.post("/requests", status_code=201)
-def create_request(body: A2ARequestCreate):
+def create_request(body: A2ARequestCreate, _: User = Depends(get_current_user)):
     with get_session() as session:
         # Validate agents exist
         for pid in [body.from_agent_id, body.to_agent_id]:
@@ -140,7 +142,7 @@ def create_request(body: A2ARequestCreate):
 
 
 @router.get("/requests/{req_id}")
-def get_request(req_id: str):
+def get_request(req_id: str, _: User = Depends(get_current_user)):
     with get_session() as session:
         req = session.get(A2ARequest, req_id)
         if not req:
@@ -149,7 +151,8 @@ def get_request(req_id: str):
 
 
 @router.post("/requests/{req_id}/approve")
-def approve_request(req_id: str, body: A2AApprove, background_tasks: BackgroundTasks):
+def approve_request(req_id: str, body: A2AApprove, background_tasks: BackgroundTasks,
+                    caller: User = Depends(get_current_user)):
     """Approve the task. Triggers execution in background."""
     with get_session() as session:
         req = session.get(A2ARequest, req_id)
@@ -157,6 +160,9 @@ def approve_request(req_id: str, body: A2AApprove, background_tasks: BackgroundT
             raise HTTPException(status_code=404, detail="Request not found")
         if req.status != "pending_approval":
             raise HTTPException(status_code=409, detail=f"Request is not pending approval (status: {req.status})")
+        # Verify the approver matches the designated responsible person
+        if req.approver_id and req.approver_id != body.approver_id:
+            raise HTTPException(status_code=403, detail="Yetkisiz: bu talebi onaylayacak kişi siz değilsiniz")
         req.status = "running"
         req.approver_id = body.approver_id
         req.approved_at = datetime.utcnow()
@@ -170,7 +176,7 @@ def approve_request(req_id: str, body: A2AApprove, background_tasks: BackgroundT
 
 
 @router.post("/requests/{req_id}/approve-result")
-def approve_result(req_id: str, body: A2AResultApprove):
+def approve_result(req_id: str, body: A2AResultApprove, _: User = Depends(get_current_user)):
     """Approve the result and mark the request as completed."""
     with get_session() as session:
         req = session.get(A2ARequest, req_id)
@@ -188,7 +194,7 @@ def approve_result(req_id: str, body: A2AResultApprove):
 
 
 @router.post("/requests/{req_id}/reject")
-def reject_request(req_id: str, body: A2AReject):
+def reject_request(req_id: str, body: A2AReject, _: User = Depends(get_current_user)):
     with get_session() as session:
         req = session.get(A2ARequest, req_id)
         if not req:

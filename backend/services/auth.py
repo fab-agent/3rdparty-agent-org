@@ -1,6 +1,5 @@
 """JWT + password hashing helpers."""
 import os
-import random
 import secrets
 import string
 from datetime import datetime, timedelta
@@ -39,6 +38,6 @@ def generate_token() -> str:
 def generate_temp_password() -> str:
     """Human-readable 10-char temp password: XXXXX-XXXXX (uppercase + digits)."""
     chars = string.ascii_uppercase + string.digits
-    a = ''.join(random.choices(chars, k=5))
-    b = ''.join(random.choices(chars, k=5))
+    a = ''.join(secrets.choice(chars) for _ in range(5))
+    b = ''.join(secrets.choice(chars) for _ in range(5))
     return f"{a}-{b}"

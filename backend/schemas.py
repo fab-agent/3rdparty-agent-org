@@ -244,7 +244,7 @@ class ChangeRequestReject(BaseModel):
 # ── A2A ────────────────────────────────────────────────────────────────────────
 
 class A2ARequestCreate(BaseModel):
-    from_session_id: str
+    from_session_id: Optional[str] = None
     from_agent_id: str
     to_agent_id: str
     task: str

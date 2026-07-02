@@ -2,7 +2,7 @@
 
 Self-hosted, open-source platform for companies to manage AI agents in a structured way.
 
-Assign model + skills + policies to each personnel member, visualize the org chart, and sync all configuration to Git via YAML files.
+Assign model + skills + policies to each personnel member, visualize the org chart, and manage agent-to-agent (A2A) delegation workflows.
 
 ---
 
@@ -14,10 +14,14 @@ Assign model + skills + policies to each personnel member, visualize the org cha
 | Department + personnel CRUD | ✅ |
 | Agent configuration (model, skills, status) | ✅ |
 | Org chart visualization (tree view) | ✅ |
-| AI provider key management (Anthropic, OpenAI, Google, Mistral) | ✅ |
-| Git integration (GitHub / GitLab / Gitea) | ✅ |
-| CLI setup wizard (`3pa init`) | ✅ |
-| Multi-language support (TR / EN / DE / ES) | ✅ |
+| AI provider key management (Anthropic, OpenAI, Google, Mistral, Qwen) | ✅ |
+| Agent-to-Agent (A2A) delegation with human approval | ✅ |
+| Real-time AI chat sessions (SSE streaming) | ✅ |
+| First-time setup wizard (no hardcoded credentials) | ✅ |
+| JWT auth + bcrypt passwords + AES-256 key encryption | ✅ |
+| Audit log | ✅ |
+| Multi-language support (TR / EN) | ✅ |
+| Unit test suite (89 tests) | ✅ |
 
 ---
 
@@ -26,7 +30,7 @@ Assign model + skills + policies to each personnel member, visualize the org cha
 ### Requirements
 
 - Docker + Docker Compose **or** Python 3.11+ and Node.js 20+
-- (Optional) AI provider API key: Anthropic / OpenAI / Google / Mistral
+- (Optional) AI provider API key: Anthropic / OpenAI / Google / Mistral / Qwen
 
 ---
 
@@ -36,8 +40,8 @@ Assign model + skills + policies to each personnel member, visualize the org cha
 git clone https://github.com/fab-agent/3rdparty-agent-org.git
 cd 3rdparty-agent-org
 
-cp .env.example .env
-# Edit .env (AI keys, optional)
+cp backend/.env.example backend/.env
+# Edit .env (JWT_SECRET required, AI keys optional)
 
 docker compose up --build
 ```
@@ -69,33 +73,15 @@ npm run dev                   # http://localhost:5173
 
 ---
 
-### Option C — CLI Wizard
+## First Launch
 
-```bash
-cd packages/cli
-npm install
-npm run build
+On first open, a setup wizard asks for:
+- Full name
+- Company name
+- E-mail
+- Password
 
-# Start the wizard
-npx 3pa init
-```
-
-Step-by-step prompts:
-1. Company name + industry
-2. AI provider selection and API key entry
-3. Git integration (optional)
-4. Start the application
-
----
-
-## After Initial Setup
-
-The platform ships with sample data on first launch:
-
-- **Fabrika Yazılım** — 6 departments, 10 humans, 9 agents
-- **Demo Corp** — 1 department, 3 people, 1 agent
-
-Use this data as a template or delete it.
+This creates the founder account. No hardcoded credentials — every install gets its own admin.
 
 ---
 
@@ -104,7 +90,7 @@ Use this data as a template or delete it.
 ### 1. Company Management
 
 The active company is shown in the sidebar (bottom left).  
-Click the company name to switch between companies or create a new one with the **"Add Company"** button.
+Switch between companies or create a new one with the **"Add Company"** button.
 
 Each company has its own departments, personnel, and agents.
 
@@ -117,8 +103,6 @@ On the **Departments** page:
 - Edit / delete existing departments
 - Set department status to Active / Inactive
 
-Policy lists can be defined per department (e.g. "Code Review SLA", "Deployment Approval Policy").
-
 ---
 
 ### 3. Personnel Management
@@ -128,24 +112,26 @@ The **Personnel** page lists both human employees and agents.
 When adding new personnel:
 - **Type:** Human or Agent
 - Assign a **department** and **manager**
-- For agents, an `AgentConfig` is automatically created in the background
+- For agents, an `AgentConfig` is created automatically
 
 ---
 
 ### 4. Agent Configuration
 
-To configure an agent for a personnel member:
 1. Select the personnel → `PATCH /personnel/{id}/agent-config`
-2. Choose a **model** (claude-sonnet-4-6, gpt-4o, gemini-2.5-pro, ...)
-3. Set the **model version** and **status** (draft / active / inactive)
-4. Add **skills**: name, version, short description
+2. Choose a **model** (claude-sonnet-4-6, gpt-4o, gemini-2.5-pro, qwen-max, ...)
+3. Set **status** (draft / active / inactive)
+4. Add **skills**: name, version, description
 
 ---
 
-### 5. Org Chart
+### 5. Agent-to-Agent (A2A) Delegation
 
-The **Org Chart** page displays the active company's hierarchy as a tree.  
-Click an agent node to view its model, skill list, and responsible person in the right panel.
+An agent can request a task from another agent. A designated human must approve before execution, and again after reviewing the result.
+
+Flow: `create → pending_approval → approved → running → pending_result_approval → completed`
+
+Rejection is available at both approval stages.
 
 ---
 
@@ -153,55 +139,16 @@ Click an agent node to view its model, skill list, and responsible person in the
 
 Under **Settings → AI Providers**:
 
-| Provider | Test Support |
+| Provider | Models |
 |---|---|
-| Anthropic (Claude) | ✅ |
-| OpenAI (GPT) | ✅ |
-| Google (Gemini) | ✅ |
-| Mistral | ✅ |
+| Anthropic (Claude) | claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5 |
+| OpenAI (GPT) | gpt-4o, gpt-4o-mini, o1, o3-mini |
+| Google (Gemini) | gemini-2.5-pro, gemini-2.0-flash |
+| Mistral | mistral-large, mistral-small, codestral |
+| Alibaba Qwen | qwen-max, qwen-plus, qwen-turbo, qwen-long |
 
-After entering an API key, use the **Test** button to verify it.  
+After entering an API key the system tests it immediately.  
 Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text.
-
----
-
-### 7. Git Integration
-
-Under **Settings → Git Integration**:
-
-1. Select a **provider**: GitHub / GitLab / Gitea
-2. Enter the **repo URL**, **branch**, and **access token**
-3. Click **Connect**
-
-Once connected:
-- **Pull** — Import YAML files from the repo into the database
-- **Push** — Export the database to YAML files and commit
-- **Diff** — View pending changes
-- **Auto PR** — Open a pull request instead of pushing directly (optional)
-
-YAML format (`agents/codeguard/agent.yaml`):
-```yaml
-id: codeguard
-name: CodeGuard
-title: Code Review Agent
-model: claude-sonnet-4-6
-model_version: '4.6'
-status: active
-department: yazilim-gelistirme
-responsible: elif-yildiz
-skills:
-  - name: Code Review
-    version: '2.1'
-    description: PR review and security scanning
-updated_at: '2026-06-01'
-```
-
----
-
-### 8. Language Switching
-
-Use the flag icon in the top right to change the UI language:  
-🇹🇷 Turkish · 🇬🇧 English · 🇩🇪 German · 🇪🇸 Spanish
 
 ---
 
@@ -213,103 +160,116 @@ Use the flag icon in the top right to change the UI language:
 │   ├── main.py                 # App startup, router registration
 │   ├── models.py               # SQLModel tables
 │   ├── schemas.py              # Pydantic request/response schemas
-│   ├── database.py             # Engine + session
-│   ├── seed.py                 # Sample data (2 companies, 7 depts, 19 personnel)
+│   ├── database.py             # Engine + session (expire_on_commit=False)
+│   ├── seed.py                 # Sample org data (no user creation)
 │   ├── api/
+│   │   ├── auth.py             # Login, invite, setup wizard, JWT
 │   │   ├── companies.py        # Company CRUD + stats
-│   │   ├── departments.py      # Department CRUD
+│   │   ├── departments.py      # Department CRUD + tree
 │   │   ├── personnel.py        # Personnel + agent config + skill CRUD
+│   │   ├── sessions.py         # AI sessions + SSE streaming
+│   │   ├── a2a.py              # Agent-to-Agent delegation flow
 │   │   ├── providers.py        # AI provider key management
-│   │   └── git_sync.py         # Git pull/push/diff/logs
+│   │   └── audit.py            # Audit log
 │   ├── core/
-│   │   └── security.py         # Fernet encryption
-│   └── services/
-│       ├── provider_service.py # Provider testing + model listing
-│       └── git_service.py      # GitPython operations + YAML export/import
+│   │   └── security.py         # Fernet encryption (data/.secret)
+│   ├── services/
+│   │   ├── agent_runtime.py    # AI execution engine (Anthropic / OpenAI / Google / Mistral / Qwen)
+│   │   ├── provider_service.py # Provider testing + model listing
+│   │   └── auth.py             # JWT + bcrypt helpers
+│   └── tests/                  # 89 pytest unit + integration tests
 │
-├── frontend/                   # SvelteKit 5 + Tailwind
-│   └── src/
-│       ├── lib/
-│       │   ├── api/            # Type-safe fetch clients
-│       │   ├── components/ui/  # Bespoke components (Button, Dialog, Badge...)
-│       │   ├── i18n/           # TR/EN/DE/ES translation dictionaries
-│       │   └── stores/         # company.svelte.ts (active company)
-│       └── routes/
-│           ├── +layout.svelte  # Company switcher, language selector, nav
-│           ├── departments/    # Department management
-│           ├── personnel/      # Personnel + agent list
-│           ├── org-chart/      # Visual org chart
-│           └── settings/       # AI providers + Git
-│
-├── packages/cli/               # `3pa` CLI wizard (TypeScript)
-├── data/                       # SQLite DB + Git repo cache
-└── docker-compose.yml
+└── frontend/                   # SvelteKit 5 + Tailwind
+    └── src/
+        ├── lib/
+        │   ├── api/            # Type-safe fetch clients
+        │   ├── components/ui/  # Bespoke UI components (Button, Dialog, Badge...)
+        │   ├── i18n/           # TR / EN translation dictionaries
+        │   └── stores/         # authStore, companyStore
+        └── routes/
+            ├── setup/          # First-time setup wizard
+            ├── +layout.svelte  # Auth guard, nav, language selector
+            ├── organizations/  # Company management
+            ├── personnel/      # Personnel + agent list
+            └── settings/       # AI providers
 ```
 
 ### Data Model
 
 ```
 Company ──< Department ──< Personnel ──── AgentConfig ──< Skill
-                    │                           │
-                    └── (company_id FK)         └── (responsible_id → Personnel)
+                                 │
+                          A2ARequest (from_agent → to_agent, human approver)
+                          AgentSession ──< SessionMessage
 ```
 
 ---
 
 ## API Reference
 
-Full documentation when the server is running:
+Full docs when the server is running:
 
 - Swagger UI → `http://localhost:8000/docs`
 - ReDoc → `http://localhost:8000/redoc`
 
-### Core Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/companies` | Company list + stats |
-| POST | `/companies` | Create company |
-| GET | `/departments?company_id=` | Department list (filtered by company) |
-| GET | `/personnel?company_id=` | Personnel list (filtered by company) |
-| GET | `/org-tree?company_id=` | Hierarchical tree |
-| GET | `/providers/status` | AI provider statuses |
-| POST | `/providers/{p}/key` | Save API key |
-| POST | `/providers/{p}/test` | Test API key |
-| GET | `/git/config` | Git connection settings |
-| POST | `/git/pull` | Pull from repo |
-| POST | `/git/push` | Push to repo |
+All endpoints require `Authorization: Bearer <token>` except `/auth/token`, `/auth/setup-status`, and `/auth/setup`.
 
 ---
 
 ## Environment Variables
 
-Start by copying `.env.example`:
-
 ```bash
+# Required
+JWT_SECRET=<random-64-char-hex>
+
+# Email (optional — needed for invite/reset flows)
+RESEND_API_KEY=
+EMAIL_FROM=noreply@example.com
+APP_URL=http://localhost:5173
+
 # AI Providers (optional — can also be added from the Settings page)
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 GOOGLE_API_KEY=AIza...
 MISTRAL_API_KEY=...
-
-# Frontend
-VITE_API_URL=http://localhost:8000
+QWEN_API_KEY=sk-...
 ```
 
 ---
 
-## Development
+## Testing
 
 ```bash
-# Backend type check (optional)
-cd backend && mypy .
-
-# Frontend type check
-cd frontend && npm run check
-
-# Frontend build only
-cd frontend && npm run build
+cd backend
+pip install -r requirements.txt
+pytest tests/ -v
 ```
+
+89 tests covering: auth, providers, A2A flow, agent runtime, CRUD endpoints.
+
+---
+
+## TODO
+
+### Security
+- [ ] **Login rate limiting** — brute-force protection on `POST /auth/token`. Implement via `slowapi` or upstream Nginx/Caddy limit_req.
+- [ ] **CORS tightening** — `allow_origins=["*"]` is fine for self-hosted dev but should be restricted to the frontend URL in production deployments.
+- [ ] **Invite role validation** — currently a `dept_head` (manager) can invite someone with the `founder` role. Restrict: only founders can assign the founder role.
+- [ ] **A2A approver caller verification** — `POST /a2a/requests/{id}/approve` checks that `body.approver_id` matches `req.approver_id`, but does not yet verify that the JWT caller's personnel record matches `approver_id`. Needs `Personnel.user_id == caller.id` check.
+- [ ] **Email format validation** — `POST /auth/invite` and `POST /auth/setup` accept any string as email. Add regex or `email-validator` check.
+
+### Features
+- [ ] **Qwen end-to-end test** — DashScope API key required. Get a valid key from [console.aliyun.com](https://dashscope.aliyuncs.com) and test via Settings → AI Providers.
+- [ ] **Faz 2: Markdown editors** — `company.md` (company policy editor), `agent.md` (agent persona editor), `policy.md` per department.
+- [ ] **Org chart frontend** — personnel hierarchy tree visualization page.
+- [ ] **A2A inbox UI** — frontend page to list pending A2A approvals for the logged-in user.
+- [ ] **Session history UI** — browse and replay past agent sessions.
+- [ ] **must_change_password gate** — frontend should redirect to change-password page when `must_change_password: true` is returned from `/auth/me`.
+
+### Infrastructure
+- [ ] **PostgreSQL support** — swap SQLite for Postgres for multi-user concurrent workloads.
+- [ ] **Docker health checks** — add `HEALTHCHECK` to backend and frontend Dockerfile.
+- [ ] **`.env.example`** — create committed example file so new contributors know what vars are needed.
 
 ---
 

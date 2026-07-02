@@ -211,7 +211,7 @@ class ChangeRequest(SQLModel, table=True):
 class A2ARequest(SQLModel, table=True):
     """Agent-to-Agent delegation request with two-stage human approval."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    from_session_id: str = Field(foreign_key="agentsession.id")
+    from_session_id: Optional[str] = Field(default=None, foreign_key="agentsession.id")
     from_agent_id: str = Field(foreign_key="personnel.id")   # requesting agent
     to_agent_id: str = Field(foreign_key="personnel.id")     # target agent
     task: str                            # task description for target agent

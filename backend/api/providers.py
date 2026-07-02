@@ -1,12 +1,13 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
 from api.audit import log_action
+from api.auth import get_current_user, require_manager
 from core.security import encrypt, decrypt
 from database import get_session
-from models import AppConfig, ProviderKey
+from models import AppConfig, ProviderKey, User
 from schemas import ConfigPatch, SetProviderKey
 from services.provider_service import (
     PROVIDER_CONFIGS,
@@ -21,14 +22,14 @@ router = APIRouter(tags=["providers"])
 # ── Platform Config ────────────────────────────────────────────────────────────
 
 @router.get("/config")
-def get_config():
+def get_config(_: User = Depends(get_current_user)):
     with get_session() as session:
         rows = session.exec(select(AppConfig)).all()
         return {r.key: r.value for r in rows}
 
 
 @router.patch("/config")
-def patch_config(body: ConfigPatch):
+def patch_config(body: ConfigPatch, _: User = Depends(require_manager)):
     with get_session() as session:
         for key, value in body.data.items():
             existing = session.get(AppConfig, key)
@@ -69,7 +70,7 @@ def _provider_status_dict(row: ProviderKey | None, provider: str) -> dict:
 
 
 @router.get("/providers/status")
-def list_provider_status():
+def list_provider_status(_: User = Depends(get_current_user)):
     with get_session() as session:
         return [
             _provider_status_dict(_provider_row(session, p), p)
@@ -78,7 +79,7 @@ def list_provider_status():
 
 
 @router.get("/providers/models")
-def list_available_models():
+def list_available_models(_: User = Depends(get_current_user)):
     """Returns models from all active providers — used by the agent model picker."""
     with get_session() as session:
         active = session.exec(
@@ -91,7 +92,8 @@ def list_available_models():
 
 
 @router.post("/providers/{provider}/key", status_code=201)
-def set_provider_key(provider: str, body: SetProviderKey):
+def set_provider_key(provider: str, body: SetProviderKey,
+                     _: User = Depends(require_manager)):
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
 
@@ -126,7 +128,7 @@ def set_provider_key(provider: str, body: SetProviderKey):
 
 
 @router.delete("/providers/{provider}/key", status_code=204)
-def delete_provider_key(provider: str):
+def delete_provider_key(provider: str, _: User = Depends(require_manager)):
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
     with get_session() as session:
@@ -138,7 +140,7 @@ def delete_provider_key(provider: str):
 
 
 @router.post("/providers/{provider}/test")
-def test_existing_key(provider: str):
+def test_existing_key(provider: str, _: User = Depends(require_manager)):
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
     with get_session() as session:

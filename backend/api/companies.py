@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select, func
 
 from api.audit import log_action
+from api.auth import get_current_user
 from database import get_session
-from models import Company, Department, Personnel, AgentConfig
+from models import Company, Department, Personnel, AgentConfig, User
 from schemas import CompanyCreate, CompanyUpdate
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -37,14 +38,14 @@ def _company_to_dict(company: Company, session) -> dict:
 
 
 @router.get("")
-def list_companies():
+def list_companies(_: User = Depends(get_current_user)):
     with get_session() as session:
         companies = session.exec(select(Company)).all()
         return [_company_to_dict(c, session) for c in companies]
 
 
 @router.post("", status_code=201)
-def create_company(body: CompanyCreate):
+def create_company(body: CompanyCreate, _: User = Depends(get_current_user)):
     with get_session() as session:
         company = Company(
             name=body.name,
@@ -60,7 +61,7 @@ def create_company(body: CompanyCreate):
 
 
 @router.get("/{company_id}")
-def get_company(company_id: str):
+def get_company(company_id: str, _: User = Depends(get_current_user)):
     with get_session() as session:
         company = session.get(Company, company_id)
         if not company:
@@ -69,7 +70,7 @@ def get_company(company_id: str):
 
 
 @router.patch("/{company_id}")
-def update_company(company_id: str, body: CompanyUpdate):
+def update_company(company_id: str, body: CompanyUpdate, _: User = Depends(get_current_user)):
     with get_session() as session:
         company = session.get(Company, company_id)
         if not company:
@@ -86,7 +87,7 @@ def update_company(company_id: str, body: CompanyUpdate):
 
 
 @router.delete("/{company_id}", status_code=204)
-def delete_company(company_id: str):
+def delete_company(company_id: str, _: User = Depends(get_current_user)):
     with get_session() as session:
         company = session.get(Company, company_id)
         if not company:
