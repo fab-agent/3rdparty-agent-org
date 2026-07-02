@@ -50,8 +50,6 @@
 	const locales: { code: Locale; label: string; flag: string }[] = [
 		{ code: 'tr', label: 'Türkçe', flag: '🇹🇷' },
 		{ code: 'en', label: 'English', flag: '🇬🇧' },
-		{ code: 'de', label: 'Deutsch', flag: '🇩🇪' },
-		{ code: 'es', label: 'Español', flag: '🇪🇸' },
 	];
 
 	function t(key: Parameters<typeof i18n.t>[0]) {
