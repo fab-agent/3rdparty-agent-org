@@ -19,5 +19,5 @@ def init_db() -> None:
 
 @contextmanager
 def get_session() -> Generator[Session, None, None]:
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         yield session
