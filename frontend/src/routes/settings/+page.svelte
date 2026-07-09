@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { providers as providerApi, type ProviderStatus } from '$lib/api/providers.js';
 	import { git as gitApi, type GitConfig, type SyncLog } from '$lib/api/git.js';
+	import { api } from '$lib/api/client.js';
 	import { companyStore } from '$lib/stores/company.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import {
@@ -22,12 +23,16 @@
 		AlertTriangle,
 		Loader2,
 		Clock,
-		User
+		User,
+		Database,
+		CloudUpload,
+		History,
+		ShieldCheck
 	} from '@lucide/svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	// ── Tabs ─────────────────────────────────────────────────────────────────
-	let tab = $state<'providers' | 'git' | 'audit'>('providers');
+	let tab = $state<'providers' | 'git' | 'audit' | 'backup'>('providers');
 
 	// ── Provider state ────────────────────────────────────────────────────────
 	type ProviderCard = ProviderStatus & {
@@ -212,9 +217,103 @@
 		}
 	}
 
-	function switchTab(newTab: 'providers' | 'git' | 'audit') {
+	// ── Backup state ─────────────────────────────────────────────────────────
+	type BackupConfig = {
+		configured: boolean;
+		endpoint_url: string | null;
+		bucket: string | null;
+		prefix: string | null;
+		region: string | null;
+		access_key_hint: string | null;
+	};
+	type BackupEntry = { ts: string; filename: string; size_bytes: number; status: string; message: string | null };
+
+	let backupConfig = $state<BackupConfig | null>(null);
+	let backupHistory = $state<BackupEntry[]>([]);
+	let backupLoading = $state(false);
+	let backupSaving = $state(false);
+	let backupRunning = $state(false);
+	let backupError = $state('');
+	let backupSuccess = $state('');
+	let showEditForm = $state(false);
+	let showSecret = $state(false);
+
+	let backupForm = $state({
+		endpoint_url: '',
+		bucket: '',
+		prefix: 'backups/',
+		region: 'us-east-1',
+		access_key: '',
+		secret_key: '',
+	});
+
+	async function loadBackup() {
+		backupLoading = true;
+		try {
+			const [cfg, hist] = await Promise.all([
+				api.get<BackupConfig>('/backup/config'),
+				api.get<BackupEntry[]>('/backup/history'),
+			]);
+			backupConfig = cfg;
+			backupHistory = hist;
+			if (cfg.configured) {
+				backupForm.endpoint_url = cfg.endpoint_url ?? '';
+				backupForm.bucket = cfg.bucket ?? '';
+				backupForm.prefix = cfg.prefix ?? 'backups/';
+				backupForm.region = cfg.region ?? 'us-east-1';
+			}
+		} finally {
+			backupLoading = false;
+		}
+	}
+
+	async function saveBackupConfig() {
+		backupSaving = true;
+		backupError = '';
+		backupSuccess = '';
+		try {
+			await api.put('/backup/config', { ...backupForm });
+			await loadBackup();
+			showEditForm = false;
+			backupSuccess = 'Yedekleme ayarları kaydedildi.';
+		} catch (e: any) {
+			backupError = e?.message ?? 'Kaydetme başarısız';
+		} finally {
+			backupSaving = false;
+		}
+	}
+
+	async function deleteBackupConfig() {
+		backupError = '';
+		try {
+			await api.delete('/backup/config');
+			backupConfig = { configured: false, endpoint_url: null, bucket: null, prefix: null, region: null, access_key_hint: null };
+			backupForm = { endpoint_url: '', bucket: '', prefix: 'backups/', region: 'us-east-1', access_key: '', secret_key: '' };
+			showEditForm = false;
+		} catch (e: any) {
+			backupError = e?.message ?? 'Silme başarısız';
+		}
+	}
+
+	async function runBackup() {
+		backupRunning = true;
+		backupError = '';
+		backupSuccess = '';
+		try {
+			const result = await api.post<{ filename: string; size_bytes: number }>('/backup/now', {});
+			backupSuccess = `Yedek oluşturuldu: ${result.filename} (${(result.size_bytes / 1024).toFixed(1)} KB)`;
+			await loadBackup();
+		} catch (e: any) {
+			backupError = e?.message ?? 'Yedekleme başarısız';
+		} finally {
+			backupRunning = false;
+		}
+	}
+
+	function switchTab(newTab: 'providers' | 'git' | 'audit' | 'backup') {
 		tab = newTab;
 		if (newTab === 'audit') loadAuditLogs();
+		if (newTab === 'backup') loadBackup();
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
@@ -290,6 +389,18 @@
 		>
 			<Clock class="w-4 h-4" />
 			Audit Log
+		</button>
+		<button
+			class={[
+				'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-x-2',
+				tab === 'backup'
+					? 'border-primary text-foreground'
+					: 'border-transparent text-muted-foreground hover:text-foreground'
+			].join(' ')}
+			onclick={() => switchTab('backup')}
+		>
+			<Database class="w-4 h-4" />
+			Yedekleme
 		</button>
 	</div>
 
@@ -722,6 +833,234 @@
 				</div>
 			</div>
 		{/if}
+	{/if}
+
+	<!-- ── BACKUP TAB ───────────────────────────────────────────────────── -->
+	{#if tab === 'backup'}
+		<div class="space-y-6">
+			<p class="text-sm text-muted-foreground">
+				Veritabanını S3, Cloudflare R2 veya MinIO gibi uyumlu bir depolamaya yedekleyin.
+				Yedekleme isteğe bağlıdır — ayarlamadan da kullanabilirsiniz.
+			</p>
+
+			{#if backupError}
+				<div class="flex items-center gap-x-2 text-sm text-destructive bg-destructive/10 px-4 py-3 rounded-xl">
+					<XCircle class="w-4 h-4 flex-shrink-0" />
+					{backupError}
+				</div>
+			{/if}
+			{#if backupSuccess}
+				<div class="flex items-center gap-x-2 text-sm text-emerald-700 bg-emerald-50 px-4 py-3 rounded-xl">
+					<CheckCircle2 class="w-4 h-4 flex-shrink-0" />
+					{backupSuccess}
+				</div>
+			{/if}
+
+			{#if backupLoading}
+				<div class="flex justify-center py-12">
+					<Loader2 class="w-5 h-5 animate-spin text-muted-foreground" />
+				</div>
+			{:else}
+				<!-- Config card -->
+				<div class="rounded-2xl border bg-card overflow-hidden">
+					<div class="flex items-center justify-between px-5 py-4">
+						<div class="flex items-center gap-x-3">
+							{#if backupConfig?.configured}
+								<ShieldCheck class="w-5 h-5 text-emerald-500" />
+								<div>
+									<div class="font-semibold text-sm">{backupConfig.bucket}</div>
+									<div class="text-xs text-muted-foreground mt-0.5">
+										{backupConfig.endpoint_url || 'AWS S3'} · {backupConfig.prefix}
+									</div>
+								</div>
+							{:else}
+								<Database class="w-5 h-5 text-muted-foreground/50" />
+								<div>
+									<div class="font-semibold text-sm text-muted-foreground">Yapılandırılmamış</div>
+									<div class="text-xs text-muted-foreground mt-0.5">Depolama bilgileri girilmemiş</div>
+								</div>
+							{/if}
+						</div>
+						<div class="flex items-center gap-x-2">
+							{#if backupConfig?.configured}
+								<Button
+									variant="default"
+									size="sm"
+									class="h-8 px-3 text-xs gap-x-1.5"
+									disabled={backupRunning}
+									onclick={runBackup}
+								>
+									{#if backupRunning}
+										<Loader2 class="w-3.5 h-3.5 animate-spin" />
+										Yedekleniyor...
+									{:else}
+										<CloudUpload class="w-3.5 h-3.5" />
+										Yedekle
+									{/if}
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-8 px-3 text-xs gap-x-1.5"
+									onclick={() => { showEditForm = !showEditForm; }}
+								>
+									Düzenle
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-8 px-3 text-xs text-destructive hover:text-destructive gap-x-1.5"
+									onclick={deleteBackupConfig}
+								>
+									<Trash2 class="w-3.5 h-3.5" />
+								</Button>
+							{:else}
+								<Button
+									variant="outline"
+									size="sm"
+									class="h-8 px-3 text-xs gap-x-1.5"
+									onclick={() => { showEditForm = true; }}
+								>
+									<Link class="w-3.5 h-3.5" />
+									Yapılandır
+								</Button>
+							{/if}
+						</div>
+					</div>
+
+					{#if showEditForm || !backupConfig?.configured}
+						<div class="px-5 pb-5 pt-2 border-t border-border/50 space-y-3">
+							<div class="grid grid-cols-2 gap-3">
+								<div>
+									<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="backup-bucket">
+										Bucket Adı <span class="text-destructive">*</span>
+									</label>
+									<input id="backup-bucket" type="text" bind:value={backupForm.bucket}
+										placeholder="my-backups"
+										class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
+								</div>
+								<div>
+									<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="backup-prefix">
+										Prefix
+									</label>
+									<input id="backup-prefix" type="text" bind:value={backupForm.prefix}
+										placeholder="backups/"
+										class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
+								</div>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="backup-endpoint">
+									Endpoint URL
+									<span class="font-normal text-muted-foreground/70">(boş = AWS S3; R2/MinIO için doldurun)</span>
+								</label>
+								<input id="backup-endpoint" type="url" bind:value={backupForm.endpoint_url}
+									placeholder="https://xxx.r2.cloudflarestorage.com"
+									class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
+							</div>
+							<div class="grid grid-cols-2 gap-3">
+								<div>
+									<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="backup-ak">
+										Access Key ID <span class="text-destructive">*</span>
+									</label>
+									<input id="backup-ak" type="text" bind:value={backupForm.access_key}
+										placeholder="AKIAIOSFODNN7EXAMPLE"
+										class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
+								</div>
+								<div>
+									<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="backup-region">
+										Region
+									</label>
+									<input id="backup-region" type="text" bind:value={backupForm.region}
+										placeholder="us-east-1"
+										class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
+								</div>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="backup-sk">
+									Secret Access Key <span class="text-destructive">*</span>
+									{#if backupConfig?.configured && !backupForm.secret_key}
+										<span class="font-normal text-muted-foreground/70">(mevcut anahtar — değiştirmek için girin)</span>
+									{/if}
+								</label>
+								<div class="relative">
+									<input id="backup-sk" type={showSecret ? 'text' : 'password'}
+										bind:value={backupForm.secret_key}
+										placeholder={backupConfig?.configured ? '••••••••' : 'wJalrXUtnFEMI/K7MDENG...'}
+										class="w-full h-9 px-3 pr-10 text-sm rounded-lg border border-input bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
+									<button type="button"
+										class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+										onclick={() => (showSecret = !showSecret)}>
+										{#if showSecret}<EyeOff class="w-4 h-4" />{:else}<Eye class="w-4 h-4" />{/if}
+									</button>
+								</div>
+							</div>
+							<div class="flex justify-end gap-x-2 pt-1">
+								{#if showEditForm}
+									<Button variant="ghost" size="sm" class="h-8 px-3 text-xs"
+										onclick={() => { showEditForm = false; }}>İptal</Button>
+								{/if}
+								<Button variant="default" size="sm" class="h-8 px-4 text-xs"
+									disabled={backupSaving || !backupForm.bucket || !backupForm.access_key || (!backupConfig?.configured && !backupForm.secret_key)}
+									onclick={saveBackupConfig}>
+									{#if backupSaving}
+										<Loader2 class="w-3.5 h-3.5 animate-spin mr-1.5" />
+									{/if}
+									Kaydet
+								</Button>
+							</div>
+						</div>
+					{/if}
+				</div>
+
+				<!-- Backup History -->
+				{#if backupHistory.length > 0}
+					<div>
+						<h3 class="text-xs font-semibold text-muted-foreground tracking-wide uppercase mb-3 flex items-center gap-x-2">
+							<History class="w-3.5 h-3.5" />
+							Son Yedekler
+						</h3>
+						<div class="rounded-xl border overflow-hidden">
+							<table class="w-full text-sm">
+								<thead>
+									<tr class="border-b bg-muted/40">
+										<th class="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Dosya</th>
+										<th class="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Boyut</th>
+										<th class="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Durum</th>
+										<th class="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Tarih</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each backupHistory as entry}
+										<tr class="border-b last:border-0 hover:bg-muted/30">
+											<td class="px-4 py-2.5 font-mono text-xs">{entry.filename}</td>
+											<td class="px-4 py-2.5 text-xs text-muted-foreground">
+												{entry.size_bytes > 0 ? (entry.size_bytes / 1024).toFixed(1) + ' KB' : '—'}
+											</td>
+											<td class="px-4 py-2.5">
+												<span class={[
+													'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+													entry.status === 'success'
+														? 'bg-emerald-500/10 text-emerald-700'
+														: 'bg-destructive/10 text-destructive'
+												].join(' ')}>
+													{entry.status === 'success' ? 'Başarılı' : 'Hata'}
+												</span>
+												{#if entry.message && entry.status !== 'success'}
+													<span class="text-xs text-muted-foreground ml-2 truncate max-w-xs">{entry.message}</span>
+												{/if}
+											</td>
+											<td class="px-4 py-2.5 text-xs text-muted-foreground text-right">
+												{new Date(entry.ts).toLocaleString('tr-TR')}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				{/if}
+			{/if}
+		</div>
 	{/if}
 
 	<!-- ── AUDIT LOG TAB ─────────────────────────────────────────────────── -->

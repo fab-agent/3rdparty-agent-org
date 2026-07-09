@@ -26,6 +26,7 @@ Assign model + skills + policies to each personnel member, visualize the org cha
 | Structured JSON logging (logs/app.log) | ✅ |
 | Database migrations (Alembic) | ✅ |
 | Login rate limiting (Nginx) | ✅ |
+| On-demand backup to S3/R2/MinIO (Settings → Backup) | ✅ |
 
 ---
 
@@ -315,7 +316,7 @@ pytest tests/ -v
 - [ ] **Faz 2: Markdown editors** — `company.md`, `agent.md`, `policy.md` editors.
 - [ ] **Org chart visualization** — personnel hierarchy tree on a dedicated page.
 - [ ] **Social media agent** — Instagram + WhatsApp integration for Fabrika Yazılım.
-- [ ] **Backup UI** — S3/cloud storage settings with on-demand backup button.
+- [x] **Backup UI** — Settings → Backup tab: S3/R2/MinIO config, on-demand backup, history log (last 20 runs).
 
 ### Infrastructure
 - [x] **Database migrations** — Alembic set up; schema changes now tracked via `alembic revision --autogenerate`.

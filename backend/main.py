@@ -38,6 +38,7 @@ from api.flows import router as flows_router
 from api.inbox import router as inbox_router
 from api.task_requests import router as task_router
 from api.audit import router as audit_router
+from api.backup import router as backup_router
 
 app = FastAPI(
     title="3rdParty Agent Organization API",
@@ -83,6 +84,7 @@ app.include_router(flows_router)
 app.include_router(inbox_router)
 app.include_router(task_router)
 app.include_router(audit_router)
+app.include_router(backup_router)
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
