@@ -8,7 +8,7 @@ from sqlmodel import select
 
 from api.auth import get_current_user
 from database import get_session
-from models import AgentSession, SessionMessage, Personnel, User
+from models import AgentMemory, AgentSession, SessionMessage, Personnel, User
 from schemas import SessionCreate, MessageCreate
 from services.agent_runtime import run_session
 from services.memory_service import generate_session_summary
@@ -83,6 +83,27 @@ def create_session(body: SessionCreate, _: User = Depends(get_current_user)):
         session.commit()
         session.refresh(sess)
         return _session_to_dict(sess, messages=[])
+
+
+# ── Memory ───────────────────────────────────────────────────────────────────
+
+@router.get("/sessions/memories")
+def list_memories(personnel_id: Optional[str] = None, _: User = Depends(get_current_user)):
+    with get_session() as session:
+        q = select(AgentMemory).order_by(AgentMemory.created_at.desc())
+        if personnel_id:
+            q = q.where(AgentMemory.personnel_id == personnel_id)
+        rows = session.exec(q).all()
+        return [
+            {
+                "id": m.id,
+                "personnel_id": m.personnel_id,
+                "session_id": m.session_id,
+                "summary": m.summary,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in rows
+        ]
 
 
 @router.get("/sessions/{session_id}")

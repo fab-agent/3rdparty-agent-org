@@ -616,7 +616,7 @@
 	<!-- Tabs -->
 	<div class="relative mb-8">
 		<div class="absolute bottom-0 left-0 right-0 h-px bg-border pointer-events-none"></div>
-		<div class="tab-scroll flex gap-x-1">
+		<div class="flex gap-x-1" style="overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none;">
 
 			<button class={['tab-btn', tab==='providers' ? 'tab-active' : 'tab-inactive'].join(' ')} onclick={() => switchTab('providers')}>
 				<Cpu class="w-4 h-4" />{t('settings_providers')}

@@ -5,8 +5,9 @@
 	import Dialog from '$lib/components/ui/dialog.svelte';
 	import Table from '$lib/components/ui/table.svelte';
 	import Input from '$lib/components/ui/input.svelte';
-	import { Plus, Pencil, Trash2, Users, Bot, Loader, Mail, ShieldCheck, UserCheck } from '@lucide/svelte';
+	import { Plus, Pencil, Trash2, Users, Bot, Loader, Mail, ShieldCheck, UserCheck, X, Building, User, BrainCircuit, MessageSquare, Clock } from '@lucide/svelte';
 	import { personnel as personnelApi, type PersonnelItem, type PersonnelCreate } from '$lib/api/personnel';
+	import { sessionsApi, type Session, type AgentMemory } from '$lib/api/sessions';
 	import { departments as deptApi, type Department } from '$lib/api/departments';
 	import { companyStore } from '$lib/stores/company.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
@@ -170,6 +171,32 @@
 		}
 	}
 
+	// ── Side panel ───────────────────────────────────────────────────────────
+	let selectedPerson = $state<PersonnelItem | null>(null);
+	let panelSessions = $state<Session[]>([]);
+	let panelMemories = $state<AgentMemory[]>([]);
+	let panelLoading = $state(false);
+
+	function openPanel(p: PersonnelItem) {
+		selectedPerson = p;
+		panelSessions = [];
+		panelMemories = [];
+	}
+	function closePanel() { selectedPerson = null; }
+
+	$effect(() => {
+		if (!selectedPerson) return;
+		const pid = selectedPerson.id;
+		panelLoading = true;
+		Promise.all([
+			sessionsApi.list({ personnel_id: pid }),
+			sessionsApi.memories(pid),
+		]).then(([s, m]) => {
+			panelSessions = s;
+			panelMemories = m;
+		}).catch(() => {}).finally(() => { panelLoading = false; });
+	});
+
 	// ── Permissions ───────────────────────────────────────────────────────────
 	const activeCompanyId = $derived(companyStore.active?.id ?? '');
 	const canManage = $derived(authStore.can(activeCompanyId, 'dept_head'));
@@ -239,7 +266,8 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each people as person (person.id)}
-						<tr class="hover:bg-muted/30 transition-colors">
+						<tr class="hover:bg-muted/30 transition-colors cursor-pointer {selectedPerson?.id === person.id ? 'bg-muted/40' : ''}"
+							onclick={(e) => { if ((e.target as HTMLElement).closest('button')) return; openPanel(person); }}>
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
 									<div class="h-9 w-9 rounded-lg ring-1 ring-border flex-shrink-0 bg-muted flex items-center justify-center">
@@ -472,3 +500,167 @@
 		</div>
 	</div>
 </Dialog>
+
+<!-- ── Personnel Side Panel ────────────────────────────────────────────── -->
+{#if selectedPerson}
+	<!-- Backdrop for mobile -->
+	<div class="fixed inset-0 z-30 bg-black/30 lg:hidden" onclick={closePanel} aria-hidden="true"></div>
+
+	<aside class="person-panel">
+		<!-- Header -->
+		<div class="flex items-start justify-between p-5 border-b border-border flex-shrink-0">
+			<div class="flex items-center gap-3">
+				<div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center ring-1 ring-border flex-shrink-0">
+					<span class="text-base font-bold text-primary">{selectedPerson.name.charAt(0)}</span>
+				</div>
+				<div>
+					<div class="font-semibold text-base leading-tight">{selectedPerson.name}</div>
+					<div class="text-sm text-muted-foreground mt-0.5">{selectedPerson.title ?? selectedPerson.role ?? '—'}</div>
+				</div>
+			</div>
+			<button class="text-muted-foreground hover:text-foreground mt-0.5" onclick={closePanel}>
+				<X class="w-5 h-5" />
+			</button>
+		</div>
+
+		<!-- Body -->
+		<div class="flex-1 overflow-y-auto p-5 space-y-5">
+
+			<!-- Info rows -->
+			<div class="space-y-3">
+				<div class="flex items-center gap-3 text-sm">
+					<Building class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+					<span class="text-muted-foreground w-24 flex-shrink-0">Departman</span>
+					<span class="font-medium">{selectedPerson.department_name ?? '—'}</span>
+				</div>
+				<div class="flex items-center gap-3 text-sm">
+					<User class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+					<span class="text-muted-foreground w-24 flex-shrink-0">Yönetici</span>
+					<span class="font-medium">{selectedPerson.manager_name ?? '—'}</span>
+				</div>
+				{#if (selectedPerson as any).email}
+					<div class="flex items-center gap-3 text-sm">
+						<Mail class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+						<span class="text-muted-foreground w-24 flex-shrink-0">E-posta</span>
+						<span class="font-medium font-mono text-xs">{(selectedPerson as any).email}</span>
+					</div>
+				{/if}
+				<div class="flex items-center gap-3 text-sm">
+					<ShieldCheck class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+					<span class="text-muted-foreground w-24 flex-shrink-0">Platform</span>
+					{#if (selectedPerson as any).has_user}
+						<span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
+							<UserCheck class="w-3.5 h-3.5" /> Aktif kullanıcı
+						</span>
+					{:else if (selectedPerson as any).email}
+						<span class="text-muted-foreground">Davet bekliyor</span>
+					{:else}
+						<span class="text-muted-foreground">E-posta yok</span>
+					{/if}
+				</div>
+			</div>
+
+			{#if selectedPerson.role}
+				<div class="rounded-xl bg-muted/50 px-4 py-3">
+					<div class="text-xs font-medium text-muted-foreground mb-1">Rol</div>
+					<div class="text-sm font-medium">{selectedPerson.role}</div>
+				</div>
+			{/if}
+
+			<!-- Sessions (Short-term) -->
+			<div>
+				<div class="flex items-center gap-2 mb-3">
+					<MessageSquare class="w-4 h-4 text-muted-foreground" />
+					<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Oturumlar</span>
+					{#if panelLoading}
+						<Loader class="w-3 h-3 animate-spin text-muted-foreground ml-auto" />
+					{/if}
+				</div>
+				{#if panelSessions.length === 0 && !panelLoading}
+					<p class="text-xs text-muted-foreground">Henüz oturum yok.</p>
+				{:else}
+					<div class="space-y-2">
+						{#each panelSessions.slice(0, 3) as s}
+							<div class="rounded-lg border border-border bg-muted/30 px-3 py-2">
+								<div class="flex items-center justify-between gap-2">
+									<span class="text-xs font-medium truncate">{s.title ?? 'Oturum'}</span>
+									<span class="text-xs px-1.5 py-0.5 rounded-md font-medium flex-shrink-0
+										{s.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}">
+										{s.status === 'active' ? 'Aktif' : 'Kapalı'}
+									</span>
+								</div>
+								<div class="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+									<Clock class="w-3 h-3" />
+									{new Date(s.updated_at).toLocaleDateString('tr-TR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Memories (Long-term) -->
+			<div>
+				<div class="flex items-center gap-2 mb-3">
+					<BrainCircuit class="w-4 h-4 text-muted-foreground" />
+					<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Uzun Dönem Hafıza</span>
+				</div>
+				{#if panelMemories.length === 0 && !panelLoading}
+					<p class="text-xs text-muted-foreground">Henüz hafıza kaydı yok. Oturumlar kapandığında özetler burada görünür.</p>
+				{:else}
+					<div class="space-y-2">
+						{#each panelMemories as m}
+							<div class="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+								<p class="text-xs leading-relaxed">{m.summary}</p>
+								<div class="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground">
+									<Clock class="w-3 h-3" />
+									{new Date(m.created_at).toLocaleDateString('tr-TR', { day:'numeric', month:'short', year:'numeric' })}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Footer actions -->
+		{#if canManage}
+			<div class="flex gap-2 p-4 border-t border-border flex-shrink-0">
+				{#if (selectedPerson as any).email && !(selectedPerson as any).has_user}
+					<Button variant="outline" size="sm" class="flex-1 gap-1.5"
+						onclick={() => { openInvite(selectedPerson!); closePanel(); }}>
+						<Mail class="w-3.5 h-3.5" /> Davet Et
+					</Button>
+				{/if}
+				<Button variant="outline" size="sm" class="flex-1 gap-1.5"
+					onclick={() => { openEdit(selectedPerson!); closePanel(); }}>
+					<Pencil class="w-3.5 h-3.5" /> Düzenle
+				</Button>
+				<Button variant="ghost" size="sm" class="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
+					onclick={() => { deleteTarget = selectedPerson; showDeleteDialog = true; closePanel(); }}>
+					<Trash2 class="w-3.5 h-3.5" />
+				</Button>
+			</div>
+		{/if}
+	</aside>
+{/if}
+
+<style>
+.person-panel {
+	position: fixed;
+	top: 0; right: 0; bottom: 0;
+	width: 380px;
+	max-width: 100vw;
+	background: hsl(var(--card));
+	border-left: 1px solid hsl(var(--border));
+	box-shadow: -8px 0 32px rgba(0,0,0,0.08);
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	animation: slideIn 0.18s cubic-bezier(0.32,0.72,0,1);
+}
+@keyframes slideIn {
+	from { transform: translateX(100%); }
+	to   { transform: translateX(0); }
+}
+</style>

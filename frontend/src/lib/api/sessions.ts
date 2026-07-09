@@ -31,6 +31,14 @@ export type StreamEvent =
 	| { type: 'error'; message: string }
 	| { type: 'stream_end' };
 
+export type AgentMemory = {
+	id: string;
+	personnel_id: string;
+	session_id: string | null;
+	summary: string;
+	created_at: string;
+};
+
 export const sessionsApi = {
 	list: (params?: { personnel_id?: string; status?: string }) => {
 		const qs = new URLSearchParams();
@@ -46,6 +54,11 @@ export const sessionsApi = {
 	get: (id: string) => api.get<Session>(`/sessions/${id}`),
 
 	close: (id: string) => api.delete(`/sessions/${id}`),
+
+	memories: (personnel_id?: string) => {
+		const qs = personnel_id ? `?personnel_id=${personnel_id}` : '';
+		return api.get<AgentMemory[]>(`/sessions/memories${qs}`);
+	},
 };
 
 export async function* streamMessage(
