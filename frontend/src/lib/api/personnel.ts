@@ -42,6 +42,7 @@ export type PersonnelCreate = {
 	role?: string;
 	type?: 'human' | 'agent';
 	email?: string;
+	company_id?: string;
 	department_id?: string;
 	manager_id?: string;
 };

@@ -9,11 +9,16 @@ export const companyStore = {
   get active() { return _active; },
   get loaded() { return _loaded; },
 
-  async load() {
+  // preferredIds: set active to first company user is a member of, not data[0]
+  async load(preferredIds?: string[]) {
     const data = await companies.list();
     _list = data;
     if (!_active && data.length > 0) {
-      _active = data[0];
+      if (preferredIds?.length) {
+        _active = data.find(c => preferredIds.includes(c.id)) ?? null;
+      } else {
+        _active = data[0];
+      }
     }
     _loaded = true;
   },

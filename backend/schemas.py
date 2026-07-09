@@ -63,6 +63,7 @@ class PersonnelCreate(BaseModel):
     role: Optional[str] = None
     type: str = "human"
     email: Optional[str] = None
+    company_id: Optional[str] = None
     department_id: Optional[str] = None
     manager_id: Optional[str] = None
 

@@ -104,15 +104,8 @@
 	});
 
 	async function loadCompanies() {
-		await companyStore.load();
-		// Prefer a company the user is actually a member of
-		const user = authStore.user;
-		if (user?.companies.length && companyStore.list.length) {
-			const myCompany = companyStore.list.find(c =>
-				user.companies.some(uc => uc.company_id === c.id)
-			);
-			if (myCompany) companyStore.setActive(myCompany);
-		}
+		const preferredIds = authStore.user?.companies.map(c => c.company_id);
+		await companyStore.load(preferredIds);
 	}
 
 	async function loadA2ACount() {

@@ -190,6 +190,7 @@
 				title: form.title || undefined,
 				role: form.jobDescription || undefined,
 				type: 'agent' as const,
+				company_id: companyStore.active?.id,
 				department_id: form.department_id || undefined,
 			};
 			const configPayload = {

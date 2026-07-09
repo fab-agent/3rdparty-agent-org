@@ -96,6 +96,7 @@ def create_personnel(body: PersonnelCreate):
             title=body.title,
             role=body.role,
             type=body.type,
+            company_id=body.company_id,
             department_id=body.department_id,
             manager_id=body.manager_id,
         )
