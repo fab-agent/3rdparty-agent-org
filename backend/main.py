@@ -1,4 +1,5 @@
 import os
+import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
@@ -12,6 +13,10 @@ if _env_file.exists():
         if _line and not _line.startswith("#") and "=" in _line:
             _k, _v = _line.split("=", 1)
             os.environ.setdefault(_k.strip(), _v.strip())
+
+from core.logging import setup_logging
+setup_logging()
+logger = logging.getLogger("app")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,6 +52,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    import time
+    t0 = time.monotonic()
+    response = await call_next(request)
+    ms = round((time.monotonic() - t0) * 1000)
+    level = logging.WARNING if response.status_code >= 400 else logging.INFO
+    logger.log(level, "http", extra={"extra": {
+        "method": request.method,
+        "path": request.url.path,
+        "status": response.status_code,
+        "ms": ms,
+    }})
+    return response
 
 app.include_router(auth_router)
 app.include_router(users_router)
@@ -89,8 +110,8 @@ def _reload_flow_schedules():
                         replace_existing=True,
                     )
             except Exception as e:
-                print(f"⚠️  Failed to schedule flow {flow.id}: {e}")
-    print(f"✅ Scheduled {len(flows)} flow(s)")
+                logger.warning("Failed to schedule flow", extra={"extra": {"flow_id": flow.id, "error": str(e)}})
+    logger.info("Flows scheduled", extra={"extra": {"count": len(flows)}})
 
 
 # ── Startup ────────────────────────────────────────────────────────────────────
@@ -103,12 +124,13 @@ def on_startup():
     _sync_env_provider_keys()
     _reload_flow_schedules()
     _scheduler.start()
-    print("✅ Database ready")
+    logger.info("Application started")
 
 
 @app.on_event("shutdown")
 def on_shutdown():
     _scheduler.shutdown(wait=False)
+    logger.info("Application shutdown")
 
 
 def _sync_env_config():

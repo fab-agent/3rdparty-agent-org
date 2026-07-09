@@ -1,0 +1,10 @@
+{"ts": "2026-07-09T08:42:52.522514+00:00", "level": "INFO", "logger": "app", "msg": "Logging initialised", "log_dir": "logs/"}
+{"ts": "2026-07-09T08:43:02.495519+00:00", "level": "INFO", "logger": "app", "msg": "Logging initialised", "log_dir": "logs/"}
+{"ts": "2026-07-09T08:43:16.885974+00:00", "level": "INFO", "logger": "app", "msg": "Logging initialised", "log_dir": "logs/"}
+{"ts": "2026-07-09T08:45:36.500233+00:00", "level": "INFO", "logger": "app", "msg": "Logging initialised", "log_dir": "logs/"}
+{"ts": "2026-07-09T08:45:37.088848+00:00", "level": "INFO", "logger": "alembic.runtime.plugins", "msg": "setup plugin alembic.autogenerate.schemas"}
+{"ts": "2026-07-09T08:45:37.089048+00:00", "level": "INFO", "logger": "alembic.runtime.plugins", "msg": "setup plugin alembic.autogenerate.tables"}
+{"ts": "2026-07-09T08:45:37.090021+00:00", "level": "INFO", "logger": "alembic.runtime.plugins", "msg": "setup plugin alembic.autogenerate.types"}
+{"ts": "2026-07-09T08:45:37.090114+00:00", "level": "INFO", "logger": "alembic.runtime.plugins", "msg": "setup plugin alembic.autogenerate.constraints"}
+{"ts": "2026-07-09T08:45:37.090201+00:00", "level": "INFO", "logger": "alembic.runtime.plugins", "msg": "setup plugin alembic.autogenerate.defaults"}
+{"ts": "2026-07-09T08:45:37.090268+00:00", "level": "INFO", "logger": "alembic.runtime.plugins", "msg": "setup plugin alembic.autogenerate.comments"}

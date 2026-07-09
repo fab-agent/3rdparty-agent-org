@@ -22,6 +22,10 @@ Assign model + skills + policies to each personnel member, visualize the org cha
 | Audit log | ✅ |
 | Multi-language support (TR / EN) | ✅ |
 | Unit test suite (89 tests) | ✅ |
+| Company-level authorization (multi-company users) | ✅ |
+| Structured JSON logging (logs/app.log) | ✅ |
+| Database migrations (Alembic) | ✅ |
+| Login rate limiting (Nginx) | ✅ |
 
 ---
 
@@ -41,13 +45,58 @@ git clone https://github.com/fab-agent/3rdparty-agent-org.git
 cd 3rdparty-agent-org
 
 cp backend/.env.example backend/.env
-# Edit .env (JWT_SECRET required, AI keys optional)
+# Edit .env — JWT_SECRET is required, AI provider keys are optional
 
 docker compose up --build
 ```
 
 UI → `http://localhost:5173`  
 API → `http://localhost:8000`
+
+**Production (with Nginx rate limiting):**
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+UI + API → `http://localhost` (Nginx on port 80)  
+Login endpoint is rate-limited to 5 attempts/minute per IP.
+
+---
+
+### Option C — HTTPS with Cloudflare Tunnel (Recommended for Production)
+
+No port forwarding or SSL certificates needed. Cloudflare Tunnel handles everything.
+
+```bash
+# 1. Install cloudflared
+curl -L https://pkg.cloudflare.com/cloudflare-main.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared jammy main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install cloudflared
+
+# 2. Login and create tunnel
+cloudflared tunnel login
+cloudflared tunnel create my-org-platform
+
+# 3. Create config at ~/.cloudflared/config.yml
+cat > ~/.cloudflared/config.yml << EOF
+tunnel: <TUNNEL_ID>
+credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: app.your-domain.com
+    service: http://localhost:80
+  - service: http_status:404
+EOF
+
+# 4. Route DNS (automatic)
+cloudflared tunnel route dns my-org-platform app.your-domain.com
+
+# 5. Start (or run as a service)
+cloudflared tunnel run my-org-platform
+```
+
+Update `VITE_API_URL` in `backend/.env` to `https://app.your-domain.com` before rebuilding.
 
 ---
 
@@ -252,24 +301,29 @@ pytest tests/ -v
 ## TODO
 
 ### Security
-- [ ] **Login rate limiting** — brute-force protection on `POST /auth/token`. Implement via `slowapi` or upstream Nginx/Caddy limit_req.
-- [ ] **CORS tightening** — `allow_origins=["*"]` is fine for self-hosted dev but should be restricted to the frontend URL in production deployments.
-- [ ] **Invite role validation** — currently a `dept_head` (manager) can invite someone with the `founder` role. Restrict: only founders can assign the founder role.
-- [ ] **A2A approver caller verification** — `POST /a2a/requests/{id}/approve` checks that `body.approver_id` matches `req.approver_id`, but does not yet verify that the JWT caller's personnel record matches `approver_id`. Needs `Personnel.user_id == caller.id` check.
-- [ ] **Email format validation** — `POST /auth/invite` and `POST /auth/setup` accept any string as email. Add regex or `email-validator` check.
+- [x] **Login rate limiting** — 5 req/min per IP via Nginx (`docker-compose.prod.yml + nginx.conf`).
+- [x] **Company-level authorization** — all endpoints verify caller is a member of the target company.
+- [x] **Input validation** — auth endpoints use Pydantic schemas (no more `body: dict`).
+- [x] **must_change_password gate** — frontend redirects to `/set-password` on first login.
+- [ ] **CORS tightening** — `allow_origins=["*"]` is fine for self-hosted dev but should be restricted in production.
+- [ ] **Invite role validation** — `dept_head` can currently assign the `founder` role; restrict to founders only.
+- [ ] **A2A approver caller verification** — verify JWT caller's `Personnel.user_id` matches `approver_id`.
+- [ ] **Email format validation** — add regex or `email-validator` check to invite/setup endpoints.
 
 ### Features
-- [ ] **Qwen end-to-end test** — DashScope API key required. Get a valid key from [console.aliyun.com](https://dashscope.aliyuncs.com) and test via Settings → AI Providers.
-- [ ] **Faz 2: Markdown editors** — `company.md` (company policy editor), `agent.md` (agent persona editor), `policy.md` per department.
-- [ ] **Org chart frontend** — personnel hierarchy tree visualization page.
-- [ ] **A2A inbox UI** — frontend page to list pending A2A approvals for the logged-in user.
-- [ ] **Session history UI** — browse and replay past agent sessions.
-- [ ] **must_change_password gate** — frontend should redirect to change-password page when `must_change_password: true` is returned from `/auth/me`.
+- [ ] **Qwen end-to-end test** — DashScope API key required.
+- [ ] **Faz 2: Markdown editors** — `company.md`, `agent.md`, `policy.md` editors.
+- [ ] **Org chart visualization** — personnel hierarchy tree on a dedicated page.
+- [ ] **Social media agent** — Instagram + WhatsApp integration for Fabrika Yazılım.
+- [ ] **Backup UI** — S3/cloud storage settings with on-demand backup button.
 
 ### Infrastructure
+- [x] **Database migrations** — Alembic set up; schema changes now tracked via `alembic revision --autogenerate`.
+- [x] **Structured logging** — JSON log file at `logs/app.log`, 30-day rotation.
+- [x] **Nginx rate limiting** — production docker-compose with login brute-force protection.
+- [x] **Cloudflare Tunnel guide** — HTTPS setup documented in README (Option C).
 - [ ] **PostgreSQL support** — swap SQLite for Postgres for multi-user concurrent workloads.
-- [ ] **Docker health checks** — add `HEALTHCHECK` to backend and frontend Dockerfile.
-- [ ] **`.env.example`** — create committed example file so new contributors know what vars are needed.
+- [ ] **`.env.example`** — create committed example file for new installs.
 
 ---
 

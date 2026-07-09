@@ -14,7 +14,12 @@ engine = create_engine(
 
 def init_db() -> None:
     os.makedirs("data", exist_ok=True)
-    SQLModel.metadata.create_all(engine)
+    # Run Alembic migrations instead of bare create_all so schema stays in sync
+    from alembic.config import Config
+    from alembic import command
+    ini_path = os.path.join(os.path.dirname(__file__), "alembic.ini")
+    alembic_cfg = Config(ini_path)
+    command.upgrade(alembic_cfg, "head")
 
 
 @contextmanager
