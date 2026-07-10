@@ -255,19 +255,6 @@
 
 			</div>
 		</section>
-	{:else if !loading && myData && !myData.linked}
-		<!-- User logged in but not linked to a personnel record -->
-		<Card class="p-6">
-			<div class="flex items-center gap-3 mb-3">
-				<div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-					<UserCheck class="w-5 h-5 text-amber-600" />
-				</div>
-				<div>
-					<div class="font-semibold">Personel kaydı bulunamadı</div>
-					<div class="text-sm text-muted-foreground">Hesabınız henüz bir personel kaydına bağlı değil.</div>
-				</div>
-			</div>
-		</Card>
 	{/if}
 
 	<!-- ── Quick links (all users) ────────────────────────────────────────── -->

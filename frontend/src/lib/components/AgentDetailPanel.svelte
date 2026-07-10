@@ -105,9 +105,13 @@
 							<div class="skill-card">
 								<div class="flex items-center justify-between mb-0.5">
 									<span class="text-sm font-medium">{skill.name}</span>
-									<span class="version-tag">v{skill.version}</span>
+									{#if (skill as any).version}
+										<span class="version-tag">v{(skill as any).version}</span>
+									{/if}
 								</div>
-								<p class="text-xs text-muted-foreground leading-relaxed">{skill.description}</p>
+								{#if skill.description}
+									<p class="text-xs text-muted-foreground leading-relaxed">{skill.description}</p>
+								{/if}
 							</div>
 						{/each}
 					</div>

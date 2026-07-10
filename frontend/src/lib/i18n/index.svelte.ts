@@ -268,7 +268,7 @@ const dict = {
     inbox_empty: 'Gelen kutusu boş',
     inbox_empty_subtitle: 'Otonom akışlardan veya görev sonuçlarından mesajlar burada görünür.',
     // Org Chart
-    org_chart_title: 'Org Haritası',
+    org_chart_title: 'Organizasyon Haritası',
     org_chart_subtitle: 'Organizasyon hiyerarşisi ve ajan dağılımı',
     org_view_personnel: 'Personel',
     org_view_dept: 'Departman',

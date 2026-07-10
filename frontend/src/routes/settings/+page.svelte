@@ -39,9 +39,16 @@
 		AlertCircle
 	} from '@lucide/svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { goto } from '$app/navigation';
+	import { onboardingApi } from '$lib/api/onboarding';
+	import { Sparkles } from '@lucide/svelte';
 
 	// ── Tabs ─────────────────────────────────────────────────────────────────
 	let tab = $state<'providers' | 'git' | 'audit' | 'backup' | 'social' | 'databases'>('providers');
+
+	// ── AI Onboarding state ───────────────────────────────────────────────────
+	let aiOnboarded = $state<boolean | null>(null);
+	let onboardingLoading = $state(false);
 
 	// ── Provider state ────────────────────────────────────────────────────────
 	type ProviderCard = ProviderStatus & {
@@ -593,9 +600,26 @@
 		return sha ? sha.slice(0, 7) : '—';
 	}
 
+	async function loadOnboardingStatus() {
+		const id = companyStore.active?.id;
+		if (!id) return;
+		try {
+			const res = await onboardingApi.status(id);
+			aiOnboarded = res.ai_onboarded;
+		} catch { aiOnboarded = false; }
+	}
+
+	function startOnboarding() {
+		const company = companyStore.active;
+		if (!company) return;
+		const params = new URLSearchParams({ company_id: company.id, company_name: company.name });
+		goto(`/onboarding?${params}`);
+	}
+
 	onMount(() => {
 		loadProviders();
 		loadGit();
+		loadOnboardingStatus();
 	});
 </script>
 
@@ -806,6 +830,32 @@
 					{/if}
 				{/if}
 			{/if}
+		</div>
+	{/if}
+
+	<!-- ── AI ONBOARDING BANNER ─────────────────────────────────────────── -->
+	{#if tab === 'providers' && aiOnboarded === false}
+		<div class="mt-6 rounded-2xl border border-primary/20 bg-primary/5 p-5 flex items-start justify-between gap-4">
+			<div class="flex items-start gap-3">
+				<div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+					<Sparkles class="w-4 h-4 text-primary" />
+				</div>
+				<div>
+					<div class="font-semibold text-sm mb-1">AI ile Organizasyon Kur</div>
+					<p class="text-xs text-muted-foreground leading-relaxed max-w-sm">
+						Şirketiniz hakkında web araştırması yaparak bölümler, ajanlar, yetenekler ve politikaları
+						otomatik oluşturun. Sadece birkaç soruya cevap verin.
+					</p>
+				</div>
+			</div>
+			<button
+				onclick={startOnboarding}
+				disabled={onboardingLoading}
+				class="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+			>
+				<Sparkles class="w-4 h-4" />
+				AI ile Kur
+			</button>
 		</div>
 	{/if}
 

@@ -11,6 +11,7 @@ class Company(SQLModel, table=True):
     slug: str
     sector: Optional[str] = None
     website: Optional[str] = None
+    ai_onboarded: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -336,6 +337,44 @@ class WorkJournalEntry(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class CompanySkill(SQLModel, table=True):
+    """Company-level skill library — assignable to multiple agents."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    company_id: str = Field(foreign_key="company.id", index=True)
+    name: str
+    slug: str
+    description: Optional[str] = None
+    content: Optional[str] = None          # markdown — what this skill does, how to use it
+    skill_type: str = Field(default="builtin")  # builtin | mcp | http | function | database
+    config_json: Optional[str] = None
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AgentSkillLink(SQLModel, table=True):
+    """Junction: which CompanySkills are active for which AgentConfig."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    agent_config_id: str = Field(foreign_key="agentconfig.id", index=True)
+    company_skill_id: str = Field(foreign_key="companyskill.id", index=True)
+
+
+class Policy(SQLModel, table=True):
+    """Markdown policy document — scoped to company, department, or agent."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    company_id: str = Field(foreign_key="company.id", index=True)
+    department_id: Optional[str] = Field(default=None, foreign_key="department.id")
+    agent_config_id: Optional[str] = Field(default=None, foreign_key="agentconfig.id")
+    name: str
+    slug: str
+    content: str = Field(default="")   # full markdown body
+    # scope: "company" | "department" | "agent"
+    scope: str = Field(default="company")
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class DatabaseConnection(SQLModel, table=True):
     """External database connection with semantic annotations."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
@@ -351,3 +390,14 @@ class DatabaseConnection(SQLModel, table=True):
     status: str = Field(default="unchecked")  # "ok" | "error" | "unchecked"
     last_checked: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class OnboardingSession(SQLModel, table=True):
+    """Persists AI onboarding progress so power/connection loss doesn't reset everything."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    company_id: str = Field(foreign_key="company.id", index=True, unique=True)
+    phase: str = Field(default="search")   # search | chat | preview | done
+    search_context: Optional[str] = None   # raw DDG result text
+    messages_json: Optional[str] = None    # JSON list of {role, content}
+    structure_json: Optional[str] = None   # JSON org structure
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

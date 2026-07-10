@@ -4,7 +4,7 @@ Seed data — runs once on startup if DB is empty.
 import json
 from sqlmodel import select
 from database import get_session
-from models import Company, Department, Personnel, AgentConfig, Skill
+from models import Company, Department, Personnel, AgentConfig, Skill, CompanySkill
 
 
 def run_seed() -> None:
@@ -317,3 +317,55 @@ def run_seed() -> None:
 
         session.commit()
         print("✅ Seed: 2 companies, 7 departments, 13 humans, 10 agents")
+
+
+def seed_company_skills() -> None:
+    """Seed company-level skills if table is empty."""
+    with get_session() as session:
+        if session.exec(select(CompanySkill)).first():
+            return  # already seeded
+
+        company = session.exec(select(Company).where(Company.slug == "fabrika-yazilim")).first()
+        if not company:
+            return
+
+        DEFAULT_SKILLS = [
+            dict(name="Code Review", slug="code-review", skill_type="builtin",
+                 description="PR inceleme, best practice ve güvenlik açığı taraması",
+                 content="## Code Review Yeteneği\n\nPull request'leri inceler, best practice kontrolü yapar ve güvenlik açıklarını tespit eder.\n\n## Kullanım\n\nAjana PR URL'i veya diff içeriği verin. Ajan şunları kontrol eder:\n- Kod kalitesi ve okunabilirlik\n- Güvenlik açıkları (OWASP Top 10)\n- Performans sorunları\n- Test kapsamı\n\n## Parametreler\n\n| Parametre | Tip | Açıklama |\n|-----------|-----|----------|\n| pr_url | string | Pull request URL'i |\n| severity | string | Rapor seviyesi: low, medium, high |"),
+            dict(name="Sunum Hazırlama", slug="sunum-hazirlama", skill_type="builtin",
+                 description="Veri ve içerikten profesyonel sunum yapısı oluşturma",
+                 content="## Sunum Hazırlama Yeteneği\n\nVerilen konu ve hedef kitleye göre yapılandırılmış sunum içeriği hazırlar.\n\n## Kullanım\n\nKonu, hedef kitle ve istenilen ton bilgisi verin.\n\n## Çıktı Formatları\n- Slayt başlıkları ve bullet points\n- Konuşma notları\n- Görselle destekleme önerileri"),
+            dict(name="Finansal Raporlama", slug="finansal-raporlama", skill_type="builtin",
+                 description="Nakit akışı tahmini ve aylık finansal rapor otomasyonu",
+                 content="## Finansal Raporlama Yeteneği\n\nAylık ve çeyreklik finansal raporları otomatik oluşturur.\n\n## Kullanım\n\nHam finansal veri (CSV/JSON) ve dönem bilgisi verin.\n\n## Raporlar\n- Gelir/gider özeti\n- Nakit akışı tahmini\n- Bütçe sapma analizi\n- Vergi yükümlülük özeti"),
+            dict(name="SEO Analizi", slug="seo-analizi", skill_type="builtin",
+                 description="Anahtar kelime araştırması ve on-page optimizasyon",
+                 content="## SEO Analizi Yeteneği\n\nSayfa içi SEO optimizasyonu ve anahtar kelime araştırması yapar.\n\n## Kullanım\n\nURL veya içerik metni + hedef anahtar kelime verin.\n\n## Çıktılar\n- Meta title/description önerileri\n- H1-H6 yapısı analizi\n- İç/dış link önerileri\n- Sayfa hızı tavsiyeleri"),
+            dict(name="Test Yazma", slug="test-yazma", skill_type="builtin",
+                 description="Playwright ve Vitest ile otomatik test senaryoları oluşturma",
+                 content="## Test Yazma Yeteneği\n\nVerilen kod veya kullanıcı hikayesine göre otomatik test senaryoları oluşturur.\n\n## Desteklenen Frameworkler\n- Playwright (E2E)\n- Vitest (Unit)\n- Jest (Unit)\n\n## Kullanım\n\nTest edilecek fonksiyon/bileşen ve beklenen davranışları tanımlayın."),
+            dict(name="CV Analizi", slug="cv-analizi", skill_type="builtin",
+                 description="CV skorlama ve kriterlere göre aday değerlendirmesi",
+                 content="## CV Analizi Yeteneği\n\nYüklenen CV'leri iş ilanı kriterlerine göre değerlendirir ve skora dönüştürür.\n\n## Kullanım\n\nCV metni + iş ilanı kriterleri verin.\n\n## Çıktı\n- Uyum skoru (0-100)\n- Güçlü/zayıf yönler\n- Mülakata çağırma tavsiyesi"),
+            dict(name="Müşteri Destek Triage", slug="musteri-destek-triage", skill_type="builtin",
+                 description="Destek taleplerini önceliklendirme ve doğru kanala yönlendirme",
+                 content="## Müşteri Destek Triage Yeteneği\n\nGelen destek taleplerini otomatik önceliklendirir ve ilgili ekibe yönlendirir.\n\n## Önceliklendirme Kriterleri\n- P1: Kritik üretim sorunu\n- P2: Önemli özellik problemi\n- P3: Genel soru/istek\n\n## Kullanım\n\nDestek talebi metnini ve müşteri segmentini verin."),
+            dict(name="İçerik Üretimi", slug="icerik-uretimi", skill_type="builtin",
+                 description="Blog, sosyal medya ve landing page için içerik yazımı",
+                 content="## İçerik Üretimi Yeteneği\n\nHedef kitleye ve platforma göre özelleştirilmiş içerik üretir.\n\n## Desteklenen Formatlar\n- Blog yazısı (SEO uyumlu)\n- LinkedIn / Twitter thread\n- Landing page copy\n- E-posta kampanya metni\n\n## Kullanım\n\nKonu, platform, ton (formal/informal) ve kelime sayısı hedefi verin."),
+        ]
+
+        for sk in DEFAULT_SKILLS:
+            session.add(CompanySkill(
+                company_id=company.id,
+                name=sk["name"],
+                slug=sk["slug"],
+                skill_type=sk["skill_type"],
+                description=sk["description"],
+                content=sk["content"],
+                is_active=True,
+            ))
+
+        session.commit()
+        print(f"✅ Seed: {len(DEFAULT_SKILLS)} company skills")

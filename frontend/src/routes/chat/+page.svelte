@@ -88,6 +88,10 @@
 		}
 	}
 
+	const visibleSessions = $derived(
+		selectedAgent ? sessions.filter(s => s.personnel_id === selectedAgent!.id) : sessions
+	);
+
 	async function loadAgentInfo(agent: PersonnelItem) {
 		// Skills
 		try {
@@ -301,7 +305,7 @@
 
 		<!-- Session list -->
 		<div class="flex-1 overflow-y-auto p-2 space-y-1">
-			{#each sessions as s}
+			{#each visibleSessions as s}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<div
@@ -337,9 +341,9 @@
 					</button>
 				</div>
 			{/each}
-			{#if sessions.length === 0}
+			{#if visibleSessions.length === 0}
 				<div class="px-3 py-6 text-center text-xs text-muted-foreground">
-					Sohbet yok
+					{selectedAgent ? `${selectedAgent.name} için sohbet yok` : 'Sohbet yok'}
 				</div>
 			{/if}
 		</div>

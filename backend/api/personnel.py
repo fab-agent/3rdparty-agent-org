@@ -8,7 +8,7 @@ from sqlmodel import select
 from api.audit import log_action
 from api.auth import check_company_membership, get_current_user
 from database import get_session
-from models import AgentConfig, Company, CompanyMember, Department, Personnel, Skill, User
+from models import AgentConfig, AgentSkillLink, Company, CompanyMember, CompanySkill, Department, Personnel, Skill, User
 from schemas import AgentConfigCreate, AgentConfigUpdate, PersonnelCreate, PersonnelUpdate, SkillCreate, SkillUpdate
 from services.auth import generate_temp_password, hash_password
 from services.email import send_invite
@@ -57,6 +57,16 @@ def _personnel_to_dict(p: Personnel, session) -> dict:
     if cfg:
         responsible = session.get(Personnel, cfg.responsible_id) if cfg.responsible_id else None
         skills = session.exec(select(Skill).where(Skill.agent_id == cfg.id)).all()
+        # Also include CompanySkill records linked via AgentSkillLink
+        linked = session.exec(
+            select(AgentSkillLink, CompanySkill)
+            .join(CompanySkill, AgentSkillLink.company_skill_id == CompanySkill.id)
+            .where(AgentSkillLink.agent_config_id == cfg.id)
+        ).all()
+        company_skills = [
+            {"id": cs.id, "name": cs.name, "slug": cs.slug, "description": cs.description}
+            for _, cs in linked
+        ]
         result["agent_config"] = {
             "id": cfg.id,
             "model": cfg.model,
@@ -65,6 +75,7 @@ def _personnel_to_dict(p: Personnel, session) -> dict:
             "responsible_id": cfg.responsible_id,
             "responsible_name": responsible.name if responsible else None,
             "skills": [_skill_to_dict(s) for s in skills],
+            "company_skills": company_skills,
         }
 
     return result
@@ -404,6 +415,11 @@ def get_org_tree(company_id: Optional[str] = None,
         all_configs   = session.exec(select(AgentConfig)).all()
         all_skills    = session.exec(select(Skill)).all()
         all_depts     = session.exec(select(Department)).all()
+        # Load CompanySkill links for the agent detail panel
+        linked_rows = session.exec(
+            select(AgentSkillLink, CompanySkill)
+            .join(CompanySkill, AgentSkillLink.company_skill_id == CompanySkill.id)
+        ).all()
 
         dept_map = {d.id: d for d in all_depts}
         cfg_map  = {c.personnel_id: c for c in all_configs}
@@ -411,6 +427,12 @@ def get_org_tree(company_id: Optional[str] = None,
         for s in all_skills:
             skills_by_agent.setdefault(s.agent_id, []).append(
                 {"name": s.name, "version": s.version, "description": s.description}
+            )
+        # Index CompanySkill by agent_config_id
+        company_skills_by_cfg: dict[str, list] = {}
+        for link, cs in linked_rows:
+            company_skills_by_cfg.setdefault(link.agent_config_id, []).append(
+                {"id": cs.id, "name": cs.name, "slug": cs.slug, "description": cs.description}
             )
 
         def build_node(p: Personnel) -> dict:
@@ -434,7 +456,10 @@ def get_org_tree(company_id: Optional[str] = None,
                 node["modelVersion"]     = cfg.model_version
                 node["agentStatus"]      = cfg.status
                 node["responsibleHuman"] = responsible_name
-                node["skills"]           = skills_by_agent.get(cfg.id, [])
+                # Prefer CompanySkill links; fall back to legacy per-agent Skill records
+                cs_list = company_skills_by_cfg.get(cfg.id, [])
+                node["skills"]           = cs_list if cs_list else skills_by_agent.get(cfg.id, [])
+                node["company_skills"]   = cs_list
                 node["policies"]         = dept.policies() if dept else []
 
             return node

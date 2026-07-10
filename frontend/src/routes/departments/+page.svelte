@@ -18,6 +18,7 @@
 	import { departments as deptApi, type Department } from '$lib/api/departments';
 	import { companyStore } from '$lib/stores/company.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import YapiTabs from '$lib/components/ui/yapi-tabs.svelte';
 
 	// ── State ─────────────────────────────────────────────────────────────────
 	let departments: Department[] = $state([]);
@@ -202,7 +203,9 @@
 	<title>Departmanlar • fab.engineering</title>
 </svelte:head>
 
-<div class={['space-y-6 transition-all duration-200', panelOpen ? 'lg:mr-[608px]' : ''].join(' ')}>
+<div class="space-y-6">
+
+	<YapiTabs />
 
 	<!-- Header -->
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

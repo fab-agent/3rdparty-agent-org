@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import select
 
 from database import get_session, init_db
-from seed import run_seed
+from seed import run_seed, seed_company_skills
 from api.auth import router as auth_router
 from api.users import router as users_router
 from api.companies import router as companies_router
@@ -44,6 +44,9 @@ from api.journal import router as journal_router
 from api.database import router as database_router
 from api.telegram_config import router as telegram_router
 from api.dashboard import router as dashboard_router
+from api.onboarding import router as onboarding_router
+from api.skills import router as skills_router
+from api.policies import router as policies_router
 
 app = FastAPI(
     title="3rdParty Agent Organization API",
@@ -95,6 +98,9 @@ app.include_router(journal_router)
 app.include_router(database_router)
 app.include_router(telegram_router)
 app.include_router(dashboard_router)
+app.include_router(skills_router)
+app.include_router(policies_router)
+app.include_router(onboarding_router)
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
@@ -132,6 +138,7 @@ def _reload_flow_schedules():
 def on_startup():
     init_db()
     run_seed()
+    seed_company_skills()
     _sync_env_config()
     _sync_env_provider_keys()
     _reload_flow_schedules()

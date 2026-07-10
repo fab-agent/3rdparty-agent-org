@@ -7,11 +7,13 @@
 	import { Plus, Pencil, Trash2, Bot, Sparkles, X, Check, Loader, GitPullRequest } from '@lucide/svelte';
 	import { personnel as personnelApi, type PersonnelItem } from '$lib/api/personnel';
 	import { departments as deptApi, type Department } from '$lib/api/departments';
+	import { skillsApi, type CompanySkill } from '$lib/api/skills';
 	import { companyStore } from '$lib/stores/company.svelte';
 	import { changeRequests as crApi } from '$lib/api/change_requests';
 	import { providers as providerApi, type ModelDef, type PriceTier } from '$lib/api/providers';
 	import { api } from '$lib/api/client.js';
 	import { t } from '$lib/i18n/index.svelte';
+	import YapiTabs from '$lib/components/ui/yapi-tabs.svelte';
 
 	// ── Dynamic models ────────────────────────────────────────────────────────
 	let availableModels = $state<ModelDef[]>([]);
@@ -53,32 +55,10 @@
 
 	type LocalSkill = { name: string; version: string; description: string; skill_type?: string; config_json?: string };
 
-	const SKILL_LIBRARY: LocalSkill[] = [
-		{ name: 'Code Review',    version: '2.1',  description: 'PR inceleme ve best practice kontrolü' },
-		{ name: 'TypeScript',     version: '5.x',  description: 'Tip güvenliği analizi ve refactor' },
-		{ name: 'Git Workflow',   version: '1.0',  description: 'Branch stratejisi ve commit standardı' },
-		{ name: 'Docker',         version: '24.x', description: 'Container build ve orchestration' },
-		{ name: 'GitHub Actions', version: '3.x',  description: 'CI/CD pipeline yönetimi' },
-		{ name: 'Monitoring',     version: '1.2',  description: 'Deploy sonrası sağlık kontrolü' },
-		{ name: 'Test Generation',version: '1.3',  description: 'Otomatik test yazımı (Playwright/Vitest)' },
-		{ name: 'Bug Triage',     version: '1.0',  description: 'Hata önceliklendirme ve analiz' },
-		{ name: 'Copywriting',    version: '2.0',  description: 'Blog ve landing page içerik üretimi' },
-		{ name: 'SEO',            version: '1.4',  description: 'Anahtar kelime ve içerik optimizasyonu' },
-		{ name: 'Social Media',   version: '1.1',  description: 'Çoklu platform içerik takvimi' },
-		{ name: 'Data Analysis',  version: '1.0',  description: 'GA4, Mixpanel ve SQL raporlama' },
-		{ name: 'Visualization',  version: '0.9',  description: 'Dashboard ve performans raporları' },
-		{ name: 'Forecasting',    version: '1.2',  description: 'Nakit akışı ve senaryo analizi' },
-		{ name: 'Reporting',      version: '2.0',  description: 'Aylık/çeyreklik finansal raporlar' },
-		{ name: 'Compliance',     version: '1.0',  description: 'Vergi ve yasal uyumluluk kontrolü' },
-	];
+	// Company skills (loaded from API, replaces the old hardcoded SKILL_LIBRARY)
+	let companySkills = $state<CompanySkill[]>([]);
 
 	const KEYWORD_MAP: Array<[RegExp, string[]]> = [
-		[/kod|yazılım|geliştirme|backend|frontend|typescript/i, ['Code Review', 'TypeScript', 'Git Workflow']],
-		[/deploy|ci|cd|docker|container|kubernetes/i,           ['Docker', 'GitHub Actions', 'Monitoring']],
-		[/test|qa|kalite|hata|bug|selenium/i,                   ['Test Generation', 'Bug Triage']],
-		[/pazarlama|içerik|blog|sosyal|marka|seo/i,             ['Copywriting', 'SEO', 'Social Media']],
-		[/veri|analiz|analitik|dashboard|rapor|sql/i,           ['Data Analysis', 'Visualization']],
-		[/finans|muhasebe|bütçe|fatura|vergi/i,                 ['Forecasting', 'Reporting', 'Compliance']],
 	];
 
 	const SKILL_TYPES = [
@@ -134,8 +114,17 @@
 		}
 	}
 
+	async function loadCompanySkills() {
+		try {
+			companySkills = await skillsApi.list(companyStore.active?.id);
+		} catch {
+			companySkills = [];
+		}
+	}
+
 	onMount(async () => {
 		load();
+		loadCompanySkills();
 		try {
 			availableModels = await providerApi.models();
 		} catch {
@@ -151,7 +140,7 @@
 	});
 
 	$effect(() => {
-		if (companyStore.active) load();
+		if (companyStore.active) { load(); loadCompanySkills(); }
 	});
 
 	// ── Form state ─────────────────────────────────────────────────────────────
@@ -166,6 +155,7 @@
 		responsible_id: '',
 		jobDescription: '',
 		selectedSkills: [] as LocalSkill[],
+		selectedCompanySkillIds: [] as string[], // CompanySkill IDs linked via AgentSkillLink
 		selectedPolicies: [] as string[],
 	});
 
@@ -197,6 +187,8 @@
 	function openEdit(agent: PersonnelItem) {
 		editingId = agent.id;
 		const cfg = agent.agent_config;
+		// Pre-select linked CompanySkills (from onboarding or manual assignment)
+		const linkedCsIds = ((cfg as any)?.company_skills ?? []).map((cs: { id: string }) => cs.id) as string[];
 		form = {
 			name: agent.name,
 			slug: agent.slug,
@@ -211,6 +203,7 @@
 				version: s.version,
 				description: s.description ?? '',
 			})),
+			selectedCompanySkillIds: linkedCsIds,
 			selectedPolicies: [],
 		};
 		suggestedSkills = [];
@@ -244,6 +237,7 @@
 			if (editingId) {
 				await personnelApi.update(editingId, personnelPayload);
 				await personnelApi.updateAgentConfig(editingId, configPayload);
+				// Sync legacy per-agent skills
 				const existingSkills = agents.find(a => a.id === editingId)?.agent_config?.skills ?? [];
 				for (const s of existingSkills) {
 					try { await personnelApi.deleteSkill(editingId, s.id); } catch {}
@@ -251,11 +245,33 @@
 				for (const s of form.selectedSkills) {
 					await personnelApi.addSkill(editingId, s);
 				}
+				// Sync CompanySkill assignments
+				const agentCfgId = agents.find(a => a.id === editingId)?.agent_config?.id;
+				if (agentCfgId) {
+					const prevIds = ((agents.find(a => a.id === editingId)?.agent_config as any)?.company_skills ?? []).map((cs: { id: string }) => cs.id) as string[];
+					for (const id of prevIds) {
+						if (!form.selectedCompanySkillIds.includes(id)) {
+							try { await skillsApi.unassign(id, agentCfgId); } catch {}
+						}
+					}
+					for (const id of form.selectedCompanySkillIds) {
+						if (!prevIds.includes(id)) {
+							try { await skillsApi.assign(id, agentCfgId); } catch {}
+						}
+					}
+				}
 			} else {
 				const created = await personnelApi.create(personnelPayload);
-				await personnelApi.createAgentConfig(created.id, configPayload);
+				const newCfg = await personnelApi.createAgentConfig(created.id, configPayload);
 				for (const s of form.selectedSkills) {
 					await personnelApi.addSkill(created.id, s);
+				}
+				// Assign CompanySkills to new agent
+				const newCfgId = (newCfg as any)?.id;
+				if (newCfgId) {
+					for (const id of form.selectedCompanySkillIds) {
+						try { await skillsApi.assign(id, newCfgId); } catch {}
+					}
 				}
 			}
 			await load();
@@ -305,11 +321,15 @@
 		return form.selectedSkills.some(s => s.name === name);
 	}
 
-	function toggleLibrarySkill(skill: LocalSkill) {
-		if (isSkillSelected(skill.name)) {
-			form.selectedSkills = form.selectedSkills.filter(s => s.name !== skill.name);
+	function isCompanySkillSelected(id: string): boolean {
+		return form.selectedCompanySkillIds.includes(id);
+	}
+
+	function toggleCompanySkill(id: string) {
+		if (form.selectedCompanySkillIds.includes(id)) {
+			form.selectedCompanySkillIds = form.selectedCompanySkillIds.filter(x => x !== id);
 		} else {
-			form.selectedSkills = [...form.selectedSkills, { ...skill }];
+			form.selectedCompanySkillIds = [...form.selectedCompanySkillIds, id];
 		}
 	}
 
@@ -364,18 +384,28 @@
 		if (!form.jobDescription.trim()) return;
 		isAnalyzing = true;
 		suggestedSkills = [];
-		await new Promise(r => setTimeout(r, 1600));
-		const text = form.jobDescription;
-		const found = new Set<string>();
-		for (const [pattern, skills] of KEYWORD_MAP) {
-			if (pattern.test(text)) skills.forEach(s => found.add(s));
-		}
-		suggestedSkills = SKILL_LIBRARY.filter(s => found.has(s.name) && !isSkillSelected(s.name));
+		await new Promise(r => setTimeout(r, 400));
+		// Suggest company skills not yet selected (keyword matching)
+		const text = form.jobDescription.toLowerCase();
+		suggestedSkills = companySkills
+			.filter(cs => !isCompanySkillSelected(cs.id) && (
+				text.includes(cs.name.toLowerCase().split(' ')[0]) ||
+				(cs.description && text.split(' ').some(w => w.length > 3 && cs.description!.toLowerCase().includes(w)))
+			))
+			.slice(0, 5)
+			.map(cs => ({ name: cs.name, version: '', description: cs.description ?? '', _csId: cs.id } as any));
 		isAnalyzing = false;
 	}
 
 	function acceptSuggestion(skill: LocalSkill) {
-		form.selectedSkills = [...form.selectedSkills, { ...skill }];
+		const csId = (skill as any)._csId as string | undefined;
+		if (csId) {
+			if (!form.selectedCompanySkillIds.includes(csId)) {
+				form.selectedCompanySkillIds = [...form.selectedCompanySkillIds, csId];
+			}
+		} else {
+			form.selectedSkills = [...form.selectedSkills, { ...skill }];
+		}
 		suggestedSkills = suggestedSkills.filter(s => s.name !== skill.name);
 	}
 
@@ -455,6 +485,8 @@
 
 <!-- ── Page ──────────────────────────────────────────────────────────────── -->
 <div class="space-y-6">
+
+	<YapiTabs />
 
 	<!-- Header -->
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -736,29 +768,34 @@
 				{/if}
 			</section>
 
-			<!-- ④ Skill Kütüphanesi -->
+			<!-- ④ Yetenekler (CompanySkill) -->
 			<section class="form-section">
 				<div class="section-title">{t('agent_skills_section')}</div>
 
-				<div class="mb-3">
-					<div class="text-xs text-muted-foreground mb-2">{t('agent_skills_library')}</div>
-					<div class="flex flex-wrap gap-1.5">
-						{#each SKILL_LIBRARY as skill}
-							{@const selected = isSkillSelected(skill.name)}
-							<button
-								type="button"
-								class="skill-chip"
-								class:skill-chip-on={selected}
-								onclick={() => toggleLibrarySkill(skill)}
-								title={skill.description}
-							>
-								{#if selected}<Check class="w-3 h-3" />{/if}
-								{skill.name}
-								<span class="chip-version">v{skill.version}</span>
-							</button>
-						{/each}
+				{#if companySkills.length > 0}
+					<div class="mb-3">
+						<div class="text-xs text-muted-foreground mb-2">Şirket Yetenekleri — seçililer ajana bağlanır</div>
+						<div class="flex flex-wrap gap-1.5">
+							{#each companySkills as cs}
+								{@const sel = isCompanySkillSelected(cs.id)}
+								<button
+									type="button"
+									class="skill-chip"
+									class:skill-chip-on={sel}
+									onclick={() => toggleCompanySkill(cs.id)}
+									title={cs.description ?? cs.name}
+								>
+									{#if sel}<Check class="w-3 h-3" />{/if}
+									{cs.name}
+								</button>
+							{/each}
+						</div>
 					</div>
-				</div>
+				{:else}
+					<p class="text-xs text-muted-foreground mb-3">
+						Henüz şirket yeteneği yok — <a href="/skills" class="underline">Yetenekler</a> bölümünden ekleyebilirsiniz.
+					</p>
+				{/if}
 
 				<!-- Custom skill -->
 				<div class="custom-skill-form">

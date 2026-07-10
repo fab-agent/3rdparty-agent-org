@@ -133,6 +133,7 @@
 	function logout() { authStore.logout(); goto('/login'); }
 
 	const isPublicPage = $derived(PUBLIC_ROUTES.some(r => $page.url.pathname.startsWith(r)));
+	const yapiActive   = $derived(['/departments','/personnel','/agents','/skills','/policies'].some(p => $page.url.pathname.startsWith(p)));
 
 	// ── Company.md panel ──────────────────────────────────────────────────────
 	type Goal = { id: number; text: string; done: boolean };
@@ -385,42 +386,20 @@
 			<!-- Nav items -->
 			<nav class="flex-1 p-3 flex flex-col gap-y-1 pt-4">
 
-				{#if can('dept_head')}
-					<a href="/">
-						<Button variant={$page.url.pathname === '/' ? 'secondary' : 'ghost'}
-							class="w-full justify-start gap-x-3 h-10 rounded-xl text-sm font-medium {sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}">
-							<Cpu class="w-4 h-4 flex-shrink-0" />
-							{#if !sidebarCollapsed}<span class="truncate">{t('nav_structure')}</span>{/if}
-						</Button>
-					</a>
-				{/if}
+				<a href="/">
+					<Button variant={$page.url.pathname === '/' ? 'secondary' : 'ghost'}
+						class="w-full justify-start gap-x-3 h-10 rounded-xl text-sm font-medium {sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}">
+						<Cpu class="w-4 h-4 flex-shrink-0" />
+						{#if !sidebarCollapsed}<span class="truncate">Göstergeler</span>{/if}
+					</Button>
+				</a>
 
 				{#if can('dept_head')}
 					<a href="/departments">
-						<Button variant={$page.url.pathname.startsWith('/departments') ? 'secondary' : 'ghost'}
+						<Button variant={yapiActive ? 'secondary' : 'ghost'}
 							class="w-full justify-start gap-x-3 h-10 rounded-xl text-sm font-medium {sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}">
-							<Building class="w-4 h-4 flex-shrink-0" />
-							{#if !sidebarCollapsed}<span class="truncate">{t('nav_departments')}</span>{/if}
-						</Button>
-					</a>
-				{/if}
-
-				{#if can('dept_head')}
-					<a href="/personnel">
-						<Button variant={$page.url.pathname.startsWith('/personnel') ? 'secondary' : 'ghost'}
-							class="w-full justify-start gap-x-3 h-10 rounded-xl text-sm font-medium {sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}">
-							<UserRound class="w-4 h-4 flex-shrink-0" />
-							{#if !sidebarCollapsed}<span class="truncate">{t('nav_personnel')}</span>{/if}
-						</Button>
-					</a>
-				{/if}
-
-				{#if can('agent_owner')}
-					<a href="/agents">
-						<Button variant={$page.url.pathname.startsWith('/agents') ? 'secondary' : 'ghost'}
-							class="w-full justify-start gap-x-3 h-10 rounded-xl text-sm font-medium {sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}">
-							<Bot class="w-4 h-4 flex-shrink-0" />
-							{#if !sidebarCollapsed}<span class="truncate">{t('nav_agents')}</span>{/if}
+							<Layers class="w-4 h-4 flex-shrink-0" />
+							{#if !sidebarCollapsed}<span class="truncate">Yapı</span>{/if}
 						</Button>
 					</a>
 				{/if}

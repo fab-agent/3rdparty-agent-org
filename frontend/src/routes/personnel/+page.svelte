@@ -17,6 +17,7 @@
 	import { invitePersonnel } from '$lib/api/client';
 	import { sessionsApi, type Session, type AgentMemory } from '$lib/api/sessions';
 	import { t } from '$lib/i18n/index.svelte';
+	import YapiTabs from '$lib/components/ui/yapi-tabs.svelte';
 
 	let people: PersonnelItem[] = $state([]);
 	let depts: Department[] = $state([]);
@@ -210,6 +211,7 @@
 </svelte:head>
 
 <div class="space-y-6">
+	<YapiTabs />
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<div>
 			<h1 class="font-display text-3xl tracking-tight">{t('personnel_title')}</h1>
