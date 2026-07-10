@@ -1,19 +1,26 @@
+import asyncio
+import base64
+import io
 import json
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlmodel import select
 
 from api.auth import get_current_user
 from database import get_session
 from models import AgentMemory, AgentSession, SessionMessage, Personnel, User
-from schemas import SessionCreate, MessageCreate
+from schemas import Attachment, MessageCreate, SessionCreate
 from services.agent_runtime import run_session
 from services.memory_service import generate_session_summary
 
 router = APIRouter(tags=["sessions"])
+
+# Per-session asyncio queues for background task → SSE communication.
+# Background task keeps running after client disconnects; queue is removed on disconnect.
+_session_queues: dict[str, "asyncio.Queue[dict | None]"] = {}
 
 
 def _session_to_dict(s: AgentSession, messages: list[SessionMessage] | None = None) -> dict:
@@ -134,12 +141,33 @@ async def close_session(session_id: str, background_tasks: BackgroundTasks,
     background_tasks.add_task(generate_session_summary, session_id)
 
 
-# ── Message streaming ─────────────────────────────────────────────────────────
+# ── Status polling (for reconnect after navigation away) ─────────────────────
 
-@router.post("/sessions/{session_id}/messages")
-async def send_message(session_id: str, body: MessageCreate,
-                       _: User = Depends(get_current_user)):
-    """Send a message to an agent and stream the response via SSE."""
+@router.get("/sessions/{session_id}/status")
+def get_session_status(session_id: str, _: User = Depends(get_current_user)):
+    """Returns current session status and all messages. Used for polling when reconnecting."""
+    with get_session() as session:
+        sess = session.get(AgentSession, session_id)
+        if not sess:
+            raise HTTPException(status_code=404, detail="Session not found")
+        messages = session.exec(
+            select(SessionMessage)
+            .where(SessionMessage.session_id == session_id)
+            .order_by(SessionMessage.created_at)
+        ).all()
+    return {
+        "status": sess.status,
+        "is_running": sess.status == "running",
+        "messages": [_message_to_dict(m) for m in messages],
+    }
+
+
+# ── File upload ───────────────────────────────────────────────────────────────
+
+@router.post("/sessions/{session_id}/files")
+async def upload_file(session_id: str, file: UploadFile = File(...),
+                      _: User = Depends(get_current_user)):
+    """Upload a file (PDF or image) to be included in the next message."""
     with get_session() as db:
         sess = db.get(AgentSession, session_id)
         if not sess:
@@ -147,25 +175,146 @@ async def send_message(session_id: str, body: MessageCreate,
         if sess.status == "closed":
             raise HTTPException(status_code=409, detail="Session is closed")
 
-    async def event_stream():
-        stream_complete = False
+    content_bytes = await file.read()
+    filename = file.filename or "file"
+    content_type = file.content_type or ""
+
+    if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
+        text = _extract_pdf_text(content_bytes)
+        return {
+            "type": "pdf",
+            "filename": filename,
+            "content": text,
+            "mime_type": "application/pdf",
+        }
+
+    elif content_type.startswith("image/"):
+        b64 = base64.b64encode(content_bytes).decode()
+        data_uri = f"data:{content_type};base64,{b64}"
+        return {
+            "type": "image",
+            "filename": filename,
+            "content": data_uri,
+            "mime_type": content_type,
+        }
+
+    else:
+        # Try to read as plain text
         try:
-            async for event in run_session(session_id, body.content):
+            text = content_bytes.decode("utf-8")
+            return {"type": "text", "filename": filename, "content": text, "mime_type": "text/plain"}
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="Desteklenmeyen dosya formatı. PDF veya görsel yükleyin.")
+
+
+def _extract_pdf_text(content: bytes) -> str:
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(io.BytesIO(content))
+        parts = []
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                parts.append(text.strip())
+        return "\n\n".join(parts) if parts else "[PDF boş veya metin içermiyor]"
+    except Exception as e:
+        return f"[PDF okunamadı: {e}]"
+
+
+# ── Background task runner ────────────────────────────────────────────────────
+
+async def _run_background(
+    session_id: str,
+    content: str,
+    queue: "asyncio.Queue[dict | None]",
+    attachments: list[Attachment] | None,
+):
+    """
+    Runs the agent in the background. Feeds events to `queue` while the SSE
+    client is connected. Always saves to DB regardless of client state.
+    """
+    try:
+        with get_session() as db:
+            sess = db.get(AgentSession, session_id)
+            if sess:
+                sess.status = "running"
+                sess.updated_at = datetime.utcnow()
+                db.add(sess)
+                db.commit()
+
+        att_dicts = [a.model_dump() for a in attachments] if attachments else None
+
+        async for event in run_session(session_id, content, attachments=att_dicts):
+            # Only send to queue if this queue is still the active one for this session
+            if _session_queues.get(session_id) is queue:
+                try:
+                    queue.put_nowait(event)
+                except asyncio.QueueFull:
+                    pass  # Client not consuming fast enough; skip live update, DB has it
+
+        # Signal done to SSE consumer
+        if _session_queues.get(session_id) is queue:
+            queue.put_nowait(None)
+
+    except Exception as e:
+        if _session_queues.get(session_id) is queue:
+            try:
+                queue.put_nowait({"type": "error", "message": str(e)})
+                queue.put_nowait(None)
+            except asyncio.QueueFull:
+                pass
+    finally:
+        with get_session() as db:
+            sess = db.get(AgentSession, session_id)
+            if sess and sess.status == "running":
+                sess.status = "idle"
+                sess.updated_at = datetime.utcnow()
+                db.add(sess)
+                db.commit()
+        _session_queues.pop(session_id, None)
+
+
+# ── Message streaming ─────────────────────────────────────────────────────────
+
+@router.post("/sessions/{session_id}/messages")
+async def send_message(session_id: str, body: MessageCreate,
+                       _: User = Depends(get_current_user)):
+    """
+    Send a message and stream the response via SSE.
+    The agent runs in a background task — navigation away does not kill the run.
+    Call GET /sessions/{id}/status to poll for completion after reconnecting.
+    """
+    with get_session() as db:
+        sess = db.get(AgentSession, session_id)
+        if not sess:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if sess.status == "closed":
+            raise HTTPException(status_code=409, detail="Session is closed")
+        if sess.status == "running":
+            raise HTTPException(status_code=409, detail="Session already running — check /status to poll")
+
+    queue: asyncio.Queue[dict | None] = asyncio.Queue(maxsize=512)
+    _session_queues[session_id] = queue
+
+    asyncio.create_task(
+        _run_background(session_id, body.content, queue, body.attachments)
+    )
+
+    async def event_stream():
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=300.0)
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'type': 'stream_end'})}\n\n"
+                    return
+                if event is None:
+                    yield f"data: {json.dumps({'type': 'stream_end'})}\n\n"
+                    return
                 yield f"data: {json.dumps(event)}\n\n"
-            stream_complete = True
-            yield f"data: {json.dumps({'type': 'stream_end'})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         finally:
-            if not stream_complete:
-                # Client disconnected mid-stream — reset active session to idle
-                with get_session() as db:
-                    sess = db.get(AgentSession, session_id)
-                    if sess and sess.status == "active":
-                        sess.status = "idle"
-                        sess.updated_at = datetime.utcnow()
-                        db.add(sess)
-                        db.commit()
+            # Client disconnected — remove queue; background task continues
+            _session_queues.pop(session_id, None)
 
     return StreamingResponse(
         event_stream(),

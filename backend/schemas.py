@@ -275,8 +275,16 @@ class SessionCreate(BaseModel):
     title: Optional[str] = None
 
 
+class Attachment(BaseModel):
+    type: str        # "pdf" | "image"
+    filename: str
+    content: str     # extracted text for PDF, base64 data URI for image
+    mime_type: Optional[str] = None
+
+
 class MessageCreate(BaseModel):
     content: str
+    attachments: Optional[list[Attachment]] = None
 
 
 # ── Change Request ─────────────────────────────────────────────────────────────

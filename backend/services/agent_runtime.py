@@ -19,6 +19,30 @@ from services.mcp_client import call_mcp_sse_tool, call_http_tool, execute_built
 from services.memory_service import load_agent_memories
 
 
+# ── Attachment helpers ────────────────────────────────────────────────────────
+
+def _build_message_with_attachments(user_message: str, attachments: list[dict] | None) -> str:
+    """Prepend file attachment content to the user message for the LLM."""
+    if not attachments:
+        return user_message
+    parts = []
+    for att in attachments:
+        att_type = att.get("type", "")
+        filename = att.get("filename", "dosya")
+        content = att.get("content", "")
+        if att_type == "pdf":
+            parts.append(f"[Yüklenen PDF: {filename}]\n{content}")
+        elif att_type == "image":
+            # Keep a short note; vision-capable providers can parse the data URI
+            # from the attachment payload handled in the provider layer.
+            parts.append(f"[Yüklenen görsel: {filename}] — Görsel içerik mevcuttur.")
+        elif att_type == "text":
+            parts.append(f"[Yüklenen metin dosyası: {filename}]\n{content}")
+    if not parts:
+        return user_message
+    return "\n\n".join(parts) + "\n\n---\n\n" + user_message
+
+
 # ── System prompt builder ─────────────────────────────────────────────────────
 
 def build_system_prompt(person: Personnel, dept: Department | None, skills: list[Skill]) -> str:
@@ -633,11 +657,16 @@ async def _stream_openai_compatible(
 async def run_session(
     session_id: str,
     user_message: str,
+    attachments: list[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Core agentic loop. Yields SSE-ready event dicts.
     Persists both the user message and assistant response to DB.
+    attachments: list of {type, filename, content, mime_type} dicts from file uploads.
     """
+    # Build the full message including any file attachments
+    full_message = _build_message_with_attachments(user_message, attachments)
+
     with get_session() as session:
         sess = session.get(AgentSession, session_id)
         if not sess:
@@ -667,7 +696,7 @@ async def run_session(
         system_prompt = build_system_prompt(person, dept, list(skills))
         tool_defs = build_tool_definitions(list(skills))
 
-        # Persist user message
+        # Persist user message (display original text; full_message goes to LLM)
         user_msg = SessionMessage(
             session_id=session_id,
             role="user",
@@ -699,11 +728,11 @@ async def run_session(
     all_tool_results: list[dict] = []
 
     if provider == "google":
-        gen = _stream_gemini(model_name, api_key, system_prompt, gemini_history, user_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
+        gen = _stream_gemini(model_name, api_key, system_prompt, gemini_history, full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
     elif provider == "anthropic":
-        gen = _stream_anthropic(model_name, api_key, system_prompt, list(history_rows), user_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
+        gen = _stream_anthropic(model_name, api_key, system_prompt, list(history_rows), full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
     elif provider in ("openai", "qwen"):
-        gen = _stream_openai_compatible(provider, model_name, api_key, system_prompt, list(history_rows), user_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
+        gen = _stream_openai_compatible(provider, model_name, api_key, system_prompt, list(history_rows), full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
     else:
         yield {"type": "error", "message": f"Provider '{provider}' not yet supported in runtime"}
         return

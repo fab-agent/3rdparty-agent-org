@@ -14,13 +14,25 @@
 		Shield,
 		Zap,
 		Info,
-		ChevronRight
+		Paperclip,
+		FileText,
+		Image,
+		RefreshCw,
 	} from '@lucide/svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import MessageContent from '$lib/components/MessageContent.svelte';
-	import { sessionsApi, streamMessage, type Session, type SessionMessage } from '$lib/api/sessions';
+	import {
+		sessionsApi,
+		streamMessage,
+		type Session,
+		type SessionMessage,
+		type Attachment,
+	} from '$lib/api/sessions';
 	import { personnel as personnelApi, type PersonnelItem } from '$lib/api/personnel';
 	import { companyStore } from '$lib/stores/company.svelte';
+
+	const LAST_SESSION_KEY = 'chat:lastSessionId';
+	const POLL_INTERVAL_MS = 3000;
 
 	// ── State ─────────────────────────────────────────────────────────────────
 
@@ -33,11 +45,20 @@
 	let agentMenuOpen = $state(false);
 	let infoPanelOpen = $state(true);
 	let agentSkills = $state<Array<{ id: string; name: string; version: string; description: string | null; skill_type: string; is_active: boolean }>>([]);
-	let agentPolicies = $state<string[]>([]);
+
 	let input = $state('');
 	let streaming = $state(false);
 	let streamingText = $state('');
 	let streamingTools = $state<Array<{ name: string; args: unknown; result?: string }>>([]);
+
+	// File attachments
+	let pendingAttachments = $state<Attachment[]>([]);
+	let fileUploading = $state(false);
+	let fileInputEl = $state<HTMLInputElement | null>(null);
+
+	// Background-run polling
+	let polling = $state(false);
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 	let messagesEl = $state<HTMLElement | null>(null);
 	let inputEl = $state<HTMLTextAreaElement | null>(null);
@@ -54,14 +75,23 @@
 		if (agentId) {
 			selectedAgent = agents.find((a) => a.id === agentId) ?? null;
 		}
+
+		// Restore last active session from localStorage
+		const lastId = localStorage.getItem(LAST_SESSION_KEY);
+		if (lastId && !activeSession) {
+			const s = sessions.find((x) => x.id === lastId);
+			if (s) await openSession(s);
+		}
 	});
 
 	$effect(() => {
 		if (companyStore.active) {
+			stopPolling();
 			activeSession = null;
 			messages = [];
 			selectedAgent = null;
 			agentSkills = [];
+			pendingAttachments = [];
 			loadAgents();
 			loadSessions();
 		}
@@ -93,30 +123,29 @@
 	);
 
 	async function loadAgentInfo(agent: PersonnelItem) {
-		// Skills
 		try {
 			const skills = await personnelApi.listSkills(agent.id);
 			agentSkills = skills as typeof agentSkills;
 		} catch {
 			agentSkills = [];
 		}
-		// Policies from agent_config dept — fetch via agent detail
-		try {
-			const detail = await personnelApi.get(agent.id);
-			// policies come from agent's org-tree or department — approximate via dept
-			agentPolicies = [];
-		} catch {
-			agentPolicies = [];
-		}
 	}
 
 	async function openSession(s: Session) {
+		stopPolling();
 		activeSession = s;
+		localStorage.setItem(LAST_SESSION_KEY, s.id);
 		const detail = await sessionsApi.get(s.id);
 		messages = detail.messages ?? [];
 		const agent = agents.find((a) => a.id === s.personnel_id) ?? null;
 		selectedAgent = agent;
 		if (agent) await loadAgentInfo(agent);
+
+		// If session was running when we were away, start polling
+		if (detail.status === 'running') {
+			startPolling(s.id);
+		}
+
 		await scrollToBottom();
 	}
 
@@ -126,22 +155,56 @@
 		sessions = [s, ...sessions];
 		activeSession = s;
 		messages = [];
+		localStorage.setItem(LAST_SESSION_KEY, s.id);
 	}
 
 	async function closeSession(s: Session) {
 		await sessionsApi.close(s.id);
 		sessions = sessions.filter((x) => x.id !== s.id);
 		if (activeSession?.id === s.id) {
+			stopPolling();
 			activeSession = null;
 			messages = [];
+			localStorage.removeItem(LAST_SESSION_KEY);
 		}
 	}
 
-	// ── Messaging ─────────────────────────────────────────────────────────────
+	// ── Background polling ────────────────────────────────────────────────────
 
-	async function send() {
-		const content = input.trim();
-		if (!content || streaming) return;
+	function startPolling(sessionId: string) {
+		stopPolling();
+		polling = true;
+		pollTimer = setInterval(async () => {
+			try {
+				const status = await sessionsApi.getStatus(sessionId);
+				messages = status.messages;
+				await scrollToBottom();
+				if (!status.is_running) {
+					stopPolling();
+					// Refresh session list to update title etc.
+					await loadSessions();
+				}
+			} catch {
+				stopPolling();
+			}
+		}, POLL_INTERVAL_MS);
+	}
+
+	function stopPolling() {
+		if (pollTimer !== null) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+		polling = false;
+	}
+
+	// ── File upload ───────────────────────────────────────────────────────────
+
+	async function handleFileSelect(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const files = input.files;
+		if (!files?.length) return;
+		input.value = '';
 
 		if (!activeSession) {
 			if (!selectedAgent) return;
@@ -149,19 +212,61 @@
 			sessions = [s, ...sessions];
 			activeSession = s;
 			messages = [];
+			localStorage.setItem(LAST_SESSION_KEY, s.id);
 		}
 
+		fileUploading = true;
+		try {
+			for (const file of Array.from(files)) {
+				const att = await sessionsApi.uploadFile(activeSession.id, file);
+				pendingAttachments = [...pendingAttachments, att];
+			}
+		} catch (err) {
+			console.error('File upload error:', err);
+		} finally {
+			fileUploading = false;
+		}
+	}
+
+	function removeAttachment(idx: number) {
+		pendingAttachments = pendingAttachments.filter((_, i) => i !== idx);
+	}
+
+	function attachmentIcon(type: string) {
+		return type === 'image' ? Image : FileText;
+	}
+
+	// ── Messaging ─────────────────────────────────────────────────────────────
+
+	async function send() {
+		const content = input.trim();
+		if ((!content && pendingAttachments.length === 0) || streaming) return;
+
+		if (!activeSession) {
+			if (!selectedAgent) return;
+			const s = await sessionsApi.create(selectedAgent.id);
+			sessions = [s, ...sessions];
+			activeSession = s;
+			messages = [];
+			localStorage.setItem(LAST_SESSION_KEY, s.id);
+		}
+
+		const attachmentsToSend = [...pendingAttachments];
+		pendingAttachments = [];
 		input = '';
 		streaming = true;
 		streamingText = '';
 		streamingTools = [];
 
 		// Optimistic user message
+		const displayContent = attachmentsToSend.length
+			? (content ? `${content}\n\n` : '') + attachmentsToSend.map(a => `📎 ${a.filename}`).join('\n')
+			: content;
 		const userMsg: SessionMessage = {
 			id: crypto.randomUUID(),
 			session_id: activeSession.id,
 			role: 'user',
-			content,
+			content: displayContent,
 			tool_calls: [],
 			tool_results: [],
 			tokens_used: null,
@@ -173,7 +278,12 @@
 		abortController = new AbortController();
 
 		try {
-			for await (const event of streamMessage(activeSession.id, content, abortController.signal)) {
+			for await (const event of streamMessage(
+				activeSession.id,
+				content || '(dosyaya bakınız)',
+				abortController.signal,
+				attachmentsToSend.length ? attachmentsToSend : undefined,
+			)) {
 				if (event.type === 'text') {
 					streamingText += event.content;
 					await scrollToBottom();
@@ -188,25 +298,36 @@
 					);
 					await scrollToBottom();
 				} else if (event.type === 'done') {
-					// Replace streaming state with final persisted message
 					const detail = await sessionsApi.get(activeSession.id);
 					messages = detail.messages ?? [];
 					streamingText = '';
 					streamingTools = [];
-					// Update session title in list
 					sessions = sessions.map((s) =>
 						s.id === activeSession!.id ? { ...s, title: detail.title } : s
 					);
 					await scrollToBottom();
 				} else if (event.type === 'error') {
-					streamingText = `[Error: ${event.message}]`;
+					streamingText = `[Hata: ${event.message}]`;
 				} else if (event.type === 'stream_end') {
+					// If streaming text wasn't cleared by 'done', load messages from DB
+					if (streamingText || streamingTools.length) {
+						const detail = await sessionsApi.get(activeSession.id);
+						messages = detail.messages ?? [];
+						streamingText = '';
+						streamingTools = [];
+					}
 					break;
 				}
 			}
 		} catch (e: unknown) {
-			if ((e as Error)?.name !== 'AbortError') {
-				streamingText = '[Connection error]';
+			if ((e as Error)?.name === 'AbortError') {
+				// User navigated away or cancelled; agent keeps running in background
+				// Start polling to catch the result when it's done
+				if (activeSession) {
+					startPolling(activeSession.id);
+				}
+			} else {
+				streamingText = '[Bağlantı hatası]';
 			}
 		} finally {
 			streaming = false;
@@ -317,7 +438,12 @@
 					onkeydown={(e) => e.key === 'Enter' && openSession(s)}
 				>
 					<div class="flex items-start gap-2 pr-6">
-						<MessageSquare class="w-3.5 h-3.5 mt-0.5 flex-shrink-0 opacity-60" />
+						<div class="relative flex-shrink-0 mt-0.5">
+							<MessageSquare class="w-3.5 h-3.5 opacity-60" />
+							{#if s.status === 'running'}
+								<span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+							{/if}
+						</div>
 						<div class="min-w-0 flex-1">
 							<div class="truncate font-medium text-xs leading-snug">
 								{s.title ?? 'Yeni sohbet'}
@@ -366,7 +492,12 @@
 					{/if}
 				</div>
 				<div class="ml-auto flex items-center gap-2">
-					{#if streaming}
+					{#if polling}
+						<span class="text-xs text-emerald-600 flex items-center gap-1.5">
+							<RefreshCw class="w-3 h-3 animate-spin" />
+							Ajan arka planda çalışıyor...
+						</span>
+					{:else if streaming}
 						<span class="text-xs text-muted-foreground flex items-center gap-1.5">
 							<Loader2 class="w-3 h-3 animate-spin" />
 							Yanıtlanıyor...
@@ -386,7 +517,7 @@
 				bind:this={messagesEl}
 				class="flex-1 overflow-y-auto px-6 py-4 space-y-4"
 			>
-				{#if messages.length === 0 && !streaming}
+				{#if messages.length === 0 && !streaming && !polling}
 					<div class="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
 						<Bot class="w-12 h-12 mb-3 opacity-20" />
 						<p class="text-sm">Bir mesaj yazarak sohbete başlayın.</p>
@@ -414,7 +545,6 @@
 							</div>
 							<div class="flex-1 min-w-0">
 								{#if msg.tool_calls?.length > 0}
-									<!-- Tool calls -->
 									{#each msg.tool_calls as tc, i}
 										<details class="mb-2 rounded-xl border border-border overflow-hidden text-xs" open={false}>
 											<summary class="flex items-center gap-2 px-3 py-2 bg-muted/50 font-medium cursor-pointer list-none">
@@ -443,6 +573,19 @@
 					{/if}
 				{/each}
 
+				<!-- Background polling indicator -->
+				{#if polling && !streaming}
+					<div class="flex gap-3">
+						<div class="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+							<Bot class="w-3.5 h-3.5 text-emerald-600" />
+						</div>
+						<div class="bg-muted/40 rounded-2xl rounded-tl-sm px-4 py-2.5 flex items-center gap-2">
+							<RefreshCw class="w-3.5 h-3.5 animate-spin text-emerald-600" />
+							<span class="text-sm text-muted-foreground">Ajan çalışıyor, sonuç bekleniyor...</span>
+						</div>
+					</div>
+				{/if}
+
 				<!-- Live streaming response -->
 				{#if streaming}
 					<div class="flex gap-3">
@@ -450,7 +593,6 @@
 							<Bot class="w-3.5 h-3.5 text-primary" />
 						</div>
 						<div class="flex-1 min-w-0">
-							<!-- Live tool calls -->
 							{#each streamingTools as t}
 								<div class="mb-2 rounded-xl border border-border overflow-hidden text-xs">
 									<div class="flex items-center gap-2 px-3 py-2 bg-muted/50 font-medium">
@@ -470,7 +612,6 @@
 								</div>
 							{/each}
 
-							<!-- Live text -->
 							{#if streamingText}
 								<div class="bg-muted/40 rounded-2xl rounded-tl-sm px-4 py-3">
 									<MessageContent content={streamingText} streaming={true} />
@@ -488,14 +629,49 @@
 
 			<!-- Input -->
 			<div class="px-6 py-4 border-t border-border flex-shrink-0">
+
+				<!-- Attachment chips -->
+				{#if pendingAttachments.length > 0}
+					<div class="flex flex-wrap gap-2 mb-2">
+						{#each pendingAttachments as att, i}
+							{@const Icon = attachmentIcon(att.type)}
+							<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted border border-border text-xs">
+								<Icon class="w-3 h-3 text-muted-foreground flex-shrink-0" />
+								<span class="max-w-[120px] truncate">{att.filename}</span>
+								<button
+									class="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+									onclick={() => removeAttachment(i)}
+								>
+									<X class="w-3 h-3" />
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
 				<div class="flex items-end gap-3 bg-muted/30 rounded-2xl border border-border px-4 py-3 focus-within:border-primary/50 transition-colors">
+					<!-- File upload button -->
+					<button
+						type="button"
+						class="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+						title="Dosya ekle (PDF veya görsel)"
+						disabled={streaming || polling}
+						onclick={() => fileInputEl?.click()}
+					>
+						{#if fileUploading}
+							<Loader2 class="w-4 h-4 animate-spin" />
+						{:else}
+							<Paperclip class="w-4 h-4" />
+						{/if}
+					</button>
+
 					<textarea
 						bind:this={inputEl}
 						bind:value={input}
 						onkeydown={handleKeydown}
 						placeholder="Mesaj yazın... (Enter gönderin, Shift+Enter yeni satır)"
 						rows={1}
-						disabled={streaming}
+						disabled={streaming || polling}
 						class="flex-1 bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground min-h-[20px] max-h-[120px] leading-5 disabled:opacity-50"
 						style="height: auto; overflow-y: hidden;"
 						oninput={(e) => {
@@ -507,14 +683,14 @@
 					<Button
 						size="sm"
 						onclick={send}
-						disabled={!input.trim() || streaming}
+						disabled={(!input.trim() && pendingAttachments.length === 0) || streaming || polling}
 						class="rounded-xl h-8 w-8 p-0 flex-shrink-0"
 					>
 						<Send class="w-3.5 h-3.5" />
 					</Button>
 				</div>
 				<p class="text-xs text-muted-foreground text-center mt-2">
-					{selectedAgent?.name ?? 'Ajan'} · Mesajlar kaydedilir
+					{selectedAgent?.name ?? 'Ajan'} · Mesajlar kaydedilir · PDF ve görsel yükleyebilirsiniz
 				</p>
 			</div>
 		{:else}
@@ -619,7 +795,7 @@
 				</div>
 			{/if}
 
-			<!-- Department policies -->
+			<!-- Department -->
 			{#if selectedAgent.department_name}
 				<div class="p-4">
 					<div class="flex items-center gap-1.5 mb-2.5">
@@ -651,6 +827,16 @@
 	{/if}
 	</div>
 </div>
+
+<!-- Hidden file input -->
+<input
+	bind:this={fileInputEl}
+	type="file"
+	accept=".pdf,image/*"
+	multiple
+	class="hidden"
+	onchange={handleFileSelect}
+/>
 
 <!-- Click outside to close agent menu -->
 {#if agentMenuOpen}

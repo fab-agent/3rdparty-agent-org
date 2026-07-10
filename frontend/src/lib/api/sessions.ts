@@ -16,11 +16,24 @@ export type Session = {
 	id: string;
 	personnel_id: string;
 	title: string | null;
-	status: 'active' | 'closed';
+	status: 'active' | 'idle' | 'running' | 'closed';
 	created_at: string;
 	updated_at: string;
 	messages?: SessionMessage[];
 	last_message?: SessionMessage | null;
+};
+
+export type SessionStatus = {
+	status: string;
+	is_running: boolean;
+	messages: SessionMessage[];
+};
+
+export type Attachment = {
+	type: 'pdf' | 'image' | 'text';
+	filename: string;
+	content: string;
+	mime_type?: string;
 };
 
 export type StreamEvent =
@@ -55,21 +68,44 @@ export const sessionsApi = {
 
 	close: (id: string) => api.delete(`/sessions/${id}`),
 
+	getStatus: (id: string) => api.get<SessionStatus>(`/sessions/${id}/status`),
+
 	memories: (personnel_id?: string) => {
 		const qs = personnel_id ? `?personnel_id=${personnel_id}` : '';
 		return api.get<AgentMemory[]>(`/sessions/memories${qs}`);
+	},
+
+	uploadFile: async (sessionId: string, file: File): Promise<Attachment> => {
+		const token = localStorage.getItem('access_token');
+		const form = new FormData();
+		form.append('file', file);
+		const res = await fetch(`${API_URL}/sessions/${sessionId}/files`, {
+			method: 'POST',
+			headers: token ? { Authorization: `Bearer ${token}` } : {},
+			body: form,
+		});
+		if (!res.ok) {
+			const err = await res.text();
+			throw new Error(err || 'Dosya yüklenemedi');
+		}
+		return res.json();
 	},
 };
 
 export async function* streamMessage(
 	sessionId: string,
 	content: string,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	attachments?: Attachment[],
 ): AsyncGenerator<StreamEvent> {
+	const token = localStorage.getItem('access_token');
 	const response = await fetch(`${API_URL}/sessions/${sessionId}/messages`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ content }),
+		headers: {
+			'Content-Type': 'application/json',
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+		},
+		body: JSON.stringify({ content, attachments: attachments?.length ? attachments : undefined }),
 		signal,
 	});
 
