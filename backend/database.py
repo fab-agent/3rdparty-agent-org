@@ -12,14 +12,35 @@ engine = create_engine(
 )
 
 
+def _is_fresh_db() -> bool:
+    """Return True if the database has no alembic_version table (brand-new install)."""
+    from sqlalchemy import inspect, text
+    with engine.connect() as conn:
+        try:
+            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'"))
+            return result.fetchone() is None
+        except Exception:
+            return True
+
+
 def init_db() -> None:
     os.makedirs("data", exist_ok=True)
-    # Run Alembic migrations instead of bare create_all so schema stays in sync
+
     from alembic.config import Config
     from alembic import command
     ini_path = os.path.join(os.path.dirname(__file__), "alembic.ini")
     alembic_cfg = Config(ini_path)
-    command.upgrade(alembic_cfg, "head")
+
+    if _is_fresh_db():
+        # Brand-new database: create all tables directly from SQLModel metadata,
+        # then stamp alembic_version to the current head so incremental migrations
+        # don't try to add columns to tables that already have them.
+        import models  # noqa: F401 — ensure all SQLModel tables are registered
+        SQLModel.metadata.create_all(engine)
+        command.stamp(alembic_cfg, "head")
+    else:
+        # Existing database: run only the incremental migrations that are missing.
+        command.upgrade(alembic_cfg, "head")
 
 
 @contextmanager
