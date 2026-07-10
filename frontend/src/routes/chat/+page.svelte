@@ -309,13 +309,11 @@
 				} else if (event.type === 'error') {
 					streamingText = `[Hata: ${event.message}]`;
 				} else if (event.type === 'stream_end') {
-					// If streaming text wasn't cleared by 'done', load messages from DB
-					if (streamingText || streamingTools.length) {
-						const detail = await sessionsApi.get(activeSession.id);
-						messages = detail.messages ?? [];
-						streamingText = '';
-						streamingTools = [];
-					}
+					// Always reload from DB to get persisted messages
+					const detail = await sessionsApi.get(activeSession.id);
+					messages = detail.messages ?? [];
+					streamingText = '';
+					streamingTools = [];
 					break;
 				}
 			}

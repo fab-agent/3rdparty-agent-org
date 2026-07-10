@@ -25,6 +25,7 @@ export const companyStore = {
 
   setActive(company: Company) {
     _active = company;
+    _list = _list.map(c => c.id === company.id ? company : c);
   },
 
   async create(name: string) {

@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select, func
 
@@ -12,6 +14,15 @@ router = APIRouter(prefix="/companies", tags=["companies"])
 _ROLE_WEIGHT = {"founder": 5, "executive": 4, "dept_head": 3, "agent_owner": 2, "user": 1}
 
 
+def _parse_meta(company: Company) -> dict:
+    if not company.metadata_json:
+        return {}
+    try:
+        return json.loads(company.metadata_json)
+    except Exception:
+        return {}
+
+
 def _company_to_dict(company: Company, session) -> dict:
     dept_count = session.exec(
         select(func.count()).where(Department.company_id == company.id)
@@ -24,6 +35,7 @@ def _company_to_dict(company: Company, session) -> dict:
         .join(Personnel, AgentConfig.personnel_id == Personnel.id)
         .where(Personnel.company_id == company.id)
     ).one()
+    meta = _parse_meta(company)
     return {
         "id": company.id,
         "name": company.name,
@@ -36,6 +48,10 @@ def _company_to_dict(company: Company, session) -> dict:
             "personnel": personnel_count,
             "agents": agent_count,
         },
+        "vision":  meta.get("vision"),
+        "mission": meta.get("mission"),
+        "values":  meta.get("values", []),
+        "goals":   meta.get("goals", []),
     }
 
 
@@ -97,6 +113,16 @@ def update_company(company_id: str, body: CompanyUpdate, current_user: User = De
         if body.slug is not None:    company.slug    = body.slug
         if body.sector is not None:  company.sector  = body.sector
         if body.website is not None: company.website = body.website
+        # Persist metadata fields
+        meta_patch = {}
+        if body.vision  is not None: meta_patch["vision"]  = body.vision
+        if body.mission is not None: meta_patch["mission"] = body.mission
+        if body.values  is not None: meta_patch["values"]  = body.values
+        if body.goals   is not None: meta_patch["goals"]   = body.goals
+        if meta_patch:
+            meta = _parse_meta(company)
+            meta.update(meta_patch)
+            company.metadata_json = json.dumps(meta, ensure_ascii=False)
         session.add(company)
         log_action(session, "update", "company", entity_id=company.id, entity_name=company.name)
         session.commit()

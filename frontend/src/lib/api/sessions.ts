@@ -76,7 +76,7 @@ export const sessionsApi = {
 	},
 
 	uploadFile: async (sessionId: string, file: File): Promise<Attachment> => {
-		const token = localStorage.getItem('access_token');
+		const token = localStorage.getItem('auth_token');
 		const form = new FormData();
 		form.append('file', file);
 		const res = await fetch(`${API_URL}/sessions/${sessionId}/files`, {
@@ -98,7 +98,7 @@ export async function* streamMessage(
 	signal?: AbortSignal,
 	attachments?: Attachment[],
 ): AsyncGenerator<StreamEvent> {
-	const token = localStorage.getItem('access_token');
+	const token = localStorage.getItem('auth_token');
 	const response = await fetch(`${API_URL}/sessions/${sessionId}/messages`, {
 		method: 'POST',
 		headers: {

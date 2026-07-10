@@ -467,6 +467,7 @@ def create_org_from_structure(company_id: str, structure: dict, fallback_model: 
             summary["agents"] += 1
 
         # 5. Policies
+        dept_policy_names: dict[str, list[str]] = {}  # dept_id → [policy_name]
         for pol in structure.get("policies", []):
             dept_id = dept_map.get(pol.get("department_slug", "")) or None
             policy = Policy(
@@ -481,6 +482,17 @@ def create_org_from_structure(company_id: str, structure: dict, fallback_model: 
             session.add(policy)
             session.flush()
             summary["policies"] += 1
+            if dept_id:
+                dept_policy_names.setdefault(dept_id, []).append(pol["name"])
+
+        # Sync policies_json on each department so agents/org-tree can see them
+        for dept_id, names in dept_policy_names.items():
+            dept_obj = session.get(Department, dept_id)
+            if dept_obj:
+                existing = json.loads(dept_obj.policies_json) if dept_obj.policies_json else []
+                merged = list({n: None for n in existing + names})  # preserve order, deduplicate
+                dept_obj.policies_json = json.dumps(merged, ensure_ascii=False)
+                session.add(dept_obj)
 
         # 6. Mark company as onboarded
         company = session.get(Company, company_id)

@@ -71,6 +71,10 @@ class CompanyUpdate(BaseModel):
     slug: Optional[str] = None
     sector: Optional[str] = None
     website: Optional[str] = None
+    vision: Optional[str] = None
+    mission: Optional[str] = None
+    values: Optional[list[str]] = None
+    goals: Optional[list[dict]] = None
 
 
 # ── Department ─────────────────────────────────────────────────────────────────

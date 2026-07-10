@@ -35,7 +35,7 @@
 	import { companyStore } from '$lib/stores/company.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { i18n, type Locale } from '$lib/i18n/index.svelte';
-	import type { Company } from '$lib/api/companies';
+	import { companies, type Company } from '$lib/api/companies';
 	import { a2aApi } from '$lib/api/a2a';
 	import Input from '$lib/components/ui/input.svelte';
 
@@ -159,17 +159,34 @@
 	let coNewGoal  = $state('');
 
 	function openCoMd() {
+		const co = active as Company | null;
 		coMdEdit = {
-			...coMdEdit,
-			name: active?.name ?? coMdEdit.name,
-			sector: (active as any)?.sector ?? coMdEdit.sector,
-			website: (active as any)?.website ?? coMdEdit.website,
-			values: [...coMdEdit.values],
-			goals: coMdEdit.goals.map(g => ({ ...g })),
+			name: co?.name ?? '',
+			sector: co?.sector ?? '',
+			website: co?.website ?? '',
+			vision: co?.vision ?? '',
+			mission: co?.mission ?? '',
+			values: co?.values?.length ? [...co.values] : [],
+			goals: co?.goals?.length ? co.goals.map(g => ({ ...g })) : [],
 		};
 		coNewValue = ''; coNewGoal = '';
 		coMdOpen = true;
 		companyMenuOpen = false;
+	}
+
+	async function saveCoMd() {
+		if (!active) return;
+		const updated = await companies.update(active.id, {
+			name: coMdEdit.name || undefined,
+			sector: coMdEdit.sector || undefined,
+			website: coMdEdit.website || undefined,
+			vision: coMdEdit.vision,
+			mission: coMdEdit.mission,
+			values: coMdEdit.values,
+			goals: coMdEdit.goals,
+		});
+		companyStore.setActive(updated);
+		coMdOpen = false;
 	}
 
 	function coAddValue() {
@@ -654,7 +671,7 @@
 		{#if canManageCompany}
 			<div class="border-t px-6 py-4 flex gap-3 justify-end flex-shrink-0 bg-card">
 				<Button variant="outline" onclick={() => (coMdOpen = false)}>İptal</Button>
-				<Button onclick={() => (coMdOpen = false)}>Kaydet</Button>
+				<Button onclick={saveCoMd}>Kaydet</Button>
 			</div>
 		{/if}
 	</aside>
