@@ -137,7 +137,8 @@ def _get_best_key() -> tuple[str, str, str] | None:
 
 # ── Simple LLM call (non-streaming, for structured output) ───────────────────
 
-async def _call_llm(messages: list[dict], provider: str, model: str, api_key: str) -> str:
+async def _call_llm(messages: list[dict], provider: str, model: str, api_key: str,
+                   max_tokens: int = 8192) -> str:
     """Single blocking call, returns assistant text."""
     def _sync():
         if provider == "anthropic":
@@ -147,7 +148,7 @@ async def _call_llm(messages: list[dict], provider: str, model: str, api_key: st
             user_msgs = [m for m in messages if m["role"] != "system"]
             resp = client.messages.create(
                 model=model,
-                max_tokens=8192,
+                max_tokens=max_tokens,
                 system=sys_msg,
                 messages=user_msgs,
             )
@@ -167,7 +168,10 @@ async def _call_llm(messages: list[dict], provider: str, model: str, api_key: st
             resp = client.models.generate_content(
                 model=model,
                 contents=history,
-                config=types.GenerateContentConfig(system_instruction=sys_msg),
+                config=types.GenerateContentConfig(
+                    system_instruction=sys_msg,
+                    max_output_tokens=max_tokens,
+                ),
             )
             return resp.text
 
@@ -179,7 +183,7 @@ async def _call_llm(messages: list[dict], provider: str, model: str, api_key: st
             }
             client = OpenAI(api_key=api_key, base_url=base_url_map.get(provider, "https://api.openai.com/v1"))
             resp = client.chat.completions.create(
-                model=model, messages=messages, max_tokens=8192
+                model=model, messages=messages, max_tokens=max_tokens
             )
             return resp.choices[0].message.content or ""
 
@@ -282,7 +286,7 @@ SADECE geçerli JSON döndür — açıklama, markdown fence veya başka hiçbir
 Tüm ajanların "model" alanına DAİMA "{available_model}" yaz. Başka model adı uydurma.
 
 ## Skill content (EN ÖNEMLİ KURAL)
-Her company_skill'in "content" alanı MİNİMUM 600 karakter olmalı ve şu Markdown başlıklarını içermeli:
+Her company_skill'in "content" alanı MİNİMUM 300 karakter olmalı ve şu Markdown başlıklarını içermeli:
 
 ## <Yetenek Adı> Yeteneği
 (1-2 cümle genel tanım)
@@ -306,7 +310,7 @@ TEK CÜMLELIK, JENERİK VEYA PLACEHOLDER CONTENT KESİNLİKLE YASAK.
 İçerik şirketin gerçek sektörüne ve konuşmadan elde edilen araç/süreç bilgilerine özel olmalı.
 
 ## Policy content (EN ÖNEMLİ KURAL)
-Her policy'nin "content" alanı MİNİMUM 500 karakter olmalı ve şu başlıkları içermeli:
+Her policy'nin "content" alanı MİNİMUM 250 karakter olmalı ve şu başlıkları içermeli:
 
 ## <Politika Adı>
 
@@ -352,21 +356,21 @@ TEK PARAGRAFLIK KURAL CÜMLESİ YASAK.
   "company_skills": [
     {{"name": "string", "slug": "string", "skill_type": "builtin",
       "description": "string (1 cümle)",
-      "content": "string (MİNİMUM 600 karakter, yukarıdaki 6 başlıklı markdown yapısı)"}}
+      "content": "string (yukarıdaki 6 başlıklı markdown yapısı, öz ve net)"}}
   ],
   "policies": [
     {{"name": "string", "slug": "string", "scope": "company | department | agent",
       "department_slug": "string or null",
-      "content": "string (MİNİMUM 500 karakter, yukarıdaki 6 başlıklı markdown yapısı)"}}
+      "content": "string (yukarıdaki 6 başlıklı markdown yapısı, öz ve net)"}}
   ]
 }}
 
 # Üretilecek miktar
-- 3-6 departman
-- 5-10 insan personel (unvan ve rol ile)
-- 4-8 ajan (her biri en az 2 yeteneğe sahip, model = "{available_model}")
-- 6-12 şirket yeteneği (her biri min 600 karakter, sektöre özel tam yapılandırılmış)
-- 4-8 politika (en az 1 şirket geneli; her biri min 500 karakter, tam yapılandırılmış)
+- 3-5 departman
+- 4-8 insan personel (unvan ve rol ile)
+- 3-6 ajan (her biri en az 2 yeteneğe sahip, model = "{available_model}")
+- 4-8 şirket yeteneği (sektöre özel, yapılandırılmış)
+- 3-5 politika (en az 1 şirket geneli, tam yapılandırılmış)
 """
 
 
@@ -492,6 +496,41 @@ def create_org_from_structure(company_id: str, structure: dict, fallback_model: 
 
 # ── Generate structure from conversation ──────────────────────────────────────
 
+def _repair_json(raw: str) -> str:
+    """
+    Attempt to fix a truncated JSON string by closing any open string literals
+    and unclosed arrays/objects. Only used as a last-resort fallback.
+    """
+    stack: list[str] = []
+    in_string = False
+    escape_next = False
+
+    for ch in raw:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            stack.append("}")
+        elif ch == "[":
+            stack.append("]")
+        elif ch in ("}","]") and stack and stack[-1] == ch:
+            stack.pop()
+
+    suffix = ""
+    if in_string:
+        suffix += '"'          # close the unterminated string
+    suffix += "".join(reversed(stack))  # close any open arrays/objects
+    return raw + suffix
+
+
 async def generate_org_structure(
     company_name: str,
     conversation: list[dict],
@@ -520,7 +559,9 @@ SADECE JSON döndür."""
         {"role": "user", "content": prompt},
     ]
 
-    raw = await _call_llm(messages, provider, model, api_key)
+    # Use 16 000 output tokens — Turkish text + JSON overhead is heavy on tokens.
+    # Anthropic claude-sonnet-4-6 supports up to 16 384 max output tokens.
+    raw = await _call_llm(messages, provider, model, api_key, max_tokens=16000)
 
     # Extract JSON from response (strip markdown fences if present)
     raw = raw.strip()
@@ -528,4 +569,24 @@ SADECE JSON döndür."""
         raw = re.sub(r"```(?:json)?\s*", "", raw)
         raw = raw.rstrip("`").strip()
 
-    return json.loads(raw)
+    # Primary parse
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as primary_err:
+        # Attempt lightweight repair (closes truncated string/array/object)
+        try:
+            repaired = _repair_json(raw)
+            result = json.loads(repaired)
+            # Warn in logs but continue — partial structure is still useful
+            import logging
+            logging.getLogger("app").warning(
+                "generate_org_structure: JSON was truncated and auto-repaired. "
+                f"Original error: {primary_err}. "
+                "Consider reviewing the generated structure for completeness."
+            )
+            return result
+        except json.JSONDecodeError:
+            raise ValueError(
+                f"AI geçersiz JSON üretiyor (onarılamadı): {primary_err}. "
+                "Lütfen daha kısa bir yapı isteyerek tekrar deneyin."
+            ) from primary_err
