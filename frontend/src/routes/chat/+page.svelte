@@ -36,6 +36,14 @@
 	const LAST_SESSION_KEY = 'chat:lastSessionId';
 	const POLL_INTERVAL_MS = 3000;
 
+	function uuid(): string {
+		if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+			const r = Math.random() * 16 | 0;
+			return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+		});
+	}
+
 	function detectProvider(model: string): string {
 		if (model.startsWith('claude')) return 'anthropic';
 		if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3')) return 'openai';
@@ -290,7 +298,7 @@
 			? (content ? `${content}\n\n` : '') + attachmentsToSend.map(a => `📎 ${a.filename}`).join('\n')
 			: content;
 		const userMsg: SessionMessage = {
-			id: crypto.randomUUID(),
+			id: uuid(),
 			session_id: activeSession.id,
 			role: 'user',
 			content: displayContent,
