@@ -106,8 +106,8 @@
 			const DOMPurify = (window as unknown as { DOMPurify: { sanitize: (h: string, opts: object) => string } }).DOMPurify;
 			if (DOMPurify) {
 				return DOMPurify.sanitize(raw, {
-					ADD_ATTR: ['data-code', 'data-id', 'class', 'id'],
-					ADD_TAGS: ['details', 'summary'],
+					ADD_ATTR: ['data-code', 'data-id', 'class', 'id', 'src', 'alt'],
+					ADD_TAGS: ['details', 'summary', 'img'],
 					FORCE_BODY: true,
 				});
 			}
@@ -384,6 +384,15 @@
 
 	@keyframes spin {
 		to { transform: rotate(360deg); }
+	}
+
+	/* Generated images */
+	.msg-content :global(img) {
+		max-width: 100%;
+		border-radius: 10px;
+		border: 1px solid hsl(var(--border));
+		margin: 0.5em 0;
+		display: block;
 	}
 
 	/* Tables */

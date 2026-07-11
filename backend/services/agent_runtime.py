@@ -303,7 +303,20 @@ def detect_provider(model: str) -> str:
         return "openai"
     if m.startswith("qwen"):
         return "qwen"
+    if m.startswith("dall-e"):
+        return "openai"
+    if m.startswith(("wanx", "flux", "stable-diffusion")):
+        return "qwen"
     return "google"
+
+
+# Image generation model prefixes — these need /images/generations, not /chat/completions
+_IMAGE_GEN_PREFIXES = ("wanx", "flux", "stable-diffusion", "dall-e")
+
+
+def is_image_gen_model(model: str) -> bool:
+    m = (model or "").lower()
+    return any(m.startswith(p) for p in _IMAGE_GEN_PREFIXES)
 
 
 # ── Gemini streaming ──────────────────────────────────────────────────────────
@@ -558,6 +571,67 @@ async def _stream_anthropic(
     }
 
 
+# ── Image generation (Qwen wanx/flux/stable-diffusion, OpenAI dall-e) ────────
+
+async def _generate_image(
+    provider: str,
+    model_name: str,
+    api_key: str,
+    prompt: str,
+    size: str = "1024x1024",
+) -> AsyncGenerator[dict, None]:
+    """Call /images/generations and yield the result as a markdown image."""
+    import httpx
+
+    base_url = _OPENAI_BASE_URLS.get(provider, "https://api.openai.com/v1")
+    if provider == "qwen":
+        from database import get_session as _gs
+        from models import ProviderKey as _PK
+        from sqlmodel import select as _sel
+        with _gs() as _db:
+            _row = _db.exec(_sel(_PK).where(_PK.provider == "qwen")).first()
+            if _row and _row.base_url:
+                base_url = _row.base_url
+
+    url = f"{base_url}/images/generations"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    body = {"model": model_name, "prompt": prompt, "n": 1, "size": size}
+
+    def _sync_call():
+        with httpx.Client(timeout=120) as client:
+            resp = client.post(url, json=body, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+
+    try:
+        data = await asyncio.to_thread(_sync_call)
+    except Exception as e:
+        yield {"type": "error", "message": f"Resim üretilemedi: {e}"}
+        yield {"type": "_meta", "tool_calls": [], "tool_results": []}
+        return
+
+    images = data.get("data", [])
+    if not images:
+        yield {"type": "error", "message": "Resim üretilemedi: API boş yanıt döndü."}
+        yield {"type": "_meta", "tool_calls": [], "tool_results": []}
+        return
+
+    parts = []
+    for img in images:
+        img_url = img.get("url")
+        b64 = img.get("b64_json")
+        revised = img.get("revised_prompt", "")
+        if img_url:
+            parts.append(f"![Üretilen resim]({img_url})")
+        elif b64:
+            parts.append(f"![Üretilen resim](data:image/png;base64,{b64})")
+        if revised and revised != prompt:
+            parts.append(f"\n*Revize prompt: {revised}*")
+
+    yield {"type": "text", "content": "\n".join(parts)}
+    yield {"type": "_meta", "tool_calls": [], "tool_results": []}
+
+
 # ── OpenAI-compatible streaming (OpenAI + Qwen) ───────────────────────────────
 
 _OPENAI_BASE_URLS = {
@@ -756,7 +830,9 @@ async def run_session(
     all_tool_calls: list[dict] = []
     all_tool_results: list[dict] = []
 
-    if provider == "google":
+    if is_image_gen_model(model_name):
+        gen = _generate_image(provider, model_name, api_key, full_message)
+    elif provider == "google":
         gen = _stream_gemini(model_name, api_key, system_prompt, gemini_history, full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
     elif provider == "anthropic":
         gen = _stream_anthropic(model_name, api_key, system_prompt, list(history_rows), full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
