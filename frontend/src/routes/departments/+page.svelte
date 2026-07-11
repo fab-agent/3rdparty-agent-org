@@ -55,6 +55,10 @@
 	const rootDepts = $derived(departments.filter((d) => !d.parent_id));
 	const subDepts = $derived(departments.filter((d) => !!d.parent_id));
 
+	// Policy lists by scope
+	const companyLevelPolicies = $derived(companyPolicies.filter(p => p.scope === 'company'));
+	const deptLevelPolicies = $derived(companyPolicies.filter(p => p.scope === 'department'));
+
 	// ── Panel state ───────────────────────────────────────────────────────────
 	let panelOpen    = $state(false);
 	let saving       = $state(false);
@@ -489,15 +493,33 @@
 				{t('dept_policies_section')}
 			</div>
 
-			{#if companyPolicies.length === 0}
+			<!-- Şirket politikaları — kilitli, her zaman aktif -->
+			{#if companyLevelPolicies.length > 0}
+				<div class="mb-2">
+					<div class="text-xs font-medium text-muted-foreground mb-1.5">Şirket Politikaları <span class="text-[10px] bg-muted px-1.5 py-0.5 rounded ml-1">her zaman aktif</span></div>
+					<div class="space-y-1">
+						{#each companyLevelPolicies as policy (policy.id)}
+							<div class="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border/50 bg-muted/30 opacity-70 cursor-not-allowed">
+								<div class="flex-shrink-0 w-4 h-4 rounded border-2 border-emerald-400 bg-emerald-500 flex items-center justify-center">
+									<ShieldCheck class="w-3 h-3 text-white" />
+								</div>
+								<span class="text-sm font-medium truncate text-muted-foreground">{policy.name}</span>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Bölüm politikaları — seçilebilir -->
+			{#if deptLevelPolicies.length === 0}
 				<p class="text-xs text-muted-foreground italic">
-					Henüz politika oluşturulmamış.
-					<a href="/policies" class="underline text-primary">Politikalar</a> sayfasından ekleyin.
+					Bölüm politikası oluşturulmamış.
+					<a href="/policies" class="underline text-primary">Politikalar</a> sayfasından "Bölüm" kapsamında ekleyin.
 				</p>
 			{:else}
 				<p class="text-xs text-muted-foreground mb-1">Bu bölüme uygulanacak politikaları seçin:</p>
-				<div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-					{#each companyPolicies as policy (policy.id)}
+				<div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+					{#each deptLevelPolicies as policy (policy.id)}
 						{@const selected = form.policyIds.includes(policy.id)}
 						<button
 							type="button"
@@ -515,9 +537,6 @@
 							</div>
 							<div class="min-w-0 flex-1">
 								<div class="text-sm font-medium truncate">{policy.name}</div>
-								{#if policy.scope !== 'company'}
-									<div class="text-xs text-muted-foreground capitalize">{policy.scope}</div>
-								{/if}
 							</div>
 						</button>
 					{/each}

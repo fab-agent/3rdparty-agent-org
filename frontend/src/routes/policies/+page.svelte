@@ -230,7 +230,7 @@ Bu politika onay tarihinden itibaren geçerlidir.
 						</div>
 					</div>
 					<div class="flex items-center gap-2 flex-shrink-0">
-						{#if !p.is_active}
+						{#if p.scope !== 'company' && !p.is_active}
 							<span class="text-xs text-amber-600">Pasif</span>
 						{/if}
 						<Badge variant={SCOPE_COLORS[p.scope] as any}>{SCOPE_LABELS[p.scope]}</Badge>
@@ -289,6 +289,14 @@ Bu politika onay tarihinden itibaren geçerlidir.
 
 					<div class="text-xs text-muted-foreground space-y-1">
 						<div>Slug: <span class="font-mono">{selected.slug}</span></div>
+						{#if selected.scope === 'company'}
+							<div class="flex items-center gap-1.5 text-emerald-700">
+								<Check class="w-3 h-3" />
+								Her zaman aktif — pasif edilemez
+							</div>
+						{:else}
+							<div>Durum: <span class="{selected.is_active ? 'text-emerald-600' : 'text-amber-600'}">{selected.is_active ? 'Aktif' : 'Pasif'}</span></div>
+						{/if}
 						{#if selected.department_id}
 							<div>Bölüm ID: <span class="font-mono">{selected.department_id}</span></div>
 						{/if}
@@ -354,12 +362,19 @@ Bu politika onay tarihinden itibaren geçerlidir.
 							</div>
 						{/if}
 
-						<div class="space-y-1.5">
-							<label class="flex items-center gap-2 text-sm cursor-pointer">
-								<input type="checkbox" bind:checked={form.is_active} class="rounded" />
-								Aktif
-							</label>
-						</div>
+						{#if form.scope === 'company'}
+							<div class="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-3 py-2 text-xs text-muted-foreground">
+								<Check class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+								Şirket politikaları her zaman aktiftir, pasif edilemez.
+							</div>
+						{:else}
+							<div class="space-y-1.5">
+								<label class="flex items-center gap-2 text-sm cursor-pointer">
+									<input type="checkbox" bind:checked={form.is_active} class="rounded" />
+									Aktif
+								</label>
+							</div>
+						{/if}
 
 						<!-- Markdown Editor -->
 						<div class="space-y-1.5">

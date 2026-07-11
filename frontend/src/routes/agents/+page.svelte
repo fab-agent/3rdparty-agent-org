@@ -927,15 +927,37 @@
 						<a href="/policies" class="underline text-primary">Politikalar</a> sayfasından ekleyin.
 					</p>
 				{:else}
-					<!-- Inherited from department (locked) -->
-					{#if inheritedPolicyIds.length > 0}
+					{@const companyLevelPolicies = companyPolicies.filter(p => p.scope === 'company')}
+					{@const deptLevelPolicies = companyPolicies.filter(p => p.scope === 'department' && inheritedPolicyIds.includes(p.id))}
+					{@const agentLevelPolicies = companyPolicies.filter(p => p.scope === 'agent')}
+					<!-- Şirket politikaları — her zaman kilitli -->
+					{#if companyLevelPolicies.length > 0}
+						<div class="mb-3">
+							<div class="text-xs font-medium text-muted-foreground mb-1.5">
+								Şirket Politikaları <span class="text-[10px] bg-muted px-1.5 py-0.5 rounded ml-1">her zaman aktif</span>
+							</div>
+							<div class="space-y-1">
+								{#each companyLevelPolicies as policy}
+									<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/50 opacity-70 cursor-not-allowed">
+										<div class="w-4 h-4 rounded border-2 border-emerald-400 bg-emerald-500 flex items-center justify-center flex-shrink-0">
+											<Check class="w-2.5 h-2.5 text-white" />
+										</div>
+										<span class="text-xs flex-1 truncate text-muted-foreground">{policy.name}</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Bölüm politikaları — kilitli, bölümden kalıtılmış -->
+					{#if deptLevelPolicies.length > 0}
 						<div class="mb-3">
 							<div class="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
 								<span>Bölüm Politikaları</span>
-								<span class="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{selectedDeptName}</span>
+								<span class="text-[10px] bg-muted px-1.5 py-0.5 rounded">{selectedDeptName}</span>
 							</div>
 							<div class="space-y-1">
-								{#each companyPolicies.filter(p => inheritedPolicyIds.includes(p.id)) as policy}
+								{#each deptLevelPolicies as policy}
 									<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 opacity-75 cursor-not-allowed">
 										<div class="w-4 h-4 rounded border-2 border-emerald-400 bg-emerald-500 flex items-center justify-center flex-shrink-0">
 											<Check class="w-2.5 h-2.5 text-white" />
@@ -946,15 +968,16 @@
 								{/each}
 							</div>
 						</div>
+					{:else if form.department_id}
+						<p class="text-xs text-muted-foreground mb-3 italic">Bu bölüme atanmış bölüm politikası yok.</p>
 					{/if}
 
-					<!-- Agent-specific policies (toggleable) -->
-					{@const ownPolicies = companyPolicies.filter(p => !inheritedPolicyIds.includes(p.id))}
-					{#if ownPolicies.length > 0}
+					<!-- Ajan politikaları — toggle edilebilir -->
+					{#if agentLevelPolicies.length > 0}
 						<div>
 							<div class="text-xs font-medium text-muted-foreground mb-1.5">Ajana Özel</div>
 							<div class="space-y-1 max-h-56 overflow-y-auto pr-1">
-								{#each ownPolicies as policy}
+								{#each agentLevelPolicies as policy}
 									{@const selected = form.selectedAgentPolicyIds.includes(policy.id)}
 									<button
 										type="button"
@@ -973,9 +996,14 @@
 								{/each}
 							</div>
 						</div>
+					{:else}
+						<p class="text-xs text-muted-foreground italic">
+							Ajan kapsamında politika oluşturulmamış.
+							<a href="/policies" class="underline text-primary">Politikalar</a> sayfasından "Ajan" kapsamında ekleyin.
+						</p>
 					{/if}
 
-					{#if inheritedPolicyIds.length === 0 && ownPolicies.length > 0 && !form.department_id}
+					{#if !form.department_id && companyLevelPolicies.length === 0 && agentLevelPolicies.length === 0}
 						<p class="text-xs text-muted-foreground mt-2 italic">Bölüm seçince bölüm politikaları otomatik eklenir.</p>
 					{/if}
 				{/if}

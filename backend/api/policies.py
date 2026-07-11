@@ -132,7 +132,11 @@ def update_policy(
             session.refresh(cr)
             return {"change_request_id": cr.id, "status": "submitted"}
 
-        for field, val in body.model_dump(exclude_none=True).items():
+        updates = body.model_dump(exclude_none=True)
+        # Company-scoped policies are always active — ignore is_active overrides
+        if p.scope == "company":
+            updates.pop("is_active", None)
+        for field, val in updates.items():
             setattr(p, field, val)
         p.updated_at = datetime.utcnow()
         session.add(p)
