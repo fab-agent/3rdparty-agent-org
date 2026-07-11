@@ -265,11 +265,16 @@
 
 		if (!activeSession) {
 			if (!selectedAgent) return;
-			const s = await sessionsApi.create(selectedAgent.id);
-			sessions = [s, ...sessions];
-			activeSession = s;
-			messages = [];
-			localStorage.setItem(LAST_SESSION_KEY, s.id);
+			try {
+				const s = await sessionsApi.create(selectedAgent.id);
+				sessions = [s, ...sessions];
+				activeSession = s;
+				messages = [];
+				localStorage.setItem(LAST_SESSION_KEY, s.id);
+			} catch (err) {
+				streamError = err instanceof Error ? err.message : 'Sohbet başlatılamadı';
+				return;
+			}
 		}
 
 		const attachmentsToSend = [...pendingAttachments];
@@ -352,7 +357,8 @@
 					startPolling(activeSession.id);
 				}
 			} else {
-				streamingText = '[Bağlantı hatası]';
+				streamError = e instanceof Error ? e.message : 'Beklenmedik hata oluştu';
+				streamingText = '';
 			}
 		} finally {
 			streaming = false;
