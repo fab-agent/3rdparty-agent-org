@@ -14,6 +14,7 @@ from services.provider_service import (
     SUPPORTED_PROVIDERS,
     detect_qwen_base_url,
     get_provider_models,
+    save_model_capabilities,
     test_provider_key,
 )
 
@@ -61,6 +62,11 @@ def _provider_status_dict(row: ProviderKey | None, provider: str, plain_key: str
             "last_tested": None,
         }
     models = get_provider_models(provider, plain_key, base_url=row.base_url) if row.status == "active" else []
+    if models:
+        try:
+            save_model_capabilities(models)
+        except Exception:
+            pass  # never block the response
     return {
         "provider": provider,
         "display_name": cfg["display_name"],
@@ -167,4 +173,4 @@ def test_existing_key(provider: str, _: User = Depends(require_manager)):
         log_action(session, "test", "provider_key", entity_name=provider, details={"valid": valid})
         session.commit()
         session.refresh(row)
-        return _provider_status_dict(row, provider)
+        return _provider_status_dict(row, provider, plain_key if valid else None)

@@ -1,3 +1,5 @@
+import json
+import os
 import httpx
 
 # Cost tier: "low" (<$1/M input), "medium" ($1-5), "high" ($5-20), "premium" (>$20)
@@ -30,10 +32,60 @@ _PRICING: dict[str, dict] = {
 
 _DEFAULT_PRICING = {"tier": "medium", "input_per_m": None, "output_per_m": None}
 
+# ── Model capability cache ────────────────────────────────────────────────────
+
+# Resolved at import time: backend/data/model_capabilities.json
+_CAPABILITIES_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "data", "model_capabilities.json"
+)
+
+# Known image-generation model prefixes used as a classification fallback
+_IMAGE_GEN_PREFIXES = (
+    "wanx", "flux", "stable-diffusion", "dall-e", "qwen-image",
+)
+
+
+def _infer_model_type(model_id: str) -> str:
+    """Classify a model as 'image' or 'chat' based on its ID."""
+    m = model_id.lower()
+    if any(m.startswith(p) for p in _IMAGE_GEN_PREFIXES):
+        return "image"
+    return "chat"
+
+
+def load_model_capabilities() -> dict[str, str]:
+    """Load {model_id: type} map from the capabilities cache file."""
+    try:
+        with open(_CAPABILITIES_PATH) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_model_capabilities(models: list[dict]) -> None:
+    """
+    Merge the given model list into the capabilities cache file.
+    Each model dict must have 'id' and 'type' keys.
+    Existing entries for other providers are preserved.
+    """
+    try:
+        existing = load_model_capabilities()
+    except Exception:
+        existing = {}
+    for m in models:
+        mid = m.get("id")
+        mtype = m.get("type")
+        if mid and mtype:
+            existing[mid] = mtype
+    os.makedirs(os.path.dirname(_CAPABILITIES_PATH), exist_ok=True)
+    with open(_CAPABILITIES_PATH, "w") as f:
+        json.dump(existing, f, indent=2, sort_keys=True)
+
 
 def _with_pricing(model_id: str, base: dict) -> dict:
     p = _PRICING.get(model_id, _DEFAULT_PRICING)
-    return {**base, **p}
+    model_type = _infer_model_type(model_id)
+    return {**base, **p, "type": model_type}
 
 
 PROVIDER_CONFIGS: dict[str, dict] = {

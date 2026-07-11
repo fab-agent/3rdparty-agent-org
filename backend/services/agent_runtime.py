@@ -310,13 +310,13 @@ def detect_provider(model: str) -> str:
     return "google"
 
 
-# Image generation model prefixes — these need /images/generations, not /chat/completions
-_IMAGE_GEN_PREFIXES = ("wanx", "flux", "stable-diffusion", "dall-e", "qwen-image")
-
-
 def is_image_gen_model(model: str) -> bool:
-    m = (model or "").lower()
-    return any(m.startswith(p) for p in _IMAGE_GEN_PREFIXES)
+    """Check model type from the capabilities cache; fall back to prefix detection."""
+    from services.provider_service import load_model_capabilities, _infer_model_type
+    caps = load_model_capabilities()
+    if model in caps:
+        return caps[model] == "image"
+    return _infer_model_type(model) == "image"
 
 
 # ── Gemini streaming ──────────────────────────────────────────────────────────
