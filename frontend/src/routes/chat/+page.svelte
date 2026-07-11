@@ -18,6 +18,7 @@
 		FileText,
 		Image,
 		RefreshCw,
+		AlertTriangle,
 	} from '@lucide/svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import MessageContent from '$lib/components/MessageContent.svelte';
@@ -29,15 +30,33 @@
 		type Attachment,
 	} from '$lib/api/sessions';
 	import { personnel as personnelApi, type PersonnelItem } from '$lib/api/personnel';
+	import { providers as providersApi, type ProviderStatus } from '$lib/api/providers';
 	import { companyStore } from '$lib/stores/company.svelte';
 
 	const LAST_SESSION_KEY = 'chat:lastSessionId';
 	const POLL_INTERVAL_MS = 3000;
 
+	function detectProvider(model: string): string {
+		if (model.startsWith('claude')) return 'anthropic';
+		if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3')) return 'openai';
+		if (model.startsWith('gemini')) return 'google';
+		if (model.startsWith('qwen')) return 'qwen';
+		return 'unknown';
+	}
+
+	function agentHasKey(agent: PersonnelItem): boolean {
+		const model = agent.agent_config?.model;
+		if (!model) return true;
+		const provider = detectProvider(model);
+		const ps = providerStatuses.find(p => p.provider === provider);
+		return ps ? ps.status === 'active' : true; // unknown provider → assume ok
+	}
+
 	// ── State ─────────────────────────────────────────────────────────────────
 
 	let agents = $state<PersonnelItem[]>([]);
 	let sessions = $state<Session[]>([]);
+	let providerStatuses = $state<ProviderStatus[]>([]);
 	let activeSession = $state<Session | null>(null);
 	let messages = $state<SessionMessage[]>([]);
 
@@ -50,6 +69,7 @@
 	let streaming = $state(false);
 	let streamingText = $state('');
 	let streamingTools = $state<Array<{ name: string; args: unknown; result?: string }>>([]);
+	let streamError = $state<string | null>(null);
 
 	// File attachments
 	let pendingAttachments = $state<Attachment[]>([]);
@@ -69,6 +89,7 @@
 	onMount(async () => {
 		await loadAgents();
 		await loadSessions();
+		try { providerStatuses = await providersApi.status(); } catch { /* ignore */ }
 
 		// Pre-select agent from URL param
 		const agentId = $page.url.searchParams.get('agent');
@@ -257,6 +278,7 @@
 		streaming = true;
 		streamingText = '';
 		streamingTools = [];
+		streamError = null;
 
 		// Optimistic user message
 		const displayContent = attachmentsToSend.length
@@ -307,13 +329,18 @@
 					);
 					await scrollToBottom();
 				} else if (event.type === 'error') {
-					streamingText = `[Hata: ${event.message}]`;
-				} else if (event.type === 'stream_end') {
-					// Always reload from DB to get persisted messages
-					const detail = await sessionsApi.get(activeSession.id);
-					messages = detail.messages ?? [];
+					streamError = event.message ?? 'Bilinmeyen hata';
 					streamingText = '';
 					streamingTools = [];
+					await scrollToBottom();
+				} else if (event.type === 'stream_end') {
+					if (!streamError) {
+						// Normal completion: reload from DB
+						const detail = await sessionsApi.get(activeSession.id);
+						messages = detail.messages ?? [];
+						streamingText = '';
+						streamingTools = [];
+					}
 					break;
 				}
 			}
@@ -378,6 +405,7 @@
 						class="absolute top-full mt-1 left-0 right-0 bg-background border border-border rounded-xl shadow-lg z-20 overflow-hidden"
 					>
 						{#each agents as agent}
+							{@const keyOk = agentHasKey(agent)}
 							<button
 								class="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted text-left transition-colors"
 								onclick={() => {
@@ -387,16 +415,19 @@
 								}}
 							>
 								<div
-									class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0"
+									class="w-6 h-6 rounded-full {keyOk ? 'bg-primary/10' : 'bg-amber-500/10'} flex items-center justify-center flex-shrink-0"
 								>
-									<Bot class="w-3.5 h-3.5 text-primary" />
+									<Bot class="w-3.5 h-3.5 {keyOk ? 'text-primary' : 'text-amber-500'}" />
 								</div>
-								<div class="min-w-0">
+								<div class="min-w-0 flex-1">
 									<div class="font-medium truncate">{agent.name}</div>
 									{#if agent.title}
 										<div class="text-xs text-muted-foreground truncate">{agent.title}</div>
 									{/if}
 								</div>
+								{#if !keyOk}
+									<AlertTriangle class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" title="Bu model için API anahtarı yapılandırılmamış" />
+								{/if}
 							</button>
 						{/each}
 						{#if agents.length === 0}
@@ -584,6 +615,21 @@
 					</div>
 				{/if}
 
+				<!-- Error response -->
+				{#if streamError}
+					<div class="flex gap-3">
+						<div class="w-7 h-7 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+							<Bot class="w-3.5 h-3.5 text-destructive" />
+						</div>
+						<div class="flex-1 min-w-0">
+							<div class="bg-destructive/8 border border-destructive/20 rounded-2xl rounded-tl-sm px-4 py-3">
+								<p class="text-sm text-destructive font-medium mb-1">Ajan yanıt veremedi</p>
+								<p class="text-xs text-destructive/80">{streamError}</p>
+							</div>
+						</div>
+					</div>
+				{/if}
+
 				<!-- Live streaming response -->
 				{#if streaming}
 					<div class="flex gap-3">
@@ -644,6 +690,13 @@
 								</button>
 							</div>
 						{/each}
+					</div>
+				{/if}
+
+				{#if selectedAgent && !agentHasKey(selectedAgent)}
+					<div class="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+						<AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
+						<span>Bu ajan <strong>{selectedAgent.agent_config?.model}</strong> modeli kullanıyor, ancak bu provider için API anahtarı yapılandırılmamış. <a href="/settings" class="underline">Ayarlar → AI Provider Keys</a> bölümünden ekleyebilirsiniz.</span>
 					</div>
 				{/if}
 
