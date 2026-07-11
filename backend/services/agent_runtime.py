@@ -311,7 +311,7 @@ def detect_provider(model: str) -> str:
 
 
 # Image generation model prefixes — these need /images/generations, not /chat/completions
-_IMAGE_GEN_PREFIXES = ("wanx", "flux", "stable-diffusion", "dall-e")
+_IMAGE_GEN_PREFIXES = ("wanx", "flux", "stable-diffusion", "dall-e", "qwen-image")
 
 
 def is_image_gen_model(model: str) -> bool:
