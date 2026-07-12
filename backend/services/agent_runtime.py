@@ -521,8 +521,10 @@ async def _stream_anthropic(
         response_text = ""
         loop_tool_calls: list[dict] = []
 
+        total_tokens_anthropic = 0
+
         def _sync_call():
-            nonlocal response_text, loop_tool_calls
+            nonlocal response_text, loop_tool_calls, total_tokens_anthropic
             resp = client.messages.create(
                 model=model_name,
                 max_tokens=4096,
@@ -530,6 +532,8 @@ async def _stream_anthropic(
                 messages=messages,
                 tools=ant_tools if ant_tools else [],
             )
+            if resp.usage:
+                total_tokens_anthropic += (resp.usage.input_tokens or 0) + (resp.usage.output_tokens or 0)
             for block in resp.content:
                 if block.type == "text":
                     response_text = block.text
@@ -568,6 +572,7 @@ async def _stream_anthropic(
         "type": "_meta",
         "tool_calls": all_tool_calls,
         "tool_results": all_tool_results,
+        "tokens_used": total_tokens_anthropic,
     }
 
 
@@ -778,12 +783,18 @@ async def _stream_openai_compatible(
         response_text = ""
         loop_tool_calls: list[dict] = []
 
+        total_tokens_this_loop = 0
+
         def _sync_call():
-            nonlocal response_text, loop_tool_calls
+            nonlocal response_text, loop_tool_calls, total_tokens_this_loop
             kwargs: dict = {"model": model_name, "messages": messages, "max_tokens": 4096}
             if oai_tools:
                 kwargs["tools"] = oai_tools
             resp = client.chat.completions.create(**kwargs)
+            if resp.usage:
+                total_tokens_this_loop += resp.usage.total_tokens or (
+                    (resp.usage.prompt_tokens or 0) + (resp.usage.completion_tokens or 0)
+                )
             choice = resp.choices[0]
             if choice.message.content:
                 response_text = choice.message.content
@@ -816,7 +827,7 @@ async def _stream_openai_compatible(
             all_tool_results.append({"name": tc["name"], "result": result})
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 
-    yield {"type": "_meta", "tool_calls": all_tool_calls, "tool_results": all_tool_results}
+    yield {"type": "_meta", "tool_calls": all_tool_calls, "tool_results": all_tool_results, "tokens_used": total_tokens_this_loop}
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
@@ -931,10 +942,12 @@ async def run_session(
         yield {"type": "error", "message": f"Provider '{provider}' not yet supported in runtime"}
         return
 
+    tokens_used = 0
     async for event in gen:
         if event["type"] == "_meta":
             all_tool_calls = event["tool_calls"]
             all_tool_results = event["tool_results"]
+            tokens_used = event.get("tokens_used") or 0
         else:
             if event["type"] == "text":
                 full_text_parts.append(event["content"])
@@ -948,6 +961,7 @@ async def run_session(
             content="".join(full_text_parts),
             tool_calls_json=json.dumps(all_tool_calls) if all_tool_calls else None,
             tool_results_json=json.dumps(all_tool_results) if all_tool_results else None,
+            tokens_used=tokens_used if tokens_used else None,
         )
         session.add(asst_msg)
 

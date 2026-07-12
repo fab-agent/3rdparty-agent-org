@@ -41,7 +41,19 @@ async def generate_session_summary(session_id: str) -> None:
             return
 
         provider_key = None
-        for prov in ("anthropic", "openai", "google", "mistral"):
+        def _prov_for_model(m: str) -> str:
+            m = (m or "").lower()
+            if m.startswith("claude"): return "anthropic"
+            if m.startswith(("gpt-", "o1", "o3")): return "openai"
+            if m.startswith("gemini"): return "google"
+            if m.startswith(("mistral", "codestral")): return "mistral"
+            if m.startswith("qwen"): return "qwen"
+            return ""
+        agent_prov = _prov_for_model(agent_cfg.model or "")
+        provider_key = None
+        for prov in ([agent_prov] if agent_prov else []) + ["anthropic", "openai", "google", "mistral", "qwen"]:
+            if not prov:
+                continue
             pk = db.exec(
                 select(ProviderKey)
                 .where(ProviderKey.provider == prov)
@@ -112,6 +124,26 @@ def _call_summary_llm(provider: str, model: str, api_key: str, prompt: str) -> s
         client = genai.Client(api_key=api_key)
         resp = client.models.generate_content(model=model, contents=prompt)
         return resp.text or ""
+
+    elif provider in ("qwen", "mistral"):
+        import openai
+        from database import get_session as _gs
+        from models import ProviderKey as _PK
+        from sqlmodel import select as _sel
+        base_url = None
+        with _gs() as _db:
+            pk = _db.exec(_sel(_PK).where(_PK.provider == provider)).first()
+            if pk and pk.base_url:
+                base_url = f"{pk.base_url}/v1" if not pk.base_url.endswith("/v1") else pk.base_url
+        if not base_url:
+            base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" if provider == "qwen" else "https://api.mistral.ai/v1"
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+        )
+        return resp.choices[0].message.content or ""
 
     return ""
 
