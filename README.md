@@ -1,8 +1,8 @@
-# 3rdParty Agent Organization
+# Agentic Organization
 
-Self-hosted, open-source platform for companies to manage AI agents in a structured way.
+Self-hosted, open-source platform for companies to manage AI agents as first-class members of their org chart.
 
-Define AI agents per personnel, manage skills and policies via Markdown, visualize the org chart, and onboard your entire organization with a single AI-assisted conversation.
+Define agents per personnel, assign skills and policies, run autonomous flows, and onboard your entire organization in a single AI-assisted conversation.
 
 ---
 
@@ -18,7 +18,12 @@ Define AI agents per personnel, manage skills and policies via Markdown, visuali
 | **Policies Management** — company / department / agent-scoped policies with Markdown editor | ✅ |
 | Org chart visualization (interactive tree view) | ✅ |
 | AI provider key management (Anthropic, OpenAI, Google, Mistral, Qwen) | ✅ |
-| Agent-to-Agent (A2A) delegation with human approval | ✅ |
+| **Autonomous Flows** — cron-scheduled agent tasks delivered to inbox | ✅ |
+| **Task Requests** — route tasks to best-matched agent by dept + skill | ✅ |
+| **Agent-to-Agent (A2A) delegation** with human approval | ✅ |
+| **Token telemetry** — per-message token tracking across all providers | ✅ |
+| **Long-term agent memory** — session summaries stored and injected into future context | ✅ |
+| **Image generation in flows** — Qwen Image / DALL-E via DashScope task API | ✅ |
 | Real-time AI chat sessions (SSE streaming) | ✅ |
 | First-time setup wizard (no hardcoded credentials) | ✅ |
 | JWT auth + bcrypt passwords + AES-256 key encryption | ✅ |
@@ -30,6 +35,9 @@ Define AI agents per personnel, manage skills and policies via Markdown, visuali
 | Login rate limiting (Nginx) | ✅ |
 | On-demand backup to S3/R2/MinIO (Settings → Backup) | ✅ |
 | Social media agent skills (Instagram Business + WhatsApp Cloud API) | ✅ |
+| Telegram notification integration | ✅ |
+| GitHub / GitLab / Gitea sync (config + policy Markdown files) | ✅ |
+| Live dashboard — company + personal telemetry (tokens, sessions, memories) | ✅ |
 
 ---
 
@@ -42,9 +50,18 @@ The standout feature. Instead of manually setting up departments, agents, skills
 3. **Preview** — a complete org structure is generated and shown before anything is written to the database
 4. **One-click Create** — departments, human personnel, AI agents, skills (with full Markdown content), and policies are all created in a single transaction
 
-The "Create" button only appears after the AI confirms it has gathered sufficient information — preventing premature generation.
-
 To start: **Settings → AI ile Kur** (requires at least one active AI provider key).
+
+---
+
+## Autonomous Flows
+
+Cron-scheduled agent tasks that run independently and deliver results to the responsible user's inbox.
+
+- Any agent can have one or more flows (e.g., every 15 min, every 30 min)
+- Flows support all providers: Anthropic, OpenAI, Qwen, Mistral, Google
+- Image generation flows route automatically to DashScope task API when an image model is detected
+- Results land in the inbox and update flow telemetry (last run, status, output snippet)
 
 ---
 
@@ -60,8 +77,8 @@ To start: **Settings → AI ile Kur** (requires at least one active AI provider 
 ### Option A — Docker (Recommended)
 
 ```bash
-git clone https://github.com/fab-agent/3rdparty-agent-org.git
-cd 3rdparty-agent-org
+git clone https://github.com/fab-agent/agentic-organization.git
+cd agentic-organization
 
 cp backend/.env.example backend/.env
 # Edit .env — JWT_SECRET is required, AI provider keys are optional
@@ -130,10 +147,10 @@ ingress:
   - service: http_status:404
 EOF
 
-# 4. Route DNS (automatic)
+# 4. Route DNS
 cloudflared tunnel route dns my-org-platform app.your-domain.com
 
-# 5. Start (or run as a service)
+# 5. Start
 cloudflared tunnel run my-org-platform
 ```
 
@@ -157,91 +174,51 @@ This creates the founder account. No hardcoded credentials — every install get
 
 ### 1. AI Onboarding (Recommended First Step)
 
-Go to **Settings → AI ile Kur**. The wizard:
-1. Searches the web for your company
-2. Asks you questions about your team and workflows
-3. Generates a preview of the org structure
-4. Creates everything with one click
-
-Requires at least one active AI provider key in **Settings → AI Providers**.
-
----
+Go to **Settings → AI ile Kur**. The wizard searches the web for your company, asks questions about your team and workflows, generates a preview, and creates everything with one click.
 
 ### 2. Company Management
 
-The active company is shown in the sidebar (bottom left).  
-Switch between companies or create a new one with the **"Add Company"** button.
-
-Each company has its own departments, personnel, agents, skills, and policies.
-
----
+Switch between companies or create a new one with the **"Add Company"** button in the navbar. Each company has its own departments, personnel, agents, skills, and policies.
 
 ### 3. Department Management
 
-On the **Departments** page:
-- Add a new department (name, slug, description, goals, policies)
-- Edit / delete existing departments
-- Set department status to Active / Inactive
-
----
+Add departments with name, slug, description, goals, and policies. Supports nested hierarchy via `parent_id`.
 
 ### 4. Personnel Management
 
-The **Personnel** page lists both human employees and agents.
-
-When adding new personnel:
-- **Type:** Human or Agent
-- Assign a **department** and **manager**
-- For agents, an `AgentConfig` is created automatically
-
----
+The **Personnel** page lists both human employees and agents. When adding personnel, choose type (Human or Agent), assign a department and manager.
 
 ### 5. Agent Configuration
 
-On the **Agents** page:
-1. Choose a **model** (claude-sonnet-4-6, gpt-4o, gemini-2.5-pro, qwen-max, ...)
-2. Set **status** (draft / active / inactive)
-3. Assign **skills** from the company skills library — checkboxes show all available skills with pre-selection for onboarding-linked ones
-
----
+On the **Agents** page: choose a model, set status (draft / active / inactive), and assign skills from the company skills library.
 
 ### 6. Skills Library
 
-On the **Skills** page (`/skills`):
-- Create company-wide skill definitions with full Markdown content
-- Each skill has a structured template: purpose, usage steps, input/output format, example, guardrails
-- Assign skills to one or more agents via `AgentSkillLink`
-- Skills created during AI Onboarding appear here automatically
-
----
+Company-wide skill definitions with full Markdown content. Assign to multiple agents via `AgentSkillLink`. Skills created during AI Onboarding appear here automatically.
 
 ### 7. Policies
 
-On the **Policies** page (`/policies`):
-- Create policies scoped to **company**, **department**, or **agent**
-- Full Markdown editor with structured sections (purpose, scope, rules, rationale, exceptions, compliance)
-- Policies created during AI Onboarding appear here automatically
-
----
+Create policies scoped to **company**, **department**, or **agent** with a full Markdown editor. Policies created during AI Onboarding appear here automatically.
 
 ### 8. Org Chart
 
-The **Org Chart** page (`/org-chart`) shows the full personnel hierarchy as an interactive tree.  
-Click any agent node to open a detail panel with model, status, assigned skills, and linked policies.
+The **Org Chart** page shows the full personnel hierarchy as an interactive tree. Click any agent node to open a detail panel with model, status, assigned skills, and linked policies.
 
----
+### 9. Autonomous Flows
 
-### 9. Agent-to-Agent (A2A) Delegation
+Under **Personnel → [Agent] → Flows**: create cron schedules (e.g., `*/15 * * * *`) with a prompt. The agent runs automatically and delivers results to the responsible human's inbox.
 
-An agent can request a task from another agent. A designated human must approve before execution, and again after reviewing the result.
+### 10. Task Requests
+
+Anyone in the org submits a task via `/task-requests`. The system routes to the best-matched agent by department and skill filter. The responsible human approves execution via `/task-requests/{id}/run`.
+
+### 11. Agent-to-Agent (A2A) Delegation
+
+An agent requests a task from another agent. A designated human must approve before execution and again after reviewing the result.
 
 Flow: `create → pending_approval → approved → running → pending_result_approval → completed`
 
-Rejection is available at both approval stages.
-
----
-
-### 10. AI Provider Management
+### 12. AI Provider Management
 
 Under **Settings → AI Providers**:
 
@@ -251,17 +228,20 @@ Under **Settings → AI Providers**:
 | OpenAI (GPT) | gpt-4o, gpt-4o-mini, o1, o3-mini |
 | Google (Gemini) | gemini-2.5-pro, gemini-2.0-flash |
 | Mistral | mistral-large, mistral-small, codestral |
-| Alibaba Qwen | qwen-max, qwen-plus, qwen-turbo, qwen-long |
+| Alibaba Qwen | qwen-max, qwen-plus, qwen-turbo, qwen-long, qwen-image-plus |
 
-After entering an API key the system tests it immediately.  
 Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text.
+
+### 13. Dashboard
+
+**Göstergeler** shows live company telemetry (agent count, sessions, token usage, memory count) and personal telemetry for the logged-in user (their agents' sessions, token consumption, long-term memory summaries).
 
 ---
 
 ## Architecture
 
 ```
-3rdparty-agent-org/
+agentic-organization/
 ├── backend/                    # FastAPI + SQLModel (SQLite)
 │   ├── main.py                 # App startup, router registration
 │   ├── models.py               # SQLModel tables
@@ -276,6 +256,8 @@ Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text
 │   │   ├── policies.py         # Policy CRUD
 │   │   ├── onboarding.py       # AI Onboarding (search / chat / generate / create)
 │   │   ├── sessions.py         # AI sessions + SSE streaming
+│   │   ├── flows.py            # Autonomous flow scheduling (APScheduler)
+│   │   ├── task_requests.py    # Task routing + human approval
 │   │   ├── a2a.py              # Agent-to-Agent delegation flow
 │   │   ├── providers.py        # AI provider key management
 │   │   ├── dashboard.py        # Live telemetry + personal stats
@@ -283,7 +265,9 @@ Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text
 │   ├── core/
 │   │   └── security.py         # Fernet encryption (data/.secret)
 │   ├── services/
-│   │   ├── agent_runtime.py    # AI execution engine (multi-provider)
+│   │   ├── agent_runtime.py    # AI execution engine (multi-provider, token capture)
+│   │   ├── memory_service.py   # Session summaries → AgentMemory (long-term memory)
+│   │   ├── flow_runner.py      # Cron executor (qwen + image gen support)
 │   │   ├── onboarding_agent.py # Web search + LLM conversation + bulk org creation
 │   │   ├── provider_service.py # Provider testing + model listing
 │   │   └── auth.py             # JWT + bcrypt helpers
@@ -292,20 +276,20 @@ Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text
 └── frontend/                   # SvelteKit 5 + Tailwind
     └── src/
         ├── lib/
-        │   ├── api/            # Type-safe fetch clients (personnel, skills, policies, onboarding...)
+        │   ├── api/            # Type-safe fetch clients
         │   ├── components/ui/  # Bespoke UI components (Button, Dialog, Badge, Table...)
         │   ├── i18n/           # TR / EN translation dictionaries
         │   └── stores/         # authStore, companyStore
         └── routes/
             ├── setup/          # First-time setup wizard
-            ├── onboarding/     # AI Onboarding wizard (search → chat → preview → create)
-            ├── agents/         # Agent list + config + company skill assignment
+            ├── onboarding/     # AI Onboarding wizard
+            ├── agents/         # Agent list + config + skill assignment
             ├── skills/         # Company skills library + Markdown editor
             ├── policies/       # Policy management + Markdown editor
             ├── org-chart/      # Interactive org tree with agent detail panel
-            ├── personnel/      # Personnel list
+            ├── personnel/      # Personnel list + side panel
             ├── departments/    # Department management
-            └── settings/       # AI providers, social media, backup, AI Onboarding trigger
+            └── settings/       # AI providers, Telegram, social media, backup, flows
 ```
 
 ### Data Model
@@ -313,18 +297,19 @@ Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text
 ```
 Company ──< Department ──< Personnel ──── AgentConfig ──< AgentSkillLink ──> CompanySkill
                                  │              │
-                                 │         AgentSession ──< SessionMessage
+                                 │         AgentSession ──< SessionMessage (tokens_used)
+                                 │              │
+                                 │         AgentMemory (long-term session summaries)
                                  │
+                          Flow (cron schedule → InboxMessage)
+                          TaskRequest (dept+skill routing → human approval → agent run)
                           A2ARequest (from_agent → to_agent, human approver)
-                          OnboardingSession (progress saved during AI Onboarding)
                           Policy (scope: company | department | agent)
 ```
 
 ---
 
 ## API Reference
-
-Full docs when the server is running:
 
 - Swagger UI → `http://localhost:8000/docs`
 - ReDoc → `http://localhost:8000/redoc`
@@ -339,17 +324,19 @@ All endpoints require `Authorization: Bearer <token>` except `/auth/token`, `/au
 # Required
 JWT_SECRET=<random-64-char-hex>
 
-# Email (optional — needed for invite/reset flows)
-RESEND_API_KEY=
-EMAIL_FROM=noreply@example.com
-APP_URL=http://localhost:5173
+# Telegram (for invite / notifications — replaces email)
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_ADMIN_CHAT_ID=
 
-# AI Providers (optional — can also be added from the Settings page)
+# AI Providers (optional — can also be added from Settings page)
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 GOOGLE_API_KEY=AIza...
 MISTRAL_API_KEY=...
 QWEN_API_KEY=sk-...
+
+# App URL (for invite links)
+APP_URL=http://localhost:5173
 ```
 
 ---
@@ -367,29 +354,13 @@ pytest tests/ -v
 ## TODO
 
 ### Security
-- [x] Login rate limiting — 5 req/min per IP via Nginx
-- [x] Company-level authorization — all endpoints verify caller is a member of the target company
-- [x] Input validation — auth endpoints use Pydantic schemas
-- [x] `must_change_password` gate — frontend redirects to `/set-password` on first login
 - [ ] CORS tightening — `allow_origins=["*"]` should be restricted in production
 - [ ] Invite role validation — restrict `founder` role assignment to founders only
 - [ ] A2A approver verification — verify JWT caller matches `approver_id`
 
 ### Features
-- [x] AI Onboarding — full org setup via web search + AI conversation
-- [x] Company Skills Library — Markdown-based, assignable to multiple agents
-- [x] Policies Management — scoped to company / department / agent
-- [x] Org Chart — interactive personnel hierarchy tree
-- [x] Social media agent — `instagram_post` + `whatsapp_send` builtin skills
-- [x] Backup UI — Settings → Backup tab: S3/R2/MinIO config, on-demand backup
-- [ ] Onboarding session resume after browser close (currently persisted, UI resume in progress)
+- [ ] Onboarding session resume after browser close
 - [ ] Change request workflow for skills and policies
-
-### Infrastructure
-- [x] Database migrations — Alembic
-- [x] Structured logging — JSON log file at `logs/app.log`, 30-day rotation
-- [x] Nginx rate limiting — production docker-compose with brute-force protection
-- [x] Cloudflare Tunnel guide — HTTPS setup documented in README
 - [ ] PostgreSQL support — swap SQLite for Postgres for concurrent workloads
 
 ---
@@ -397,3 +368,7 @@ pytest tests/ -v
 ## License
 
 MIT — Free for commercial use, forking, and contributions.
+
+---
+
+<sub>Built by [Fabrika Yazılım](https://fab.limited) · Istanbul · [bilgi@kuntaykunt.com](mailto:bilgi@kuntaykunt.com)</sub>
