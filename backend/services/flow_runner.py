@@ -273,6 +273,38 @@ def _find_admin_user_id(session: Session, company_id: str) -> Optional[str]:
     return None
 
 
+def _notify_flow_telegram(company_id: str, flow_name: str, agent_name: str, output: str) -> None:
+    """Send flow result to Telegram admin chat."""
+    try:
+        from models import TelegramConfig
+        from core.security import decrypt as _decrypt
+        with get_session() as s:
+            cfg = s.exec(
+                select(TelegramConfig)
+                .where(TelegramConfig.company_id == company_id)
+                .where(TelegramConfig.is_active == True)
+            ).first()
+            if not cfg:
+                return
+        token = _decrypt(cfg.encrypted_token)
+        chat_id = cfg.admin_chat_id
+        preview = output[:600].replace("<", "&lt;").replace(">", "&gt;")
+        text = (
+            f"📊 <b>[Akış Tamamlandı]</b> {flow_name}\n"
+            f"🤖 Ajan: <b>{agent_name}</b>\n\n"
+            f"{preview}"
+            + (" <i>…(devamı var)</i>" if len(output) > 600 else "")
+        )
+        import httpx as _httpx
+        with _httpx.Client(timeout=10) as c:
+            c.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            )
+    except Exception:
+        pass
+
+
 def run_flow(flow_id: str) -> None:
     """Execute a single flow. Called by APScheduler."""
     with get_session() as session:
@@ -368,6 +400,9 @@ def run_flow(flow_id: str) -> None:
             flow.updated_at = datetime.utcnow()
             session.add(flow)
             session.commit()
+
+            # Telegram notification
+            _notify_flow_telegram(flow.company_id, flow.name, agent.name, output)
 
         except Exception as e:
             flow.last_run_at = datetime.utcnow()

@@ -43,6 +43,7 @@ from api.social_media import router as social_media_router
 from api.journal import router as journal_router
 from api.database import router as database_router
 from api.telegram_config import router as telegram_router
+from api.telegram_bot import router as telegram_bot_router
 from api.dashboard import router as dashboard_router
 from api.onboarding import router as onboarding_router
 from api.skills import router as skills_router
@@ -97,6 +98,7 @@ app.include_router(social_media_router)
 app.include_router(journal_router)
 app.include_router(database_router)
 app.include_router(telegram_router)
+app.include_router(telegram_bot_router)
 app.include_router(dashboard_router)
 app.include_router(skills_router)
 app.include_router(policies_router)
@@ -143,12 +145,16 @@ def on_startup():
     _sync_env_provider_keys()
     _reload_flow_schedules()
     _scheduler.start()
+    from api.telegram_bot import start_polling
+    start_polling()
     logger.info("Application started")
 
 
 @app.on_event("shutdown")
 def on_shutdown():
     _scheduler.shutdown(wait=False)
+    from api.telegram_bot import stop_polling
+    stop_polling()
     logger.info("Application shutdown")
 
 

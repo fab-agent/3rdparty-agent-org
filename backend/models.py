@@ -414,3 +414,14 @@ class OnboardingSession(SQLModel, table=True):
     messages_json: Optional[str] = None    # JSON list of {role, content}
     structure_json: Optional[str] = None   # JSON org structure
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class TelegramBotState(SQLModel, table=True):
+    """Per-chat state for the Telegram bot: selected agent, active session."""
+    chat_id: str = Field(primary_key=True)
+    user_id: Optional[str] = None               # Platform User.id if linked
+    company_id: Optional[str] = None            # Active company
+    selected_agent_id: Optional[str] = None     # Personnel.id of chosen agent
+    selected_agent_name: Optional[str] = None
+    active_session_id: Optional[str] = None     # AgentSession.id (persists history)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
