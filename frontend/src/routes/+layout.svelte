@@ -260,7 +260,7 @@
 								{/if}
 							{:else}
 								<Building2 class="w-4 h-4 text-muted-foreground" />
-								<span class="text-muted-foreground">Şirket seç</span>
+								<span class="text-muted-foreground">{t('company_select')}</span>
 							{/if}
 							<ChevronDown class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 {companyMenuOpen ? 'rotate-180' : ''} transition-transform" />
 						</Button>
@@ -406,7 +406,7 @@
 					<Button variant={$page.url.pathname === '/' ? 'secondary' : 'ghost'}
 						class="w-full justify-start gap-x-3 h-10 rounded-xl text-sm font-medium {sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}">
 						<Cpu class="w-4 h-4 flex-shrink-0" />
-						{#if !sidebarCollapsed}<span class="truncate">Göstergeler</span>{/if}
+						{#if !sidebarCollapsed}<span class="truncate">{t('nav_dashboard')}</span>{/if}
 					</Button>
 				</a>
 
@@ -415,7 +415,7 @@
 						<Button variant={yapiActive ? 'secondary' : 'ghost'}
 							class="w-full justify-start gap-x-3 h-10 rounded-xl text-sm font-medium {sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}">
 							<Layers class="w-4 h-4 flex-shrink-0" />
-							{#if !sidebarCollapsed}<span class="truncate">Yapı</span>{/if}
+							{#if !sidebarCollapsed}<span class="truncate">{t('nav_structure')}</span>{/if}
 						</Button>
 					</a>
 				{/if}
@@ -500,7 +500,7 @@
 							<ChevronRight class="w-4 h-4" />
 						{:else}
 							<ChevronLeft class="w-4 h-4" />
-							<span class="text-xs">Daralt</span>
+							<span class="text-xs">{t('sidebar_collapse')}</span>
 						{/if}
 					</Button>
 				</div>
@@ -526,7 +526,7 @@
 					<Building2 class="w-4 h-4 text-muted-foreground" />
 				</div>
 				<div>
-					<div class="font-semibold text-sm">Şirket Bilgileri</div>
+					<div class="font-semibold text-sm">{t('dash_company_info')}</div>
 					<div class="text-xs text-muted-foreground">company.md</div>
 				</div>
 			</div>
@@ -540,19 +540,19 @@
 
 			<!-- Identity -->
 			<section class="space-y-4">
-				<div class="co-section-label"><span class="co-badge">1</span>Kimlik</div>
+				<div class="co-section-label"><span class="co-badge">1</span>{t('comd_identity')}</div>
 				{#if canManageCompany}
 					<div class="grid sm:grid-cols-2 gap-3">
 						<div class="space-y-1.5 sm:col-span-2">
-							<label class="text-sm font-medium" for="co-name">Şirket Adı</label>
+							<label class="text-sm font-medium" for="co-name">{t('dash_company_name')}</label>
 							<Input id="co-name" bind:value={coMdEdit.name} placeholder="Acme Corp" />
 						</div>
 						<div class="space-y-1.5">
-							<label class="text-sm font-medium" for="co-sector">Sektör</label>
+							<label class="text-sm font-medium" for="co-sector">{t('dash_sector')}</label>
 							<Input id="co-sector" bind:value={coMdEdit.sector} placeholder="Yazılım & SaaS" />
 						</div>
 						<div class="space-y-1.5">
-							<label class="text-sm font-medium" for="co-web">Web Sitesi</label>
+							<label class="text-sm font-medium" for="co-web">{t('dash_website')}</label>
 							<Input id="co-web" bind:value={coMdEdit.website} placeholder="https://..." />
 						</div>
 					</div>
@@ -567,29 +567,29 @@
 
 			<!-- Vision & Mission -->
 			<section class="space-y-4">
-				<div class="co-section-label"><span class="co-badge">2</span>Vizyon & Misyon</div>
+				<div class="co-section-label"><span class="co-badge">2</span>{t('dash_vision_mission')}</div>
 				{#if canManageCompany}
 					<div class="space-y-3">
 						<div class="space-y-1.5">
-							<label class="text-sm font-medium" for="co-vision">Vizyon</label>
-							<textarea id="co-vision" bind:value={coMdEdit.vision} class="co-textarea" rows="3" placeholder="Uzun vadeli hedef..."></textarea>
+							<label class="text-sm font-medium" for="co-vision">{t('dash_vision')}</label>
+							<textarea id="co-vision" bind:value={coMdEdit.vision} class="co-textarea" rows="3" placeholder={t('dash_vision_ph')}></textarea>
 						</div>
 						<div class="space-y-1.5">
-							<label class="text-sm font-medium" for="co-mission">Misyon</label>
-							<textarea id="co-mission" bind:value={coMdEdit.mission} class="co-textarea" rows="3" placeholder="Günlük amaç..."></textarea>
+							<label class="text-sm font-medium" for="co-mission">{t('dash_mission')}</label>
+							<textarea id="co-mission" bind:value={coMdEdit.mission} class="co-textarea" rows="3" placeholder={t('dash_mission_ph')}></textarea>
 						</div>
 					</div>
 				{:else}
 					<div class="space-y-3">
 						{#if coMdEdit.vision}
 							<div>
-								<div class="text-xs font-semibold text-muted-foreground mb-1">VİZYON</div>
+								<div class="text-xs font-semibold text-muted-foreground mb-1">{t('dash_vision').toUpperCase()}</div>
 								<p class="text-sm text-muted-foreground leading-relaxed">{coMdEdit.vision}</p>
 							</div>
 						{/if}
 						{#if coMdEdit.mission}
 							<div>
-								<div class="text-xs font-semibold text-muted-foreground mb-1">MİSYON</div>
+								<div class="text-xs font-semibold text-muted-foreground mb-1">{t('dash_mission').toUpperCase()}</div>
 								<p class="text-sm text-muted-foreground leading-relaxed">{coMdEdit.mission}</p>
 							</div>
 						{/if}
@@ -599,7 +599,7 @@
 
 			<!-- Values -->
 			<section class="space-y-3">
-				<div class="co-section-label"><span class="co-badge">3</span>Değerler</div>
+				<div class="co-section-label"><span class="co-badge">3</span>{t('dash_company_values')}</div>
 				{#if coMdEdit.values.length > 0}
 					<div class="flex flex-wrap gap-2">
 						{#each coMdEdit.values as val}
@@ -616,7 +616,7 @@
 				{/if}
 				{#if canManageCompany}
 					<div class="flex gap-2">
-						<Input bind:value={coNewValue} placeholder="Yeni değer..." class="flex-1"
+						<Input bind:value={coNewValue} placeholder={t('dash_new_value_ph')} class="flex-1"
 							onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); coAddValue(); } }} />
 						<Button variant="outline" size="sm" onclick={coAddValue} disabled={!coNewValue.trim()}>
 							<Plus class="w-3.5 h-3.5" />
@@ -627,7 +627,7 @@
 
 			<!-- Goals -->
 			<section class="space-y-3">
-				<div class="co-section-label"><span class="co-badge">4</span>Hedefler</div>
+				<div class="co-section-label"><span class="co-badge">4</span>{t('dash_goals')}</div>
 				{#if coMdEdit.goals.length > 0}
 					<div class="space-y-2">
 						{#each coMdEdit.goals as goal}
@@ -647,7 +647,7 @@
 				{/if}
 				{#if canManageCompany}
 					<div class="flex gap-2">
-						<Input bind:value={coNewGoal} placeholder="Yeni hedef..." class="flex-1"
+						<Input bind:value={coNewGoal} placeholder={t('dash_new_goal_ph')} class="flex-1"
 							onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); coAddGoal(); } }} />
 						<Button variant="outline" size="sm" onclick={coAddGoal} disabled={!coNewGoal.trim()}>
 							<Plus class="w-3.5 h-3.5" />
@@ -659,8 +659,8 @@
 
 		{#if canManageCompany}
 			<div class="border-t px-6 py-4 flex gap-3 justify-end flex-shrink-0 bg-card">
-				<Button variant="outline" onclick={() => (coMdOpen = false)}>İptal</Button>
-				<Button onclick={saveCoMd}>Kaydet</Button>
+				<Button variant="outline" onclick={() => (coMdOpen = false)}>{t('cancel')}</Button>
+				<Button onclick={saveCoMd}>{t('save')}</Button>
 			</div>
 		{/if}
 	</aside>

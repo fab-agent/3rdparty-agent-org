@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { Building2, Users, Bot, Zap, FileText } from '@lucide/svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
-	const tabs = [
-		{ href: '/departments', label: 'Bölümler',    icon: Building2 },
-		{ href: '/personnel',   label: 'İnsanlar',    icon: Users     },
-		{ href: '/agents',      label: 'Ajanlar',     icon: Bot       },
-		{ href: '/skills',      label: 'Yetenekler',  icon: Zap       },
-		{ href: '/policies',    label: 'Politikalar', icon: FileText  },
-	];
+	const tabs = $derived([
+		{ href: '/departments', label: t('nav_departments'), icon: Building2 },
+		{ href: '/personnel',   label: t('nav_personnel'),  icon: Users     },
+		{ href: '/agents',      label: t('nav_agents'),     icon: Bot       },
+		{ href: '/skills',      label: t('nav_skills'),     icon: Zap       },
+		{ href: '/policies',    label: t('nav_policies'),   icon: FileText  },
+	]);
 
 	const current = $derived($page.url.pathname);
 </script>

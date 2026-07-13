@@ -322,9 +322,9 @@
 			await api.put('/backup/config', { ...backupForm });
 			await loadBackup();
 			showEditForm = false;
-			backupSuccess = 'Yedekleme ayarları kaydedildi.';
+			backupSuccess = t('settings_backup_saved');
 		} catch (e: any) {
-			backupError = e?.message ?? 'Kaydetme başarısız';
+			backupError = e?.message ?? t('settings_backup_save_failed');
 		} finally {
 			backupSaving = false;
 		}
@@ -351,7 +351,7 @@
 			backupSuccess = `Yedek oluşturuldu: ${result.filename} (${(result.size_bytes / 1024).toFixed(1)} KB)`;
 			await loadBackup();
 		} catch (e: any) {
-			backupError = e?.message ?? 'Yedekleme başarısız';
+			backupError = e?.message ?? t('settings_backup_save_failed');
 		} finally {
 			backupRunning = false;
 		}
@@ -404,7 +404,7 @@
 			await loadSocial();
 			socialSuccess = 'Sosyal medya ayarları kaydedildi.';
 		} catch (e: any) {
-			socialError = e?.message ?? 'Kaydetme başarısız';
+			socialError = e?.message ?? t('settings_backup_save_failed');
 		} finally {
 			socialSaving = false;
 		}
@@ -457,7 +457,7 @@
 			tgConfig = res;
 			tgForm = { bot_token: '', admin_chat_id: '' };
 			tgEditMode = false;
-			tgSuccess = `Bağlandı — @${res.bot_username ?? 'bot'}`;
+			tgSuccess = `${t('tg_connected')} — @${res.bot_username ?? 'bot'}`;
 		} catch (e: any) {
 			tgError = e?.message ?? 'Kaydetme başarısız';
 		} finally {
@@ -570,7 +570,7 @@
 				schema_json: JSON.stringify(selectedDB.schema),
 				examples_json: JSON.stringify(selectedDB.examples ?? []),
 			});
-			dbSuccess = 'Açıklamalar kaydedildi.';
+			dbSuccess = t('db_save_annotations');
 		} catch (e: any) {
 			dbError = e?.message ?? 'Kaydedilemedi';
 		}
@@ -649,16 +649,19 @@
 				<GitBranch class="w-4 h-4" />{t('settings_git')}
 			</button>
 			<button class={['tab-btn', tab==='audit' ? 'tab-active' : 'tab-inactive'].join(' ')} onclick={() => switchTab('audit')}>
-				<Clock class="w-4 h-4" />Audit Log
+				<Clock class="w-4 h-4" />{t('settings_audit_tab')}
 			</button>
 			<button class={['tab-btn', tab==='backup' ? 'tab-active' : 'tab-inactive'].join(' ')} onclick={() => switchTab('backup')}>
-				<Database class="w-4 h-4" />Yedekleme
+				<Database class="w-4 h-4" />{t('settings_backup_tab')}
 			</button>
 			<button class={['tab-btn', tab==='social' ? 'tab-active' : 'tab-inactive'].join(' ')} onclick={() => switchTab('social')}>
-				<Link class="w-4 h-4" />Entegrasyonlar
+				<Link class="w-4 h-4" />{t('settings_integrations_tab')}
 			</button>
 			<button class={['tab-btn', tab==='databases' ? 'tab-active' : 'tab-inactive'].join(' ')} onclick={() => switchTab('databases')}>
-				<Table2 class="w-4 h-4" />Veritabanları
+				<Table2 class="w-4 h-4" />{t('settings_databases_tab')}
+				{#if tab !== 'databases'}
+					<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" title="Database connections"></span>
+				{/if}
 			</button>
 
 		</div>
@@ -678,7 +681,7 @@
 				{#if configuredProviders.length === 0}
 					<div class="text-center py-12 text-muted-foreground">
 						<Cpu class="w-8 h-8 mx-auto mb-3 opacity-30" />
-						<p class="text-sm">Henüz AI sağlayıcısı eklenmemiş</p>
+						<p class="text-sm">{t('settings_provider_none')}</p>
 					</div>
 				{:else}
 					<div class="space-y-3">
@@ -775,12 +778,12 @@
 					{#if !showAddProvider}
 						<Button variant="outline" size="sm" class="h-8 px-4 text-xs gap-x-1.5"
 							onclick={() => { showAddProvider = true; addProviderSlug = unconfiguredProviders[0].provider; }}>
-							<Plus class="w-3.5 h-3.5" /> Sağlayıcı Ekle
+							<Plus class="w-3.5 h-3.5" /> {t('settings_provider_add_btn')}
 						</Button>
 					{:else}
 						<div class="rounded-2xl border bg-card p-5 space-y-3">
 							<div class="flex items-center justify-between">
-								<span class="text-sm font-medium">Sağlayıcı Ekle</span>
+								<span class="text-sm font-medium">{t('settings_provider_add_title')}</span>
 								<button class="text-muted-foreground hover:text-foreground"
 									onclick={() => { showAddProvider = false; addProviderError = ''; addProviderKey = ''; }}>
 									<X class="w-4 h-4" />
@@ -788,7 +791,7 @@
 							</div>
 							<div class="grid grid-cols-2 gap-3">
 								<div>
-									<label class="block text-xs font-medium text-muted-foreground mb-1.5">Sağlayıcı</label>
+									<label class="block text-xs font-medium text-muted-foreground mb-1.5">{t('settings_provider_label')}</label>
 									<select bind:value={addProviderSlug}
 										class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring">
 										{#each unconfiguredProviders as p}
@@ -797,7 +800,7 @@
 									</select>
 								</div>
 								<div>
-									<label class="block text-xs font-medium text-muted-foreground mb-1.5">API Anahtarı</label>
+									<label class="block text-xs font-medium text-muted-foreground mb-1.5">{t('settings_api_key_label')}</label>
 									<div class="relative">
 										<input type={addProviderShowKey ? 'text' : 'password'}
 											bind:value={addProviderKey}
@@ -819,11 +822,11 @@
 							<div class="flex justify-end gap-x-2">
 								<Button variant="ghost" size="sm" class="h-8 px-3 text-xs"
 									onclick={() => { showAddProvider = false; addProviderError = ''; addProviderKey = ''; }}>
-									İptal
+									{t('cancel')}
 								</Button>
 								<Button variant="default" size="sm" class="h-8 px-4 text-xs"
 									disabled={addProviderSaving || !addProviderKey.trim()} onclick={addProvider}>
-									{#if addProviderSaving}<Loader2 class="w-3.5 h-3.5 animate-spin mr-1.5" />Test ediliyor...{:else}Bağlan{/if}
+									{#if addProviderSaving}<Loader2 class="w-3.5 h-3.5 animate-spin mr-1.5" />{t('settings_provider_testing')}{:else}{t('settings_connect_btn')}{/if}
 								</Button>
 							</div>
 						</div>
@@ -841,10 +844,9 @@
 					<Sparkles class="w-4 h-4 text-primary" />
 				</div>
 				<div>
-					<div class="font-semibold text-sm mb-1">AI ile Organizasyon Kur</div>
+					<div class="font-semibold text-sm mb-1">{t('settings_ai_setup_title')}</div>
 					<p class="text-xs text-muted-foreground leading-relaxed max-w-sm">
-						Şirketiniz hakkında web araştırması yaparak bölümler, ajanlar, yetenekler ve politikaları
-						otomatik oluşturun. Sadece birkaç soruya cevap verin.
+						{t('settings_ai_setup_desc')}
 					</p>
 				</div>
 			</div>
@@ -854,7 +856,7 @@
 				class="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
 			>
 				<Sparkles class="w-4 h-4" />
-				AI ile Kur
+				{t('settings_ai_setup_btn')}
 			</button>
 		</div>
 	{/if}
@@ -1120,10 +1122,7 @@
 	<!-- ── BACKUP TAB ───────────────────────────────────────────────────── -->
 	{#if tab === 'backup'}
 		<div class="space-y-6">
-			<p class="text-sm text-muted-foreground">
-				Veritabanını S3, Cloudflare R2 veya MinIO gibi uyumlu bir depolamaya yedekleyin.
-				Yedekleme isteğe bağlıdır — ayarlamadan da kullanabilirsiniz.
-			</p>
+			<p class="text-sm text-muted-foreground">{t('settings_backup_desc')}</p>
 
 			{#if backupError}
 				<div class="flex items-center gap-x-2 text-sm text-destructive bg-destructive/10 px-4 py-3 rounded-xl">
@@ -1158,8 +1157,8 @@
 							{:else}
 								<Database class="w-5 h-5 text-muted-foreground/50" />
 								<div>
-									<div class="font-semibold text-sm text-muted-foreground">Yapılandırılmamış</div>
-									<div class="text-xs text-muted-foreground mt-0.5">Depolama bilgileri girilmemiş</div>
+									<div class="font-semibold text-sm text-muted-foreground">{t('settings_backup_unconfigured')}</div>
+									<div class="text-xs text-muted-foreground mt-0.5">{t('settings_backup_unconfigured_desc')}</div>
 								</div>
 							{/if}
 						</div>
@@ -1174,10 +1173,10 @@
 								>
 									{#if backupRunning}
 										<Loader2 class="w-3.5 h-3.5 animate-spin" />
-										Yedekleniyor...
+										{t('settings_backup_running')}
 									{:else}
 										<CloudUpload class="w-3.5 h-3.5" />
-										Yedekle
+										{t('settings_backup_now')}
 									{/if}
 								</Button>
 								<Button
@@ -1186,7 +1185,7 @@
 									class="h-8 px-3 text-xs gap-x-1.5"
 									onclick={() => { showEditForm = !showEditForm; }}
 								>
-									Düzenle
+									{t('settings_backup_edit')}
 								</Button>
 								<Button
 									variant="ghost"
@@ -1204,7 +1203,7 @@
 									onclick={() => { showEditForm = true; }}
 								>
 									<Link class="w-3.5 h-3.5" />
-									Yapılandır
+									{t('settings_backup_configure')}
 								</Button>
 							{/if}
 						</div>
@@ -1279,7 +1278,7 @@
 							<div class="flex justify-end gap-x-2 pt-1">
 								{#if showEditForm}
 									<Button variant="ghost" size="sm" class="h-8 px-3 text-xs"
-										onclick={() => { showEditForm = false; }}>İptal</Button>
+										onclick={() => { showEditForm = false; }}>{t('cancel')}</Button>
 								{/if}
 								<Button variant="default" size="sm" class="h-8 px-4 text-xs"
 									disabled={backupSaving || !backupForm.bucket || !backupForm.access_key || (!backupConfig?.configured && !backupForm.secret_key)}
@@ -1287,7 +1286,7 @@
 									{#if backupSaving}
 										<Loader2 class="w-3.5 h-3.5 animate-spin mr-1.5" />
 									{/if}
-									Kaydet
+									{t('save')}
 								</Button>
 							</div>
 						</div>
@@ -1299,7 +1298,7 @@
 					<div>
 						<h3 class="text-xs font-semibold text-muted-foreground tracking-wide uppercase mb-3 flex items-center gap-x-2">
 							<History class="w-3.5 h-3.5" />
-							Son Yedekler
+							{t('settings_backup_history_title')}
 						</h3>
 						<div class="rounded-xl border overflow-hidden">
 							<table class="w-full text-sm">
@@ -1325,7 +1324,7 @@
 														? 'bg-emerald-500/10 text-emerald-700'
 														: 'bg-destructive/10 text-destructive'
 												].join(' ')}>
-													{entry.status === 'success' ? 'Başarılı' : 'Hata'}
+													{entry.status === 'success' ? t('settings_backup_status_ok') : t('error')}
 												</span>
 												{#if entry.message && entry.status !== 'success'}
 													<span class="text-xs text-muted-foreground ml-2 truncate max-w-xs">{entry.message}</span>
@@ -1348,10 +1347,7 @@
 	<!-- ── DATABASES TAB ────────────────────────────────────────────────── -->
 	{#if tab === 'databases'}
 		<div class="space-y-5">
-			<p class="text-sm text-muted-foreground">
-				Ajanlara veritabanı sorgu yetenekleri ekleyin. Şema keşfi ve semantik açıklamalar sayesinde
-				yapay zeka tabloları ve kolonları anlayarak doğru SQL üretir.
-			</p>
+			<p class="text-sm text-muted-foreground">{t('db_tab_desc')}</p>
 
 			{#if dbError}
 				<div class="flex items-center gap-x-2 text-sm text-destructive bg-destructive/10 px-4 py-3 rounded-xl">
@@ -1369,12 +1365,12 @@
 				<div class="rounded-2xl border bg-card p-5 space-y-3">
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="db-name">İsim</label>
+							<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="db-name">{t('db_name_label')}</label>
 							<input id="db-name" type="text" bind:value={dbForm.name} placeholder="Müşteri DB"
 								class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
 						</div>
 						<div>
-							<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="db-type">Tür</label>
+							<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="db-type">{t('db_type_label')}</label>
 							<select id="db-type" bind:value={dbForm.db_type} class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring">
 								<option value="postgresql">PostgreSQL</option>
 								<option value="mysql">MySQL / MariaDB</option>
@@ -1384,17 +1380,17 @@
 					</div>
 					<div>
 						<label class="block text-xs font-medium text-muted-foreground mb-1.5" for="db-dsn">
-							Bağlantı Dizesi (DSN)
+							{t('db_dsn_label')}
 						</label>
 						<input id="db-dsn" type="text" bind:value={dbForm.dsn}
 							placeholder={dbForm.db_type === 'sqlite' ? '/data/mydb.db' : dbForm.db_type === 'postgresql' ? 'postgresql://user:pass@host:5432/dbname' : 'mysql+pymysql://user:pass@host/dbname'}
 							class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
 					</div>
 					<div class="flex justify-end gap-x-2">
-						<Button variant="ghost" size="sm" class="h-8 px-3 text-xs" onclick={() => showAddDB = false}>İptal</Button>
+						<Button variant="ghost" size="sm" class="h-8 px-3 text-xs" onclick={() => showAddDB = false}>{t('cancel')}</Button>
 						<Button variant="default" size="sm" class="h-8 px-4 text-xs"
 							disabled={!dbForm.name.trim() || !dbForm.dsn.trim()}
-							onclick={addDatabase}>Bağlan</Button>
+							onclick={addDatabase}>{t('db_connect')}</Button>
 					</div>
 				</div>
 			{/if}
@@ -1412,7 +1408,7 @@
 				</div>
 			{:else}
 				<div class="flex justify-between items-center">
-					<span class="text-xs text-muted-foreground">{databases.length} bağlantı</span>
+					<span class="text-xs text-muted-foreground">{databases.length} {t('db_connections')}</span>
 					<Button variant="outline" size="sm" class="h-8 px-3 text-xs" onclick={() => showAddDB = !showAddDB}>
 						<Plus class="w-3.5 h-3.5 mr-1" /> Ekle
 					</Button>
@@ -1428,7 +1424,7 @@
 								<div class="flex-1 min-w-0">
 									<div class="text-sm font-medium">{db.name}</div>
 									<div class="text-xs text-muted-foreground">{db.db_type}
-										{#if db.schema}· {Object.keys(db.schema.tables ?? {}).length} tablo{/if}
+										{#if db.schema}· {Object.keys(db.schema.tables ?? {}).length} {t('db_tables')}{/if}
 									</div>
 								</div>
 								<div class="flex items-center gap-x-1.5">
@@ -1440,7 +1436,7 @@
 										{:else}
 											<RefreshCcw class="w-3 h-3" />
 										{/if}
-										Keşfet
+										{t('db_discover')}
 									</Button>
 									<Button variant="ghost" size="sm" class="h-7 px-2 text-destructive hover:text-destructive text-xs"
 										onclick={(e) => { e.stopPropagation(); deleteDatabase(db.id); }}>
@@ -1460,10 +1456,10 @@
 												<div class="flex-1 space-y-1.5">
 													<div class="flex items-center gap-x-2">
 														<span class="font-mono text-xs font-semibold">{tname}</span>
-														<span class="text-xs text-muted-foreground">{tdata.row_count.toLocaleString()} satır</span>
+														<span class="text-xs text-muted-foreground">{tdata.row_count.toLocaleString()} {t('db_table_rows')}</span>
 													</div>
 													<input type="text" bind:value={tdata.description}
-														placeholder="Bu tablo ne içeriyor? (ör: Müşteri kayıtları)"
+														placeholder={t('db_schema_desc')}
 														class="w-full h-8 px-2.5 text-xs rounded-lg border border-input bg-muted/40 focus:outline-none focus:ring-1 focus:ring-ring" />
 													<div class="pl-3 border-l border-border/50 space-y-1.5">
 														{#each Object.entries(tdata.columns) as [cname, cdata]}
@@ -1486,8 +1482,8 @@
 
 									<!-- Example queries -->
 									<div class="space-y-2">
-										<p class="text-xs font-medium text-muted-foreground">Örnek Sorgular
-											<span class="font-normal">(ajan bu örneklerden öğrenir)</span>
+										<p class="text-xs font-medium text-muted-foreground">{t('db_examples_title')}
+											<span class="font-normal">{t('db_examples_hint')}</span>
 										</p>
 										{#each (selectedDB.examples ?? []) as ex, i}
 											<div class="space-y-1">
@@ -1499,12 +1495,12 @@
 										{/each}
 										<Button variant="ghost" size="sm" class="h-7 px-2 text-xs"
 											onclick={() => { if (selectedDB) selectedDB.examples = [...(selectedDB.examples ?? []), { sql: '', description: '' }]; }}>
-											<Plus class="w-3 h-3 mr-1" /> Örnek Ekle
+											<Plus class="w-3 h-3 mr-1" /> {t('db_examples_add')}
 										</Button>
 									</div>
 
 									<Button variant="default" size="sm" class="h-8 px-4 text-xs" onclick={saveAnnotations}>
-										Açıklamaları Kaydet
+										{t('db_save_annotations')}
 									</Button>
 								</div>
 							{/if}
@@ -1550,7 +1546,7 @@
 						<div class="flex items-center gap-x-3">
 							<CheckCircle2 class="w-5 h-5 text-sky-500 flex-shrink-0" />
 							<div>
-								<div class="font-semibold text-sm">Telegram bağlı</div>
+								<div class="font-semibold text-sm">{t('tg_connected')}</div>
 								<div class="text-xs text-muted-foreground mt-0.5">
 									Chat ID: <code class="font-mono">{tgConfig.admin_chat_id}</code>
 								</div>
@@ -1564,12 +1560,12 @@
 							</Button>
 							<Button variant="ghost" size="sm" class="h-8 px-3 text-xs"
 								onclick={() => { tgEditMode = true; }}>
-								Güncelle
+								{t('tg_update')}
 							</Button>
 							<Button variant="ghost" size="sm" class="h-8 px-3 text-xs text-destructive hover:text-destructive gap-x-1.5"
 								disabled={tgDeleting} onclick={deleteTelegram}>
 								{#if tgDeleting}<Loader2 class="w-3.5 h-3.5 animate-spin" />{:else}<Trash2 class="w-3.5 h-3.5" />{/if}
-								Kaldır
+								{t('tg_remove')}
 							</Button>
 						</div>
 					</div>
@@ -1608,12 +1604,12 @@
 					<div class="flex justify-end gap-x-2">
 						{#if tgEditMode}
 							<Button variant="ghost" size="sm" class="h-8 px-3 text-xs"
-								onclick={() => { tgEditMode = false; tgError = ''; }}>İptal</Button>
+								onclick={() => { tgEditMode = false; tgError = ''; }}>{t('cancel')}</Button>
 						{/if}
 						<Button variant="default" size="sm" class="h-8 px-4 text-xs"
 							disabled={tgSaving || !tgForm.bot_token.trim() || !tgForm.admin_chat_id.trim()}
 							onclick={saveTelegram}>
-							{#if tgSaving}<Loader2 class="w-3.5 h-3.5 animate-spin mr-1.5" />Doğrulanıyor...{:else}Bağlan{/if}
+							{#if tgSaving}<Loader2 class="w-3.5 h-3.5 animate-spin mr-1.5" />{t('tg_verify')}{:else}{t('settings_connect_btn')}{/if}
 						</Button>
 					</div>
 				</div>
@@ -1626,7 +1622,7 @@
 		<div>
 			<h3 class="text-sm font-semibold mb-3 flex items-center gap-x-2">
 				<Share2 class="w-4 h-4 text-pink-500" />
-				Sosyal Medya
+				{t('social_tab_title')}
 			</h3>
 			<p class="text-xs text-muted-foreground mb-4">
 				Instagram Business ve WhatsApp Business Cloud API entegrasyonu. Ajanlara
@@ -1663,9 +1659,9 @@
 							<div class="font-semibold text-sm flex items-center gap-x-2">
 								Instagram Business
 								{#if socialConfig?.instagram_configured}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700">Aktif</span>
+									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700">{t('social_active')}</span>
 								{:else}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">Yapılandırılmamış</span>
+									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{t('social_unconfigured')}</span>
 								{/if}
 							</div>
 							<div class="text-xs text-muted-foreground mt-0.5">
@@ -1725,9 +1721,9 @@
 							<div class="font-semibold text-sm flex items-center gap-x-2">
 								WhatsApp Business
 								{#if socialConfig?.whatsapp_configured}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700">Aktif</span>
+									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700">{t('social_active')}</span>
 								{:else}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">Yapılandırılmamış</span>
+									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{t('social_unconfigured')}</span>
 								{/if}
 							</div>
 							<div class="text-xs text-muted-foreground mt-0.5">
@@ -1789,7 +1785,7 @@
 					<Button variant="ghost" size="sm" class="h-8 px-3 text-xs text-destructive hover:text-destructive"
 						onclick={deleteSocial}>
 						<Trash2 class="w-3.5 h-3.5 mr-1.5" />
-						Tüm Kimlik Bilgilerini Sil
+						{t('social_delete_all')}
 					</Button>
 					<Button variant="default" size="sm" class="h-8 px-5 text-xs"
 						disabled={socialSaving}
@@ -1797,16 +1793,15 @@
 						{#if socialSaving}
 							<Loader2 class="w-3.5 h-3.5 animate-spin mr-1.5" />
 						{/if}
-						Kaydet
+						{t('save')}
 					</Button>
 				</div>
 
 				<!-- Skill guide -->
 				<div class="rounded-xl border border-dashed bg-muted/30 p-4 space-y-2">
-					<p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ajan Skill Kurulumu</p>
+					<p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('social_skill_guide')}</p>
 					<p class="text-xs text-muted-foreground">
-						Bir ajana Instagram/WhatsApp yetenekleri eklemek için Personel → Ajan Yapılandırması →
-						Skill Ekle bölümünden:
+						{t('social_skill_guide_desc')}
 					</p>
 					<ul class="text-xs text-muted-foreground space-y-1 list-disc pl-4">
 						<li><code class="bg-background border rounded px-1">instagram_post</code> — Skill türü: <strong>builtin</strong>, parametreler: image_url, caption</li>
