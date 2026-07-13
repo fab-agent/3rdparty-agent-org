@@ -245,6 +245,23 @@ def delete_personnel(person_id: str, current_user: User = Depends(get_current_us
         session.commit()
 
 
+@router.post("/personnel/{person_id}/archive", status_code=200)
+def archive_personnel(person_id: str, current_user: User = Depends(get_current_user)):
+    """Soft-delete: sets agent status to 'inactive'. Preserves DB record and Git history."""
+    with get_session() as session:
+        person = _get_person_and_check_membership(person_id, current_user.id, session)
+        cfg = session.exec(select(AgentConfig).where(AgentConfig.personnel_id == person_id)).first()
+        if cfg:
+            cfg.status = "inactive"
+            cfg.updated_at = datetime.utcnow()
+            session.add(cfg)
+        log_action(session, "archive", "personnel", entity_id=person.id,
+                   entity_name=person.name, company_id=person.company_id, user_id=current_user.id)
+        session.commit()
+        session.refresh(person)
+        return _personnel_to_dict(person, session)
+
+
 # ── Agent Config ───────────────────────────────────────────────────────────────
 
 @router.get("/personnel/{person_id}/agent-config")

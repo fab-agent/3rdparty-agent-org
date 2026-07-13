@@ -4,7 +4,7 @@
 	import Badge from '$lib/components/ui/badge.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Table from '$lib/components/ui/table.svelte';
-	import { Plus, Pencil, Trash2, Bot, Sparkles, X, Check, Loader, GitPullRequest } from '@lucide/svelte';
+	import { Plus, Pencil, Archive, Bot, Sparkles, X, Check, Loader } from '@lucide/svelte';
 	import { personnel as personnelApi, type PersonnelItem } from '$lib/api/personnel';
 	import { departments as deptApi, type Department } from '$lib/api/departments';
 	import { skillsApi, type CompanySkill, type BuiltinTool } from '$lib/api/skills';
@@ -291,31 +291,34 @@
 		}
 	}
 
-	// ── Delete ────────────────────────────────────────────────────────────────
-	let deleteTarget: PersonnelItem | null = $state(null);
-	let showDeleteDialog = $state(false);
-	let deleting = $state(false);
+	// ── Archive (soft-delete) ─────────────────────────────────────────────────
+	let archiveTarget: PersonnelItem | null = $state(null);
+	let showArchiveDialog = $state(false);
+	let archiving = $state(false);
+	let showArchived = $state(false);
 
-	function requestDelete(agent: PersonnelItem) { deleteTarget = agent; showDeleteDialog = true; }
-	function cancelDelete() { deleteTarget = null; showDeleteDialog = false; }
+	function requestArchive(agent: PersonnelItem) { archiveTarget = agent; showArchiveDialog = true; }
+	function cancelArchive() { archiveTarget = null; showArchiveDialog = false; }
 
-	async function confirmDelete() {
-		if (!deleteTarget) return;
-		deleting = true;
+	async function confirmArchive() {
+		if (!archiveTarget) return;
+		archiving = true;
 		try {
-			await personnelApi.delete(deleteTarget.id);
-			agents = agents.filter(a => a.id !== deleteTarget!.id);
-			cancelDelete();
+			const updated = await personnelApi.archive(archiveTarget.id);
+			agents = agents.map(a => a.id === updated.id ? updated : a);
+			cancelArchive();
 		} catch (e) {
 			alert((e as Error).message);
 		} finally {
-			deleting = false;
+			archiving = false;
 		}
 	}
 
 	// ── Stats ─────────────────────────────────────────────────────────────────
-	const totalActive = $derived(agents.filter(a => a.agent_config?.status === 'active').length);
-	const totalDraft  = $derived(agents.filter(a => a.agent_config?.status === 'draft').length);
+	const totalActive   = $derived(agents.filter(a => a.agent_config?.status === 'active').length);
+	const totalDraft    = $derived(agents.filter(a => a.agent_config?.status === 'draft').length);
+	const totalInactive = $derived(agents.filter(a => a.agent_config?.status === 'inactive').length);
+	const visibleAgents = $derived(showArchived ? agents : agents.filter(a => a.agent_config?.status !== 'inactive'));
 
 	const STATUS_BADGE: Record<string, 'default' | 'secondary' | 'destructive'> = {
 		active: 'default', draft: 'secondary', inactive: 'destructive'
@@ -430,53 +433,7 @@
 		}
 	}
 
-	// ── Change Request dialog ─────────────────────────────────────────────────
-	let crTarget: PersonnelItem | null = $state(null);
-	let showCrDialog = $state(false);
-	let crForm = $state({ change_type: 'agent_config' as 'agent_config' | 'skill' | 'policy', title: '', proposed_json: '' });
 	let crSaving = $state(false);
-
-	function openCrDialog(agent: PersonnelItem) {
-		crTarget = agent;
-		const cfg = agent.agent_config;
-		crForm = {
-			change_type: 'agent_config',
-			title: `${agent.name} - Yapılandırma Değişikliği`,
-			proposed_json: JSON.stringify({ model: cfg?.model, status: cfg?.status, responsible_id: cfg?.responsible_id }, null, 2),
-		};
-		showCrDialog = true;
-	}
-
-	function setCrType(t: typeof crForm.change_type) {
-		crForm.change_type = t;
-		if (!crTarget) return;
-		const cfg = crTarget.agent_config;
-		if (t === 'agent_config') {
-			crForm.proposed_json = JSON.stringify({ model: cfg?.model, status: cfg?.status, responsible_id: cfg?.responsible_id }, null, 2);
-		} else if (t === 'skill') {
-			crForm.proposed_json = JSON.stringify({ name: '', description: '' }, null, 2);
-		} else {
-			crForm.proposed_json = JSON.stringify({ policy_name: '', content: '' }, null, 2);
-		}
-	}
-
-	async function submitCr() {
-		if (!crTarget || !crForm.title) return;
-		crSaving = true;
-		try {
-			let proposed: Record<string, unknown>;
-			try { proposed = JSON.parse(crForm.proposed_json); } catch { proposed = { raw: crForm.proposed_json }; }
-			await crApi.create({
-				personnel_id: crTarget.id,
-				change_type: crForm.change_type,
-				title: crForm.title,
-				proposed,
-			}, companyStore.active?.id ?? '');
-			showCrDialog = false;
-			crTarget = null;
-		} catch (e) { alert((e as Error).message); }
-		finally { crSaving = false; }
-	}
 
 	async function submitAgentCr() {
 		if (!editingId || !form.name || !form.title) return;
@@ -528,10 +485,10 @@
 	</div>
 
 	<!-- Stats -->
-	<div class="grid grid-cols-3 gap-3">
+	<div class="grid grid-cols-4 gap-3">
 		<div class="rounded-xl border bg-card px-4 py-3">
 			<div class="text-xs text-muted-foreground">{t('agent_stat_total')}</div>
-			<div class="text-2xl font-semibold tracking-tight mt-0.5">{agents.length}</div>
+			<div class="text-2xl font-semibold tracking-tight mt-0.5">{agents.length - totalInactive}</div>
 		</div>
 		<div class="rounded-xl border bg-card px-4 py-3">
 			<div class="text-xs text-muted-foreground">{t('agent_stat_active')}</div>
@@ -541,6 +498,13 @@
 			<div class="text-xs text-muted-foreground">{t('agent_stat_draft')}</div>
 			<div class="text-2xl font-semibold tracking-tight mt-0.5 text-amber-500">{totalDraft}</div>
 		</div>
+		<button
+			class="rounded-xl border bg-card px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+			onclick={() => (showArchived = !showArchived)}
+		>
+			<div class="text-xs text-muted-foreground">{t('agent_stat_inactive')}</div>
+			<div class="text-2xl font-semibold tracking-tight mt-0.5 text-muted-foreground">{totalInactive}</div>
+		</button>
 	</div>
 
 	<!-- Loading / Error / Table -->
@@ -553,7 +517,7 @@
 		<div class="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
 			{error}
 		</div>
-	{:else if agents.length === 0}
+	{:else if visibleAgents.length === 0}
 		<div class="rounded-xl border bg-card flex flex-col items-center justify-center py-20 text-center gap-3">
 			<div class="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
 				<Bot class="w-6 h-6 text-violet-600" />
@@ -580,7 +544,7 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y">
-					{#each agents as agent (agent.id)}
+					{#each visibleAgents as agent (agent.id)}
 						<tr class="hover:bg-muted/30 transition-colors">
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
@@ -609,16 +573,15 @@
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex justify-end gap-1">
-									<Button variant="ghost" size="icon" onclick={() => openCrDialog(agent)} aria-label={t('agent_cr_btn')} title={t('agent_cr_tooltip')} class="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
-										<GitPullRequest class="h-4 w-4" />
-									</Button>
 									<Button variant="ghost" size="icon" onclick={() => openEdit(agent)} aria-label={t('edit')}>
 										<Pencil class="h-4 w-4" />
 									</Button>
-									<Button variant="ghost" size="icon" onclick={() => requestDelete(agent)} aria-label={t('delete')}
-										class="text-destructive hover:text-destructive hover:bg-destructive/10">
-										<Trash2 class="h-4 w-4" />
+									{#if agent.agent_config?.status !== 'inactive'}
+									<Button variant="ghost" size="icon" onclick={() => requestArchive(agent)} aria-label={t('archive')}
+										class="text-muted-foreground hover:text-amber-600 hover:bg-amber-50">
+										<Archive class="h-4 w-4" />
 									</Button>
+									{/if}
 								</div>
 							</td>
 						</tr>
@@ -1083,72 +1046,25 @@
 	</aside>
 {/if}
 
-<!-- ── Delete Dialog ─────────────────────────────────────────────────────── -->
-{#if showDeleteDialog}
+<!-- ── Archive Dialog ─────────────────────────────────────────────────────── -->
+{#if showArchiveDialog}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-backdrop" onclick={cancelDelete}>
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-backdrop" onclick={cancelArchive}>
 		<div class="bg-background w-full max-w-sm rounded-xl border p-6 shadow-lg mx-4 animate-dialog" onclick={(e) => e.stopPropagation()}>
-			<h2 class="font-display text-xl tracking-tight">{t('agent_delete_title')}</h2>
-			<p class="text-sm text-muted-foreground mt-1">
-				<strong class="text-foreground">{deleteTarget?.name}</strong> {t('agent_delete_confirm')}
+			<div class="flex items-center gap-3 mb-3">
+				<div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+					<Archive class="w-4 h-4 text-amber-600" />
+				</div>
+				<h2 class="font-display text-xl tracking-tight">{t('agent_archive_title')}</h2>
+			</div>
+			<p class="text-sm text-muted-foreground">
+				<strong class="text-foreground">{archiveTarget?.name}</strong> {t('agent_archive_confirm')}
 			</p>
 			<div class="flex gap-3 justify-end mt-5">
-				<Button variant="outline" onclick={cancelDelete}>{t('cancel')}</Button>
-				<Button variant="destructive" onclick={confirmDelete} disabled={deleting}>
-					{deleting ? t('deleting') : t('delete')}
-				</Button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- ── Change Request Dialog ─────────────────────────────────────────────── -->
-{#if showCrDialog}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-backdrop" onclick={() => (showCrDialog = false)}>
-		<div class="bg-background w-full max-w-lg rounded-xl border p-6 shadow-lg mx-4 animate-dialog space-y-4" onclick={(e) => e.stopPropagation()} role="dialog">
-			<div class="flex items-start justify-between gap-2">
-				<div>
-					<h2 class="font-display text-xl tracking-tight">{t('agent_cr_title')}</h2>
-					<p class="text-sm text-muted-foreground mt-0.5">{crTarget?.name}</p>
-				</div>
-				<button onclick={() => (showCrDialog = false)} class="text-muted-foreground hover:text-foreground mt-0.5">
-					<X class="w-4 h-4" />
-				</button>
-			</div>
-
-			<div class="space-y-1">
-				<label class="text-xs font-medium text-muted-foreground">{t('agent_cr_type_label')}</label>
-				<div class="flex gap-2">
-					{#each [{ v: 'agent_config', l: t('agent_cr_type_config') }, { v: 'skill', l: t('agent_cr_type_skill') }, { v: 'policy', l: t('agent_cr_type_policy') }] as crType}
-						<button
-							onclick={() => setCrType(crType.v as typeof crForm.change_type)}
-							class={['flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors', crForm.change_type === crType.v ? 'bg-amber-50 border-amber-300 text-amber-800' : 'border-input text-muted-foreground hover:text-foreground'].join(' ')}
-						>
-							{crType.l}
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<div class="space-y-1">
-				<label class="text-xs font-medium text-muted-foreground">{t('agent_cr_title_label')} *</label>
-				<input bind:value={crForm.title} class="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring" placeholder="Değişikliği kısaca açıklayın..." />
-			</div>
-
-			<div class="space-y-1">
-				<label class="text-xs font-medium text-muted-foreground">{t('agent_cr_proposed_label')}</label>
-				<textarea
-					bind:value={crForm.proposed_json}
-					rows={6}
-					class="w-full px-3 py-2 text-xs font-mono rounded-lg border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-				></textarea>
-			</div>
-
-			<div class="flex gap-3 justify-end pt-1">
-				<Button variant="outline" onclick={() => (showCrDialog = false)}>{t('cancel')}</Button>
-				<Button onclick={submitCr} disabled={crSaving || !crForm.title} class="bg-amber-600 hover:bg-amber-700 text-white">
-					{crSaving ? t('agent_cr_submitting') : t('agent_cr_submit')}
+				<Button variant="outline" onclick={cancelArchive}>{t('cancel')}</Button>
+				<Button onclick={confirmArchive} disabled={archiving}
+					class="bg-amber-600 hover:bg-amber-700 text-white">
+					{archiving ? t('archiving') : t('archive')}
 				</Button>
 			</div>
 		</div>

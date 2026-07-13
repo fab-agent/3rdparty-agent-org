@@ -63,7 +63,8 @@ export const personnel = {
 	get:    (id: string)                          => api.get<PersonnelItem>(`/personnel/${id}`),
 	create: (body: PersonnelCreate)               => api.post<PersonnelItem>('/personnel', body),
 	update: (id: string, body: PersonnelUpdate)   => api.patch<PersonnelItem>(`/personnel/${id}`, body),
-	delete: (id: string)                          => api.delete(`/personnel/${id}`),
+	delete:  (id: string)                          => api.delete(`/personnel/${id}`),
+	archive: (id: string)                          => api.post<PersonnelItem>(`/personnel/${id}/archive`, {}),
 
 	getAgentConfig:    (id: string)                        => api.get<AgentConfig>(`/personnel/${id}/agent-config`),
 	createAgentConfig: (id: string, body: Partial<AgentConfig>) => api.post<AgentConfig>(`/personnel/${id}/agent-config`, body),
