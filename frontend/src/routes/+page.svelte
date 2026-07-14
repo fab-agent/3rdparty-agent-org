@@ -5,24 +5,27 @@
 	import {
 		Users, Bot, MessageSquare, Zap, BrainCircuit, Clock,
 		TrendingUp, Activity, UserCheck, Loader, ChevronRight,
-		Cpu, Plus,
+		Cpu, Plus, RefreshCw, CheckCircle2, XCircle, Shield,
 	} from '@lucide/svelte';
-	import { dashboardApi, type CompanyStats, type MyDashboard } from '$lib/api/dashboard';
+	import { dashboardApi, type CompanyStats, type MyDashboard, type VersionInfo, type AgentSla } from '$lib/api/dashboard';
 	import { companyStore } from '$lib/stores/company.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	let stats = $state<CompanyStats | null>(null);
 	let myData = $state<MyDashboard | null>(null);
+	let sla = $state<AgentSla | null>(null);
+	let versionInfo = $state<VersionInfo | null>(null);
 	let loading = $state(true);
 
 	async function load() {
 		loading = true;
 		try {
 			const cid = companyStore.active?.id;
-			[stats, myData] = await Promise.all([
+			[stats, myData, sla] = await Promise.all([
 				dashboardApi.stats(cid),
 				dashboardApi.me(cid),
+				dashboardApi.agentSla(cid),
 			]);
 		} catch {
 			// ignore
@@ -31,7 +34,10 @@
 		}
 	}
 
-	onMount(load);
+	onMount(async () => {
+		load();
+		try { versionInfo = await dashboardApi.version(); } catch { /* ignore */ }
+	});
 	$effect(() => { if (companyStore.active) load(); });
 
 	const activeCompanyId = $derived(companyStore.active?.id ?? '');
@@ -55,6 +61,27 @@
 </svelte:head>
 
 <div class="space-y-8">
+
+	<!-- Update notification banner -->
+	{#if versionInfo?.update_available}
+		<div class="flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+			<RefreshCw class="w-4 h-4 text-amber-500 shrink-0" />
+			<span class="text-amber-700 dark:text-amber-400">
+				Yeni sürüm mevcut: <strong>v{versionInfo.latest}</strong>
+				(mevcut: v{versionInfo.current})
+			</span>
+			{#if versionInfo.release_url}
+				<a
+					href={versionInfo.release_url}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="ml-auto shrink-0 text-amber-600 dark:text-amber-400 underline underline-offset-2 hover:no-underline"
+				>
+					GitHub'da görüntüle →
+				</a>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Header -->
 	<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -254,6 +281,85 @@
 				</Card>
 
 			</div>
+		</section>
+	{/if}
+
+	<!-- ── Agent SLA (managers+) ────────────────────────────────────────────── -->
+	{#if isManager && (sla?.agents?.length ?? 0) > 0}
+		<section>
+			<div class="flex items-center gap-2 mb-4">
+				<Shield class="w-4 h-4 text-muted-foreground" />
+				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ajan SLA & Başarı Oranı</span>
+			</div>
+			<Card class="overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b border-border/60 bg-muted/30">
+								<th class="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Ajan</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Oturum</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Token</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Flow</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Görev</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Başarı</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each sla?.agents ?? [] as row}
+								<tr class="border-b border-border/40 hover:bg-muted/20 transition-colors">
+									<td class="px-4 py-3">
+										<div class="font-medium">{row.name}</div>
+										{#if row.title}
+											<div class="text-xs text-muted-foreground">{row.title}</div>
+										{/if}
+									</td>
+									<td class="px-4 py-3 text-right tabular-nums">
+										<span>{row.total_sessions}</span>
+										{#if row.active_sessions > 0}
+											<span class="ml-1 text-xs text-emerald-600">({row.active_sessions} aktif)</span>
+										{/if}
+									</td>
+									<td class="px-4 py-3 text-right tabular-nums text-muted-foreground">
+										{fmtTokens(row.total_tokens)}
+									</td>
+									<td class="px-4 py-3 text-right tabular-nums">
+										{#if row.flow_count > 0}
+											<span class="text-emerald-600">{row.flow_success}✓</span>
+											{#if row.flow_error > 0}
+												<span class="ml-1 text-destructive">{row.flow_error}✗</span>
+											{/if}
+										{:else}
+											<span class="text-muted-foreground">—</span>
+										{/if}
+									</td>
+									<td class="px-4 py-3 text-right tabular-nums">
+										{#if row.task_total > 0}
+											{row.task_completed}/{row.task_total}
+										{:else}
+											<span class="text-muted-foreground">—</span>
+										{/if}
+									</td>
+									<td class="px-4 py-3 text-right">
+										{#if row.success_rate !== null}
+											<span class="inline-flex items-center gap-1 font-semibold tabular-nums
+												{row.success_rate >= 90 ? 'text-emerald-600' : row.success_rate >= 70 ? 'text-amber-600' : 'text-destructive'}">
+												{#if row.success_rate >= 90}
+													<CheckCircle2 class="w-3.5 h-3.5" />
+												{:else}
+													<XCircle class="w-3.5 h-3.5" />
+												{/if}
+												{row.success_rate}%
+											</span>
+										{:else}
+											<span class="text-muted-foreground text-xs">Veri yok</span>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</Card>
 		</section>
 	{/if}
 

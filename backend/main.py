@@ -48,6 +48,7 @@ from api.dashboard import router as dashboard_router
 from api.onboarding import router as onboarding_router
 from api.skills import router as skills_router
 from api.policies import router as policies_router
+from api.system import router as system_router
 
 app = FastAPI(
     title="3rdParty Agent Organization API",
@@ -103,6 +104,7 @@ app.include_router(dashboard_router)
 app.include_router(skills_router)
 app.include_router(policies_router)
 app.include_router(onboarding_router)
+app.include_router(system_router)
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────

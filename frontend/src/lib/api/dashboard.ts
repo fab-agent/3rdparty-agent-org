@@ -43,6 +43,33 @@ export interface MyDashboard {
 	memories?: MyMemory[];
 }
 
+export interface AgentSlaRow {
+	id: string;
+	name: string;
+	title: string | null;
+	status: string;
+	total_sessions: number;
+	active_sessions: number;
+	total_tokens: number;
+	flow_count: number;
+	flow_success: number;
+	flow_error: number;
+	task_total: number;
+	task_completed: number;
+	success_rate: number | null;
+}
+
+export interface AgentSla {
+	agents: AgentSlaRow[];
+}
+
+export interface VersionInfo {
+	current: string;
+	latest: string | null;
+	release_url: string | null;
+	update_available: boolean;
+}
+
 export const dashboardApi = {
 	stats: (company_id?: string) => {
 		const qs = company_id ? `?company_id=${company_id}` : '';
@@ -52,4 +79,9 @@ export const dashboardApi = {
 		const qs = company_id ? `?company_id=${company_id}` : '';
 		return api.get<MyDashboard>(`/dashboard/me${qs}`);
 	},
+	agentSla: (company_id?: string) => {
+		const qs = company_id ? `?company_id=${company_id}` : '';
+		return api.get<AgentSla>(`/dashboard/agent-sla${qs}`);
+	},
+	version: () => api.get<VersionInfo>('/system/version'),
 };

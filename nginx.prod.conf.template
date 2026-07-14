@@ -1,0 +1,107 @@
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    # Rate limiting zones
+    limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+    limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
+
+    log_format json_combined escape=json
+        '{"ts":"$time_iso8601","method":"$request_method","path":"$request_uri",'
+        '"status":$status,"bytes":$body_bytes_sent,"ip":"$remote_addr",'
+        '"ua":"$http_user_agent","rt":"$request_time"}';
+
+    access_log /var/log/nginx/access.log json_combined;
+
+    sendfile on;
+    keepalive_timeout 65;
+    client_max_body_size 10m;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+
+    upstream backend {
+        server backend:8000;
+    }
+
+    upstream frontend {
+        server frontend:3000;
+    }
+
+    # HTTP → HTTPS redirect + certbot challenge
+    server {
+        listen 80;
+        server_name __DOMAIN__;
+
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # HTTPS main server
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name __DOMAIN__;
+
+        ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_ciphers         HIGH:!aNULL:!MD5;
+        ssl_session_cache   shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options SAMEORIGIN always;
+
+        # Login endpoint — strict rate limit: 5 attempts per minute per IP
+        location = /api/auth/token {
+            limit_req zone=login burst=3 nodelay;
+            limit_req_status 429;
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+        }
+
+        # API — general rate limit: 60 req/min per IP
+        location /api/ {
+            limit_req zone=api burst=20 nodelay;
+            limit_req_status 429;
+            rewrite ^/api/(.*) /$1 break;
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            # SSE support
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 300s;
+        }
+
+        # Frontend
+        location / {
+            proxy_pass http://frontend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+}

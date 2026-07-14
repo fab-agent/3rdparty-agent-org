@@ -8,7 +8,7 @@ from api.auth import get_current_user
 from database import get_session
 from models import (
     AgentConfig, AgentMemory, AgentSession, Company, CompanyMember,
-    Personnel, SessionMessage, User,
+    Flow, Personnel, SessionMessage, TaskRequest, User,
 )
 
 router = APIRouter(tags=["dashboard"])
@@ -203,3 +203,74 @@ def my_dashboard(company_id: Optional[str] = None, user: User = Depends(get_curr
                 for m in memories[:10]
             ],
         }
+
+
+@router.get("/dashboard/agent-sla")
+def agent_sla(company_id: Optional[str] = None, user: User = Depends(get_current_user)):
+    """Per-agent SLA metrics: sessions, tokens, flow success rate, task completion."""
+    with get_session() as session:
+        if not company_id:
+            first_mem = session.exec(
+                select(CompanyMember).where(CompanyMember.user_id == user.id)
+            ).first()
+            company_id = first_mem.company_id if first_mem else None
+        if not company_id:
+            return {"agents": []}
+
+        agents = session.exec(
+            select(Personnel)
+            .where(Personnel.company_id == company_id)
+            .where(Personnel.type == "agent")
+        ).all()
+
+        results = []
+        for agent in agents:
+            cfg = session.exec(
+                select(AgentConfig).where(AgentConfig.personnel_id == agent.id)
+            ).first()
+
+            agent_sessions = session.exec(
+                select(AgentSession).where(AgentSession.personnel_id == agent.id)
+            ).all()
+            session_ids = [s.id for s in agent_sessions]
+
+            total_tokens = 0
+            if session_ids:
+                msgs = session.exec(
+                    select(SessionMessage).where(SessionMessage.session_id.in_(session_ids))
+                ).all()
+                total_tokens = sum(m.tokens_used or 0 for m in msgs)
+
+            flows = session.exec(
+                select(Flow).where(Flow.personnel_id == agent.id)
+            ).all()
+            flow_success = sum(1 for f in flows if f.last_run_status == "success")
+            flow_error = sum(1 for f in flows if f.last_run_status == "error")
+
+            tasks = session.exec(
+                select(TaskRequest).where(TaskRequest.assigned_agent_id == agent.id)
+            ).all()
+            task_total = len(tasks)
+            task_completed = sum(1 for t in tasks if t.status == "completed")
+
+            total_ops = flow_success + flow_error + task_total
+            completed_ops = flow_success + task_completed
+            success_rate = round(completed_ops / total_ops * 100, 1) if total_ops > 0 else None
+
+            results.append({
+                "id": agent.id,
+                "name": agent.name,
+                "title": agent.title,
+                "status": cfg.status if cfg else "draft",
+                "total_sessions": len(agent_sessions),
+                "active_sessions": sum(1 for s in agent_sessions if s.status == "active"),
+                "total_tokens": total_tokens,
+                "flow_count": len(flows),
+                "flow_success": flow_success,
+                "flow_error": flow_error,
+                "task_total": task_total,
+                "task_completed": task_completed,
+                "success_rate": success_rate,
+            })
+
+        return {"agents": results}
