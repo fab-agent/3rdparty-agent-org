@@ -42,7 +42,7 @@
 
 	const activeCompanyId = $derived(companyStore.active?.id ?? '');
 	const isManager = $derived(authStore.can(activeCompanyId, 'dept_head'));
-	const userName = $derived(authStore.user?.name?.split(' ')[0] ?? 'Merhaba');
+	const userName = $derived(authStore.user?.name?.split(' ')[0] ?? t('dash_greeting'));
 
 	function fmtTokens(n: number): string {
 		if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -67,8 +67,8 @@
 		<div class="flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
 			<RefreshCw class="w-4 h-4 text-amber-500 shrink-0" />
 			<span class="text-amber-700 dark:text-amber-400">
-				Yeni sürüm mevcut: <strong>v{versionInfo.latest}</strong>
-				(mevcut: v{versionInfo.current})
+				{t('dash_update_available')} <strong>v{versionInfo.latest}</strong>
+				({t('dash_update_current')} v{versionInfo.current})
 			</span>
 			{#if versionInfo.release_url}
 				<a
@@ -77,7 +77,7 @@
 					rel="noopener noreferrer"
 					class="ml-auto shrink-0 text-amber-600 dark:text-amber-400 underline underline-offset-2 hover:no-underline"
 				>
-					GitHub'da görüntüle →
+					{t('dash_update_view')}
 				</a>
 			{/if}
 		</div>
@@ -86,7 +86,7 @@
 	<!-- Header -->
 	<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 		<div>
-			<h1 class="font-display text-3xl tracking-tight">Merhaba, {userName} 👋</h1>
+			<h1 class="font-display text-3xl tracking-tight">{t('dash_greeting')}, {userName} 👋</h1>
 			<p class="text-muted-foreground mt-1">
 				{companyStore.active?.name ?? ''} · {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}
 			</p>
@@ -106,7 +106,7 @@
 		<section>
 			<div class="flex items-center gap-2 mb-4">
 				<Activity class="w-4 h-4 text-muted-foreground" />
-				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Şirket Telemetrisi</span>
+				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('dash_section_telemetry')}</span>
 			</div>
 			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
 				{#if loading}
@@ -119,43 +119,43 @@
 				{:else if stats}
 					<Card class="p-4">
 						<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-							<Users class="w-3.5 h-3.5" /> İnsan
+							<Users class="w-3.5 h-3.5" /> {t('dash_stat_human')}
 						</div>
 						<div class="text-3xl font-semibold tracking-tighter">{stats.human_count}</div>
 					</Card>
 					<Card class="p-4">
 						<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-							<Bot class="w-3.5 h-3.5" /> Ajan
+							<Bot class="w-3.5 h-3.5" /> {t('dash_stat_agent')}
 						</div>
 						<div class="text-3xl font-semibold tracking-tighter">{stats.agent_count}</div>
-						<div class="text-xs text-emerald-600 font-medium mt-1">{stats.active_agents} aktif</div>
+						<div class="text-xs text-emerald-600 font-medium mt-1">{stats.active_agents} {t('dash_stat_label_active')}</div>
 					</Card>
 					<Card class="p-4">
 						<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-							<MessageSquare class="w-3.5 h-3.5" /> Bugün Oturum
+							<MessageSquare class="w-3.5 h-3.5" /> {t('dash_stat_today_sessions')}
 						</div>
 						<div class="text-3xl font-semibold tracking-tighter">{stats.today_sessions}</div>
-						<div class="text-xs text-muted-foreground mt-1">{stats.total_sessions} toplam</div>
+						<div class="text-xs text-muted-foreground mt-1">{stats.total_sessions} {t('dash_stat_label_total')}</div>
 					</Card>
 					<Card class="p-4">
 						<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-							<Activity class="w-3.5 h-3.5" /> Aktif Oturum
+							<Activity class="w-3.5 h-3.5" /> {t('dash_stat_active_sessions')}
 						</div>
 						<div class="text-3xl font-semibold tracking-tighter {stats.active_sessions > 0 ? 'text-emerald-600' : ''}">{stats.active_sessions}</div>
 					</Card>
 					<Card class="p-4">
 						<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-							<Zap class="w-3.5 h-3.5" /> Token (Bugün)
+							<Zap class="w-3.5 h-3.5" /> {t('dash_stat_today_tokens')}
 						</div>
 						<div class="text-3xl font-semibold tracking-tighter">{fmtTokens(stats.today_tokens)}</div>
-						<div class="text-xs text-muted-foreground mt-1">{fmtTokens(stats.total_tokens)} toplam</div>
+						<div class="text-xs text-muted-foreground mt-1">{fmtTokens(stats.total_tokens)} {t('dash_stat_label_total')}</div>
 					</Card>
 					<Card class="p-4">
 						<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-							<BrainCircuit class="w-3.5 h-3.5" /> Hafıza
+							<BrainCircuit class="w-3.5 h-3.5" /> {t('dash_stat_memory')}
 						</div>
 						<div class="text-3xl font-semibold tracking-tighter">{stats.memory_count}</div>
-						<div class="text-xs text-muted-foreground mt-1">uzun dönem</div>
+						<div class="text-xs text-muted-foreground mt-1">{t('dash_stat_label_longterm')}</div>
 					</Card>
 				{/if}
 			</div>
@@ -167,7 +167,7 @@
 		<section>
 			<div class="flex items-center gap-2 mb-4">
 				<UserCheck class="w-4 h-4 text-muted-foreground" />
-				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Benim Aktivitem</span>
+				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('dash_section_my_activity')}</span>
 				{#if myData.personnel_name}
 					<span class="text-xs text-muted-foreground">· {myData.personnel_name}</span>
 				{/if}
@@ -177,30 +177,30 @@
 			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
 				<Card class="p-4">
 					<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-						<MessageSquare class="w-3.5 h-3.5" /> Bugün Oturum
+						<MessageSquare class="w-3.5 h-3.5" /> {t('dash_stat_today_sessions')}
 					</div>
 					<div class="text-3xl font-semibold tracking-tighter">{myData.today_sessions ?? 0}</div>
-					<div class="text-xs text-muted-foreground mt-1">{myData.total_sessions ?? 0} toplam</div>
+					<div class="text-xs text-muted-foreground mt-1">{myData.total_sessions ?? 0} {t('dash_stat_label_total')}</div>
 				</Card>
 				<Card class="p-4">
 					<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-						<Activity class="w-3.5 h-3.5" /> Aktif Oturum
+						<Activity class="w-3.5 h-3.5" /> {t('dash_stat_active_sessions')}
 					</div>
 					<div class="text-3xl font-semibold tracking-tighter {(myData.active_sessions ?? 0) > 0 ? 'text-emerald-600' : ''}">{myData.active_sessions ?? 0}</div>
 				</Card>
 				<Card class="p-4">
 					<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-						<Zap class="w-3.5 h-3.5" /> Token (Bugün)
+						<Zap class="w-3.5 h-3.5" /> {t('dash_stat_today_tokens')}
 					</div>
 					<div class="text-3xl font-semibold tracking-tighter">{fmtTokens(myData.today_tokens ?? 0)}</div>
-					<div class="text-xs text-muted-foreground mt-1">{fmtTokens(myData.total_tokens ?? 0)} toplam</div>
+					<div class="text-xs text-muted-foreground mt-1">{fmtTokens(myData.total_tokens ?? 0)} {t('dash_stat_label_total')}</div>
 				</Card>
 				<Card class="p-4">
 					<div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-						<BrainCircuit class="w-3.5 h-3.5" /> Hafıza
+						<BrainCircuit class="w-3.5 h-3.5" /> {t('dash_stat_memory')}
 					</div>
 					<div class="text-3xl font-semibold tracking-tighter">{myData.memories?.length ?? 0}</div>
-					<div class="text-xs text-muted-foreground mt-1">uzun dönem</div>
+					<div class="text-xs text-muted-foreground mt-1">{t('dash_stat_label_longterm')}</div>
 				</Card>
 			</div>
 
@@ -211,10 +211,10 @@
 					<div class="flex items-center justify-between mb-4">
 						<div class="flex items-center gap-2">
 							<MessageSquare class="w-4 h-4 text-muted-foreground" />
-							<span class="font-semibold text-sm">Son Oturumlar</span>
+							<span class="font-semibold text-sm">{t('dash_recent_sessions')}</span>
 						</div>
 						<a href="/agents" class="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
-							Tümü <ChevronRight class="w-3 h-3" />
+							{t('dash_view_all')} <ChevronRight class="w-3 h-3" />
 						</a>
 					</div>
 					{#if loading}
@@ -226,7 +226,7 @@
 					{:else if !myData.recent_sessions?.length}
 						<div class="flex flex-col items-center justify-center py-8 text-center gap-2">
 							<MessageSquare class="w-8 h-8 text-muted-foreground/40" />
-							<p class="text-sm text-muted-foreground">Henüz oturum yok.</p>
+							<p class="text-sm text-muted-foreground">{t('dash_no_sessions')}</p>
 						</div>
 					{:else}
 						<div class="space-y-2">
@@ -234,12 +234,12 @@
 								<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
 									<div class="w-2 h-2 rounded-full flex-shrink-0 {s.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/30'}"></div>
 									<div class="flex-1 min-w-0">
-										<div class="text-sm font-medium truncate">{s.title ?? 'Oturum'}</div>
+										<div class="text-sm font-medium truncate">{s.title ?? t('dash_session_title_default')}</div>
 										<div class="text-xs text-muted-foreground">{fmtDate(s.updated_at)}</div>
 									</div>
 									<span class="text-xs px-2 py-0.5 rounded-md font-medium flex-shrink-0
 										{s.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}">
-										{s.status === 'active' ? 'Aktif' : 'Kapalı'}
+										{s.status === 'active' ? t('dash_session_active') : t('dash_session_closed')}
 									</span>
 								</div>
 							{/each}
@@ -251,7 +251,7 @@
 				<Card class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<BrainCircuit class="w-4 h-4 text-muted-foreground" />
-						<span class="font-semibold text-sm">Uzun Dönem Hafıza</span>
+						<span class="font-semibold text-sm">{t('dash_longterm_memory')}</span>
 					</div>
 					{#if loading}
 						<div class="space-y-2">
@@ -262,8 +262,8 @@
 					{:else if !myData.memories?.length}
 						<div class="flex flex-col items-center justify-center py-8 text-center gap-2">
 							<BrainCircuit class="w-8 h-8 text-muted-foreground/40" />
-							<p class="text-sm text-muted-foreground">Henüz hafıza özeti yok.</p>
-							<p class="text-xs text-muted-foreground">Oturumlar kapandığında AI özet oluşturur.</p>
+							<p class="text-sm text-muted-foreground">{t('dash_no_memory')}</p>
+							<p class="text-xs text-muted-foreground">{t('dash_no_memory_hint')}</p>
 						</div>
 					{:else}
 						<div class="space-y-2 max-h-64 overflow-y-auto">
@@ -289,19 +289,19 @@
 		<section>
 			<div class="flex items-center gap-2 mb-4">
 				<Shield class="w-4 h-4 text-muted-foreground" />
-				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ajan SLA & Başarı Oranı</span>
+				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('dash_section_sla')}</span>
 			</div>
 			<Card class="overflow-hidden">
 				<div class="overflow-x-auto">
 					<table class="w-full text-sm">
 						<thead>
 							<tr class="border-b border-border/60 bg-muted/30">
-								<th class="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Ajan</th>
-								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Oturum</th>
-								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Token</th>
-								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Flow</th>
-								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Görev</th>
-								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Başarı</th>
+								<th class="text-left px-4 py-3 font-medium text-muted-foreground text-xs">{t('dash_sla_col_agent')}</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">{t('dash_sla_col_sessions')}</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">{t('dash_sla_col_tokens')}</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">{t('dash_sla_col_flow')}</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">{t('dash_sla_col_task')}</th>
+								<th class="text-right px-4 py-3 font-medium text-muted-foreground text-xs">{t('dash_sla_col_success')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -316,7 +316,7 @@
 									<td class="px-4 py-3 text-right tabular-nums">
 										<span>{row.total_sessions}</span>
 										{#if row.active_sessions > 0}
-											<span class="ml-1 text-xs text-emerald-600">({row.active_sessions} aktif)</span>
+											<span class="ml-1 text-xs text-emerald-600">({row.active_sessions} {t('dash_sla_active_suffix')})</span>
 										{/if}
 									</td>
 									<td class="px-4 py-3 text-right tabular-nums text-muted-foreground">
@@ -351,7 +351,7 @@
 												{row.success_rate}%
 											</span>
 										{:else}
-											<span class="text-muted-foreground text-xs">Veri yok</span>
+											<span class="text-muted-foreground text-xs">{t('dash_sla_no_data')}</span>
 										{/if}
 									</td>
 								</tr>
@@ -367,14 +367,14 @@
 	<section>
 		<div class="flex items-center gap-2 mb-4">
 			<TrendingUp class="w-4 h-4 text-muted-foreground" />
-			<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hızlı Erişim</span>
+			<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('dash_section_quicklinks')}</span>
 		</div>
 		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 			{#each [
-				{ href: '/agents',    label: 'Ajanlar',    icon: Bot,           desc: 'Agent yönetimi' },
-				{ href: '/personnel', label: 'Personel',   icon: Users,         desc: 'Ekip üyeleri' },
-				{ href: '/settings',  label: 'Ayarlar',    icon: Cpu,           desc: 'AI sağlayıcıları' },
-				{ href: '/orgtree',   label: 'Org Şeması', icon: TrendingUp,    desc: 'Hiyerarşi görünümü' },
+				{ href: '/agents',    label: t('dash_quicklink_agents'),    icon: Bot,        desc: t('dash_quicklink_agents_desc') },
+				{ href: '/personnel', label: t('dash_quicklink_personnel'), icon: Users,      desc: t('dash_quicklink_personnel_desc') },
+				{ href: '/settings',  label: t('dash_quicklink_settings'),  icon: Cpu,        desc: t('dash_quicklink_settings_desc') },
+				{ href: '/orgtree',   label: t('dash_quicklink_orgtree'),   icon: TrendingUp, desc: t('dash_quicklink_orgtree_desc') },
 			] as item}
 				<a href={item.href} class="block">
 					<Card class="p-4 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer h-full">

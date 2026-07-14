@@ -158,7 +158,12 @@ def delete_provider_key(provider: str, _: User = Depends(require_manager)):
         row = _provider_row(session, provider)
         if row:
             log_action(session, "delete", "provider_key", entity_name=provider)
-            session.delete(row)
+            # Soft-delete: keep row so env-sync on restart doesn't re-add this key
+            row.encrypted_key = ""
+            row.status = "unconfigured"
+            row.base_url = None
+            row.last_tested = None
+            session.add(row)
             session.commit()
 
 

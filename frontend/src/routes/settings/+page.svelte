@@ -164,7 +164,8 @@
 			card.has_key = false;
 			card.models = [];
 			card.last_tested = null;
-			card.editMode = true;
+			card.editMode = false;
+			card.connectMode = false;
 			card.keyInput = '';
 			card.error = '';
 		} finally {
@@ -736,6 +737,8 @@
 											{#if card.testing}<Loader2 class="w-3.5 h-3.5 animate-spin" />{:else}<RefreshCw class="w-3.5 h-3.5" />{/if}
 											{t('settings_provider_test')}
 										</Button>
+									{/if}
+									{#if isActive || isInvalid}
 										<Button variant="ghost" size="sm"
 											class="h-8 px-3 text-xs text-destructive hover:text-destructive gap-x-1.5"
 											disabled={card.deleting} onclick={() => deleteKey(card)}>
