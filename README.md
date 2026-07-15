@@ -367,7 +367,7 @@ pytest tests/ -v
 
 ## License
 
-MIT — Free for commercial use, forking, and contributions.
+**MIT + Commons Clause** — Free to use, fork, and self-host for your own organization. Reselling, white-labeling, or offering as a paid service requires a commercial license. Contact [bilgi@kuntaykunt.com](mailto:bilgi@kuntaykunt.com) to discuss.
 
 ---
 
