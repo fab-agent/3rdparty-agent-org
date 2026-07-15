@@ -24,7 +24,10 @@ def check_version():
             resp = httpx.get(
                 f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
                 timeout=5,
-                headers={"Accept": "application/vnd.github+json", "User-Agent": "3rdparty-agent-org"},
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": "3rdparty-agent-org",
+                },
             )
             if resp.status_code == 200:
                 data = resp.json()

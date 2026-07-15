@@ -6,6 +6,7 @@ AI Onboarding Service
 3. Structured JSON org generation
 4. Bulk entity creation
 """
+
 import asyncio
 import json
 import re
@@ -30,6 +31,7 @@ from models import (
 )
 
 # ── Session persistence ───────────────────────────────────────────────────────
+
 
 def get_onboarding_session(company_id: str) -> dict | None:
     """Return saved onboarding session for company, or None."""
@@ -87,27 +89,33 @@ def delete_onboarding_session(company_id: str) -> None:
 
 # ── Web search ────────────────────────────────────────────────────────────────
 
+
 def search_company(company_name: str, max_results: int = 6) -> str:
     """Return a short text context from DDG search results."""
     try:
         from ddgs import DDGS
+
         snippets = []
         with DDGS() as d:
-            results = list(d.text(
-                f'"{company_name}" şirket sektör hakkında',
-                region="tr-tr",
-                max_results=max_results,
-            ))
+            results = list(
+                d.text(
+                    f'"{company_name}" şirket sektör hakkında',
+                    region="tr-tr",
+                    max_results=max_results,
+                )
+            )
             for r in results:
                 snippets.append(f"• {r['title']}: {r['body'][:200]}")
 
         if not snippets:
             # English fallback
             with DDGS() as d:
-                results = list(d.text(
-                    f'"{company_name}" company sector about',
-                    max_results=max_results,
-                ))
+                results = list(
+                    d.text(
+                        f'"{company_name}" company sector about',
+                        max_results=max_results,
+                    )
+                )
                 for r in results:
                     snippets.append(f"• {r['title']}: {r['body'][:200]}")
 
@@ -118,15 +126,16 @@ def search_company(company_name: str, max_results: int = 6) -> str:
 
 # ── Provider selection ────────────────────────────────────────────────────────
 
+
 def _get_best_key() -> tuple[str, str, str] | None:
     """Return (provider, model, api_key) for the first active key. Prefers anthropic → openai → google."""
     priority = ["anthropic", "openai", "google", "qwen", "mistral"]
     default_models = {
         "anthropic": "claude-sonnet-4-6",
-        "openai":    "gpt-4o",
-        "google":    "gemini-2.0-flash",
-        "qwen":      "qwen-plus",
-        "mistral":   "mistral-large-latest",
+        "openai": "gpt-4o",
+        "google": "gemini-2.0-flash",
+        "qwen": "qwen-plus",
+        "mistral": "mistral-large-latest",
     }
     with get_session() as session:
         keys = session.exec(
@@ -143,14 +152,24 @@ def _get_best_key() -> tuple[str, str, str] | None:
 
 # ── Simple LLM call (non-streaming, for structured output) ───────────────────
 
-async def _call_llm(messages: list[dict], provider: str, model: str, api_key: str,
-                   max_tokens: int = 8192) -> str:
+
+async def _call_llm(
+    messages: list[dict],
+    provider: str,
+    model: str,
+    api_key: str,
+    max_tokens: int = 8192,
+) -> str:
     """Single blocking call, returns assistant text."""
+
     def _sync():
         if provider == "anthropic":
             import anthropic
+
             client = anthropic.Anthropic(api_key=api_key)
-            sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+            sys_msg = next(
+                (m["content"] for m in messages if m["role"] == "system"), ""
+            )
             user_msgs = [m for m in messages if m["role"] != "system"]
             resp = client.messages.create(
                 model=model,
@@ -163,14 +182,21 @@ async def _call_llm(messages: list[dict], provider: str, model: str, api_key: st
         elif provider == "google":
             from google import genai
             from google.genai import types
+
             client = genai.Client(api_key=api_key)
-            sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+            sys_msg = next(
+                (m["content"] for m in messages if m["role"] == "system"), ""
+            )
             history = []
             for m in messages:
                 if m["role"] == "system":
                     continue
-                history.append({"role": "user" if m["role"] == "user" else "model",
-                                 "parts": [{"text": m["content"]}]})
+                history.append(
+                    {
+                        "role": "user" if m["role"] == "user" else "model",
+                        "parts": [{"text": m["content"]}],
+                    }
+                )
             resp = client.models.generate_content(
                 model=model,
                 contents=history,
@@ -183,11 +209,15 @@ async def _call_llm(messages: list[dict], provider: str, model: str, api_key: st
 
         else:  # openai-compatible
             from openai import OpenAI
+
             base_url_map = {
                 "openai": "https://api.openai.com/v1",
-                "qwen":   "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+                "qwen": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
             }
-            client = OpenAI(api_key=api_key, base_url=base_url_map.get(provider, "https://api.openai.com/v1"))
+            client = OpenAI(
+                api_key=api_key,
+                base_url=base_url_map.get(provider, "https://api.openai.com/v1"),
+            )
             resp = client.chat.completions.create(
                 model=model, messages=messages, max_tokens=max_tokens
             )
@@ -197,6 +227,7 @@ async def _call_llm(messages: list[dict], provider: str, model: str, api_key: st
 
 
 # ── Streaming LLM call (for chat UI) ─────────────────────────────────────────
+
 
 async def stream_onboarding_chat(
     messages: list[dict],
@@ -208,43 +239,64 @@ async def stream_onboarding_chat(
 
     async def _anthropic():
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
         sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
         user_msgs = [m for m in messages if m["role"] != "system"]
 
         def _sync():
             return client.messages.create(
-                model=model, max_tokens=2048,
-                system=sys_msg, messages=user_msgs,
+                model=model,
+                max_tokens=2048,
+                system=sys_msg,
+                messages=user_msgs,
             )
+
         resp = await asyncio.to_thread(_sync)
         yield resp.content[0].text
 
     async def _google():
         from google import genai
         from google.genai import types
+
         client = genai.Client(api_key=api_key)
         sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
         history = [
-            {"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["content"]}]}
-            for m in messages if m["role"] != "system"
+            {
+                "role": "user" if m["role"] == "user" else "model",
+                "parts": [{"text": m["content"]}],
+            }
+            for m in messages
+            if m["role"] != "system"
         ]
 
         def _sync():
             return client.models.generate_content(
-                model=model, contents=history,
+                model=model,
+                contents=history,
                 config=types.GenerateContentConfig(system_instruction=sys_msg),
             )
+
         resp = await asyncio.to_thread(_sync)
         yield resp.text
 
     async def _openai_compat():
         from openai import OpenAI
-        base_url_map = {"openai": "https://api.openai.com/v1", "qwen": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"}
-        client = OpenAI(api_key=api_key, base_url=base_url_map.get(provider, "https://api.openai.com/v1"))
+
+        base_url_map = {
+            "openai": "https://api.openai.com/v1",
+            "qwen": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        }
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url_map.get(provider, "https://api.openai.com/v1"),
+        )
 
         def _sync():
-            return client.chat.completions.create(model=model, messages=messages, max_tokens=2048)
+            return client.chat.completions.create(
+                model=model, messages=messages, max_tokens=2048
+            )
+
         resp = await asyncio.to_thread(_sync)
         yield resp.choices[0].message.content or ""
 
@@ -382,7 +434,10 @@ TEK PARAGRAFLIK KURAL CÜMLESİ YASAK.
 
 # ── Bulk entity creator ───────────────────────────────────────────────────────
 
-def create_org_from_structure(company_id: str, structure: dict, fallback_model: str = "qwen-plus") -> dict:
+
+def create_org_from_structure(
+    company_id: str, structure: dict, fallback_model: str = "qwen-plus"
+) -> dict:
     """Create all entities from the generated structure. Returns summary."""
     summary = {"departments": 0, "humans": 0, "agents": 0, "skills": 0, "policies": 0}
 
@@ -412,7 +467,9 @@ def create_org_from_structure(company_id: str, structure: dict, fallback_model: 
                 slug=sk.get("slug", sk["name"].lower().replace(" ", "-")),
                 skill_type=sk.get("skill_type", "builtin"),
                 description=sk.get("description"),
-                content=sk.get("content", f"## {sk['name']}\n\n{sk.get('description', '')}"),
+                content=sk.get(
+                    "content", f"## {sk['name']}\n\n{sk.get('description', '')}"
+                ),
                 is_active=True,
             )
             session.add(skill)
@@ -465,10 +522,12 @@ def create_org_from_structure(company_id: str, structure: dict, fallback_model: 
             for skill_slug in ag.get("skills", []):
                 skill_id = skill_id_map.get(skill_slug)
                 if skill_id:
-                    session.add(AgentSkillLink(
-                        agent_config_id=cfg.id,
-                        company_skill_id=skill_id,
-                    ))
+                    session.add(
+                        AgentSkillLink(
+                            agent_config_id=cfg.id,
+                            company_skill_id=skill_id,
+                        )
+                    )
 
             summary["agents"] += 1
 
@@ -520,7 +579,9 @@ def create_org_from_structure(company_id: str, structure: dict, fallback_model: 
             for name in names:
                 pid = policy_name_to_id.get(name)
                 if pid:
-                    session.add(DepartmentPolicyLink(department_id=dept_id, policy_id=pid))
+                    session.add(
+                        DepartmentPolicyLink(department_id=dept_id, policy_id=pid)
+                    )
 
         # 6. Mark company as onboarded
         company = session.get(Company, company_id)
@@ -535,6 +596,7 @@ def create_org_from_structure(company_id: str, structure: dict, fallback_model: 
 
 
 # ── Generate structure from conversation ──────────────────────────────────────
+
 
 def _repair_json(raw: str) -> str:
     """
@@ -561,12 +623,12 @@ def _repair_json(raw: str) -> str:
             stack.append("}")
         elif ch == "[":
             stack.append("]")
-        elif ch in ("}","]") and stack and stack[-1] == ch:
+        elif ch in ("}", "]") and stack and stack[-1] == ch:
             stack.pop()
 
     suffix = ""
     if in_string:
-        suffix += '"'          # close the unterminated string
+        suffix += '"'  # close the unterminated string
     suffix += "".join(reversed(stack))  # close any open arrays/objects
     return raw + suffix
 
@@ -619,6 +681,7 @@ SADECE JSON döndür."""
             result = json.loads(repaired)
             # Warn in logs but continue — partial structure is still useful
             import logging
+
             logging.getLogger("app").warning(
                 "generate_org_structure: JSON was truncated and auto-repaired. "
                 f"Original error: {primary_err}. "

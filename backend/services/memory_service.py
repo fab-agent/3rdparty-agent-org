@@ -1,4 +1,5 @@
 """Agent memory: generate and load session summaries."""
+
 from datetime import datetime
 
 from sqlmodel import select
@@ -39,17 +40,30 @@ async def generate_session_summary(session_id: str) -> None:
             return
 
         provider_key = None
+
         def _prov_for_model(m: str) -> str:
             m = (m or "").lower()
-            if m.startswith("claude"): return "anthropic"
-            if m.startswith(("gpt-", "o1", "o3")): return "openai"
-            if m.startswith("gemini"): return "google"
-            if m.startswith(("mistral", "codestral")): return "mistral"
-            if m.startswith("qwen"): return "qwen"
+            if m.startswith("claude"):
+                return "anthropic"
+            if m.startswith(("gpt-", "o1", "o3")):
+                return "openai"
+            if m.startswith("gemini"):
+                return "google"
+            if m.startswith(("mistral", "codestral")):
+                return "mistral"
+            if m.startswith("qwen"):
+                return "qwen"
             return ""
+
         agent_prov = _prov_for_model(agent_cfg.model or "")
         provider_key = None
-        for prov in ([agent_prov] if agent_prov else []) + ["anthropic", "openai", "google", "mistral", "qwen"]:
+        for prov in ([agent_prov] if agent_prov else []) + [
+            "anthropic",
+            "openai",
+            "google",
+            "mistral",
+            "qwen",
+        ]:
             if not prov:
                 continue
             pk = db.exec(
@@ -98,6 +112,7 @@ def _call_summary_llm(provider: str, model: str, api_key: str, prompt: str) -> s
 
     if provider == "anthropic":
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
             model=model,
@@ -108,6 +123,7 @@ def _call_summary_llm(provider: str, model: str, api_key: str, prompt: str) -> s
 
     elif provider == "openai":
         import openai
+
         client = openai.OpenAI(api_key=api_key)
         resp = client.chat.completions.create(
             model=model,
@@ -118,6 +134,7 @@ def _call_summary_llm(provider: str, model: str, api_key: str, prompt: str) -> s
 
     elif provider == "google":
         from google import genai
+
         client = genai.Client(api_key=api_key)
         resp = client.models.generate_content(model=model, contents=prompt)
         return resp.text or ""
@@ -128,13 +145,22 @@ def _call_summary_llm(provider: str, model: str, api_key: str, prompt: str) -> s
 
         from database import get_session as _gs
         from models import ProviderKey as _PK
+
         base_url = None
         with _gs() as _db:
             pk = _db.exec(_sel(_PK).where(_PK.provider == provider)).first()
             if pk and pk.base_url:
-                base_url = f"{pk.base_url}/v1" if not pk.base_url.endswith("/v1") else pk.base_url
+                base_url = (
+                    f"{pk.base_url}/v1"
+                    if not pk.base_url.endswith("/v1")
+                    else pk.base_url
+                )
         if not base_url:
-            base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" if provider == "qwen" else "https://api.mistral.ai/v1"
+            base_url = (
+                "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+                if provider == "qwen"
+                else "https://api.mistral.ai/v1"
+            )
         client = openai.OpenAI(api_key=api_key, base_url=base_url)
         resp = client.chat.completions.create(
             model=model,

@@ -1,4 +1,5 @@
 """User & CompanyMember management (founder-only CRUD)."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
@@ -25,14 +26,16 @@ def _user_to_dict(user: User, session) -> dict:
                 agent = session.get(Personnel, m.scope_id)
                 if agent:
                     scope_name = agent.name
-        companies.append({
-            "membership_id": m.id,
-            "company_id": m.company_id,
-            "company_name": co.name if co else None,
-            "role": m.role,
-            "scope_id": m.scope_id,
-            "scope_name": scope_name,
-        })
+        companies.append(
+            {
+                "membership_id": m.id,
+                "company_id": m.company_id,
+                "company_name": co.name if co else None,
+                "role": m.role,
+                "scope_id": m.scope_id,
+                "scope_name": scope_name,
+            }
+        )
     return {
         "id": user.id,
         "email": user.email,
@@ -50,7 +53,8 @@ def list_users(company_id: str | None = None, _: User = Depends(require_founder)
     with get_session() as session:
         if company_id:
             member_ids = [
-                m.user_id for m in session.exec(
+                m.user_id
+                for m in session.exec(
                     select(CompanyMember).where(CompanyMember.company_id == company_id)
                 ).all()
             ]
@@ -92,13 +96,16 @@ def delete_user(user_id: str, _: User = Depends(require_founder)):
         if not user:
             raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
         # Remove memberships
-        for m in session.exec(select(CompanyMember).where(CompanyMember.user_id == user_id)).all():
+        for m in session.exec(
+            select(CompanyMember).where(CompanyMember.user_id == user_id)
+        ).all():
             session.delete(m)
         session.delete(user)
         session.commit()
 
 
 # ── Membership management ─────────────────────────────────────────────────────
+
 
 @router.get("/{user_id}/memberships")
 def list_memberships(user_id: str, _: User = Depends(require_founder)):

@@ -2,6 +2,7 @@
 AgentSession CRUD, status polling, close, and SSE message tests.
 LLM calls are always mocked.
 """
+
 import json
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ import models
 from tests.conftest import make_agent_config, make_personnel, make_provider_key
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _make_session(client, personnel_id, title="Test Session"):
     return client.post("/sessions", json={"personnel_id": personnel_id, "title": title})
@@ -24,6 +26,7 @@ def _setup(auth_client, db_session):
 
 
 # ── Create ────────────────────────────────────────────────────────────────────
+
 
 def test_create_session_201(auth_client, db_session):
     agent_id = _setup(auth_client, db_session)
@@ -51,6 +54,7 @@ def test_create_session_requires_auth(client, db_session):
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 
 def test_list_sessions_empty(auth_client, db_session):
     _setup(auth_client, db_session)
@@ -80,6 +84,7 @@ def test_list_sessions_by_personnel(auth_client, db_session):
 
 # ── Get ───────────────────────────────────────────────────────────────────────
 
+
 def test_get_session_detail(auth_client, db_session):
     agent_id = _setup(auth_client, db_session)
     sess_id = _make_session(auth_client, agent_id).json()["id"]
@@ -95,6 +100,7 @@ def test_get_session_not_found(auth_client):
 
 
 # ── Status ────────────────────────────────────────────────────────────────────
+
 
 def test_get_session_status(auth_client, db_session):
     agent_id = _setup(auth_client, db_session)
@@ -115,6 +121,7 @@ def test_get_session_status_not_found(auth_client):
 
 # ── Close ─────────────────────────────────────────────────────────────────────
 
+
 def test_close_session(auth_client, db_session):
     agent_id = _setup(auth_client, db_session)
     sess_id = _make_session(auth_client, agent_id).json()["id"]
@@ -134,6 +141,7 @@ def test_close_session_not_found(auth_client):
 
 # ── Memories ──────────────────────────────────────────────────────────────────
 
+
 def test_list_memories_empty(auth_client):
     r = auth_client.get("/sessions/memories")
     assert r.status_code == 200
@@ -142,7 +150,9 @@ def test_list_memories_empty(auth_client):
 
 def test_list_memories_by_personnel(auth_client, db_session):
     agent_id = _setup(auth_client, db_session)
-    mem = models.AgentMemory(personnel_id=agent_id, session_id="sess-1", summary="Liked Python")
+    mem = models.AgentMemory(
+        personnel_id=agent_id, session_id="sess-1", summary="Liked Python"
+    )
     db_session.add(mem)
     db_session.commit()
     r = auth_client.get(f"/sessions/memories?personnel_id={agent_id}")
@@ -153,6 +163,7 @@ def test_list_memories_by_personnel(auth_client, db_session):
 
 # ── Message send (SSE) ────────────────────────────────────────────────────────
 
+
 async def _mock_run_success(session_id, content, attachments=None):
     yield {"type": "text", "content": "Hello from mock agent!"}
 
@@ -162,8 +173,9 @@ def test_send_message_streams_sse(auth_client, db_session):
     sess_id = _make_session(auth_client, agent_id).json()["id"]
 
     with patch("api.sessions.run_session", new=_mock_run_success):
-        with auth_client.stream("POST", f"/sessions/{sess_id}/messages",
-                                json={"content": "Hello"}) as r:
+        with auth_client.stream(
+            "POST", f"/sessions/{sess_id}/messages", json={"content": "Hello"}
+        ) as r:
             assert r.status_code == 200
             assert "text/event-stream" in r.headers["content-type"]
             lines = [l for l in r.iter_lines() if l.startswith("data: ")]

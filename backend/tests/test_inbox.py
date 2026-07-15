@@ -2,12 +2,14 @@
 Inbox endpoint tests.
 InboxMessages are created directly in the DB (no create endpoint).
 """
+
 from datetime import datetime
 
 import models
 from tests.conftest import make_user
 
 # ── Fixture helper ────────────────────────────────────────────────────────────
+
 
 def _make_inbox_msg(db_session, recipient_user_id, company_id, **overrides):
     msg = models.InboxMessage(
@@ -27,6 +29,7 @@ def _make_inbox_msg(db_session, recipient_user_id, company_id, **overrides):
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 
 def test_list_inbox_empty(auth_client):
     r = auth_client.get("/inbox")
@@ -83,6 +86,7 @@ def test_list_inbox_by_company(auth_client, db_session):
 
 # ── Unread count ──────────────────────────────────────────────────────────────
 
+
 def test_unread_count_zero(auth_client):
     r = auth_client.get("/inbox/unread-count")
     assert r.status_code == 200
@@ -101,6 +105,7 @@ def test_unread_count(auth_client, db_session):
 
 
 # ── Mark read ─────────────────────────────────────────────────────────────────
+
 
 def test_mark_read(auth_client, db_session):
     user = auth_client._test_user
@@ -136,6 +141,7 @@ def test_mark_all_read(auth_client, db_session):
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
+
 
 def test_delete_message(auth_client, db_session):
     user = auth_client._test_user

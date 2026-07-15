@@ -1,4 +1,5 @@
 """Auth endpoints: login, invite, change-password, me."""
+
 import os as _os
 from datetime import datetime, timedelta
 
@@ -38,12 +39,14 @@ def _tg_notify(session, company_id: str, fn, **kwargs):
     except Exception as exc:
         print(f"[telegram] notify failed: {exc}")
 
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 TEMP_PASSWORD_TTL_MINUTES = 30
 
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
+
 
 def get_current_user(authorization: str | None = Header(None)) -> User:
     if not authorization or not authorization.startswith("Bearer "):
@@ -103,6 +106,7 @@ def check_company_membership(user_id: str, company_id: str, session) -> CompanyM
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
+
 @router.post("/token")
 def login(body: LoginRequest):
     email: str = body.email
@@ -121,7 +125,7 @@ def login(body: LoginRequest):
             _regenerate_and_send(user)
             raise HTTPException(
                 status_code=401,
-                detail="Geçici şifrenizin süresi dolmuştu. Yeni geçici şifre yöneticinize Telegram'dan iletildi."
+                detail="Geçici şifrenizin süresi dolmuştu. Yeni geçici şifre yöneticinize Telegram'dan iletildi.",
             )
         raise HTTPException(status_code=401, detail="Email veya şifre hatalı")
 
@@ -130,7 +134,7 @@ def login(body: LoginRequest):
         _regenerate_and_send(user)
         raise HTTPException(
             status_code=401,
-            detail="Geçici şifrenizin süresi dolmuştu. Yeni geçici şifre yöneticinize Telegram'dan iletildi."
+            detail="Geçici şifrenizin süresi dolmuştu. Yeni geçici şifre yöneticinize Telegram'dan iletildi.",
         )
 
     # Success
@@ -153,17 +157,28 @@ def _regenerate_and_send(user: User) -> None:
     with get_session() as session:
         u = session.get(User, user.id)
         u.password_hash = hash_password(temp_pw)
-        u.invite_expires_at = datetime.utcnow() + timedelta(minutes=TEMP_PASSWORD_TTL_MINUTES)
+        u.invite_expires_at = datetime.utcnow() + timedelta(
+            minutes=TEMP_PASSWORD_TTL_MINUTES
+        )
         u.must_change_password = True
         session.add(u)
         session.commit()
-        member = session.exec(select(CompanyMember).where(CompanyMember.user_id == user.id)).first()
+        member = session.exec(
+            select(CompanyMember).where(CompanyMember.user_id == user.id)
+        ).first()
         if member:
-            _tg_notify(session, member.company_id, _tg.notify_temp_password,
-                       name=user.name, email=user.email, temp_password=temp_pw)
+            _tg_notify(
+                session,
+                member.company_id,
+                _tg.notify_temp_password,
+                name=user.name,
+                email=user.email,
+                temp_password=temp_pw,
+            )
 
 
 # ── Current user ──────────────────────────────────────────────────────────────
+
 
 @router.get("/me")
 def me(user: User = Depends(get_current_user)):
@@ -180,13 +195,15 @@ def me(user: User = Depends(get_current_user)):
                     .where(Personnel.user_id == user.id)
                     .where(Personnel.company_id == m.company_id)
                 ).first()
-                companies.append({
-                    "company_id": m.company_id,
-                    "company_name": co.name,
-                    "role": m.role,
-                    "scope_id": m.scope_id,
-                    "personnel_id": person.id if person else None,
-                })
+                companies.append(
+                    {
+                        "company_id": m.company_id,
+                        "company_name": co.name,
+                        "role": m.role,
+                        "scope_id": m.scope_id,
+                        "personnel_id": person.id if person else None,
+                    }
+                )
     return {
         "id": user.id,
         "email": user.email,
@@ -197,6 +214,7 @@ def me(user: User = Depends(get_current_user)):
 
 
 # ── Invite (temp-password flow) ───────────────────────────────────────────────
+
 
 @router.post("/invite", status_code=201)
 def invite_user(body: InviteRequest, caller: User = Depends(require_manager)):
@@ -225,7 +243,9 @@ def invite_user(body: InviteRequest, caller: User = Depends(require_manager)):
         temp_pw = generate_temp_password()
         user.password_hash = hash_password(temp_pw)
         user.must_change_password = True
-        user.invite_expires_at = datetime.utcnow() + timedelta(minutes=TEMP_PASSWORD_TTL_MINUTES)
+        user.invite_expires_at = datetime.utcnow() + timedelta(
+            minutes=TEMP_PASSWORD_TTL_MINUTES
+        )
         # Clear any stale invite/reset tokens
         user.invite_token = None
         user.reset_token = None
@@ -243,25 +263,41 @@ def invite_user(body: InviteRequest, caller: User = Depends(require_manager)):
             existing_member.scope_id = scope_id
             session.add(existing_member)
         else:
-            session.add(CompanyMember(
-                user_id=user.id,
-                company_id=company_id,
-                role=role,
-                scope_id=scope_id,
-            ))
+            session.add(
+                CompanyMember(
+                    user_id=user.id,
+                    company_id=company_id,
+                    role=role,
+                    scope_id=scope_id,
+                )
+            )
         session.commit()
         user_id = user.id
 
     with get_session() as session:
-        _tg_notify(session, company_id, _tg.notify_invite,
-                   name=name, email=email, company_name=company.name, temp_password=temp_pw)
-    return {"user_id": user_id, "temp_password": temp_pw, "message": "Davet oluşturuldu"}
+        _tg_notify(
+            session,
+            company_id,
+            _tg.notify_invite,
+            name=name,
+            email=email,
+            company_name=company.name,
+            temp_password=temp_pw,
+        )
+    return {
+        "user_id": user_id,
+        "temp_password": temp_pw,
+        "message": "Davet oluşturuldu",
+    }
 
 
 # ── Change password (authenticated — first-login or profile) ─────────────────
 
+
 @router.post("/change-password")
-def change_password(body: ChangePasswordRequest, user: User = Depends(get_current_user)):
+def change_password(
+    body: ChangePasswordRequest, user: User = Depends(get_current_user)
+):
     password: str = body.password
 
     with get_session() as session:
@@ -280,6 +316,7 @@ def change_password(body: ChangePasswordRequest, user: User = Depends(get_curren
 
 
 # ── First-time setup ──────────────────────────────────────────────────────────
+
 
 @router.get("/setup-status")
 def setup_status():
@@ -305,17 +342,25 @@ def setup(body: SetupRequest):
         raise HTTPException(status_code=422, detail="name ve company_name boş olamaz")
 
     with get_session() as session:
-        user = User(email=email, name=name, password_hash=hash_password(password), is_active=True)
+        user = User(
+            email=email,
+            name=name,
+            password_hash=hash_password(password),
+            is_active=True,
+        )
         session.add(user)
         session.flush()
 
         import re
+
         slug = re.sub(r"[^a-z0-9]+", "-", company_name.lower()).strip("-") or "sirket"
         company = Company(name=company_name, slug=slug)
         session.add(company)
         session.flush()
 
-        session.add(CompanyMember(user_id=user.id, company_id=company.id, role="founder"))
+        session.add(
+            CompanyMember(user_id=user.id, company_id=company.id, role="founder")
+        )
         session.commit()
         user_id = user.id
 
@@ -324,6 +369,7 @@ def setup(body: SetupRequest):
 
 
 # ── Admin: reset user password ────────────────────────────────────────────────
+
 
 @router.post("/reset/{user_id}")
 def admin_reset(user_id: str, caller: User = Depends(require_manager)):
@@ -334,14 +380,24 @@ def admin_reset(user_id: str, caller: User = Depends(require_manager)):
         temp_pw = generate_temp_password()
         user.password_hash = hash_password(temp_pw)
         user.must_change_password = True
-        user.invite_expires_at = datetime.utcnow() + timedelta(minutes=TEMP_PASSWORD_TTL_MINUTES)
+        user.invite_expires_at = datetime.utcnow() + timedelta(
+            minutes=TEMP_PASSWORD_TTL_MINUTES
+        )
         session.add(user)
         session.commit()
         email, name = user.email, user.name
 
     with get_session() as session:
-        member = session.exec(select(CompanyMember).where(CompanyMember.user_id == user_id)).first()
+        member = session.exec(
+            select(CompanyMember).where(CompanyMember.user_id == user_id)
+        ).first()
         if member:
-            _tg_notify(session, member.company_id, _tg.notify_admin_reset,
-                       name=name, email=email, temp_password=temp_pw)
+            _tg_notify(
+                session,
+                member.company_id,
+                _tg.notify_admin_reset,
+                name=name,
+                email=email,
+                temp_password=temp_pw,
+            )
     return {"message": "Geçici şifre oluşturuldu", "temp_password": temp_pw}

@@ -44,11 +44,18 @@ _BOT_BASE = "https://api.telegram.org/bot{token}/{method}"
 
 # ── Telegram API helpers ───────────────────────────────────────────────────────
 
+
 def _tg_url(token: str, method: str) -> str:
     return _BOT_BASE.format(token=token, method=method)
 
 
-def _send(token: str, chat_id: str, text: str, reply_markup: dict | None = None, parse_mode: str = "HTML") -> None:
+def _send(
+    token: str,
+    chat_id: str,
+    text: str,
+    reply_markup: dict | None = None,
+    parse_mode: str = "HTML",
+) -> None:
     payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
@@ -62,10 +69,15 @@ def _send(token: str, chat_id: str, text: str, reply_markup: dict | None = None,
 def _edit_message(token: str, chat_id: str, message_id: int, text: str) -> None:
     try:
         with httpx.Client(timeout=10) as c:
-            c.post(_tg_url(token, "editMessageText"), json={
-                "chat_id": chat_id, "message_id": message_id,
-                "text": text, "parse_mode": "HTML",
-            })
+            c.post(
+                _tg_url(token, "editMessageText"),
+                json={
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                },
+            )
     except Exception:
         pass
 
@@ -73,14 +85,20 @@ def _edit_message(token: str, chat_id: str, message_id: int, text: str) -> None:
 def _answer_callback(token: str, callback_query_id: str, text: str = "") -> None:
     try:
         with httpx.Client(timeout=5) as c:
-            c.post(_tg_url(token, "answerCallbackQuery"), json={
-                "callback_query_id": callback_query_id, "text": text,
-            })
+            c.post(
+                _tg_url(token, "answerCallbackQuery"),
+                json={
+                    "callback_query_id": callback_query_id,
+                    "text": text,
+                },
+            )
     except Exception:
         pass
 
 
-def _split_and_send(token: str, chat_id: str, text: str, parse_mode: str = "HTML") -> None:
+def _split_and_send(
+    token: str, chat_id: str, text: str, parse_mode: str = "HTML"
+) -> None:
     """Split long messages at 4096-char Telegram limit."""
     limit = 4096
     while text:
@@ -90,6 +108,7 @@ def _split_and_send(token: str, chat_id: str, text: str, parse_mode: str = "HTML
 
 # ── Bot config loader ──────────────────────────────────────────────────────────
 
+
 def _get_bot_token(company_id: str | None = None) -> str | None:
     with get_session() as db:
         q = select(TelegramConfig).where(TelegramConfig.is_active == True)
@@ -97,7 +116,9 @@ def _get_bot_token(company_id: str | None = None) -> str | None:
             q = q.where(TelegramConfig.company_id == company_id)
         cfg = db.exec(q).first()
         if not cfg:
-            cfg = db.exec(select(TelegramConfig).where(TelegramConfig.is_active == True)).first()
+            cfg = db.exec(
+                select(TelegramConfig).where(TelegramConfig.is_active == True)
+            ).first()
         if not cfg:
             return None
         return decrypt(cfg.encrypted_token)
@@ -129,6 +150,7 @@ def _save_state(state: TelegramBotState) -> None:
 
 # ── Agent keyboard builder ─────────────────────────────────────────────────────
 
+
 def _agent_keyboard(company_id: str | None) -> dict:
     with get_session() as db:
         q = (
@@ -156,15 +178,20 @@ def _agent_keyboard(company_id: str | None) -> dict:
 
 # ── Pending approvals ──────────────────────────────────────────────────────────
 
+
 def _pending_approvals_text_and_keyboard(company_id: str | None) -> tuple[str, dict]:
     with get_session() as db:
-        tasks = db.exec(
-            select(TaskRequest)
-            .where(TaskRequest.company_id == company_id)
-            .where(TaskRequest.status == "assigned")
-            .order_by(TaskRequest.created_at.desc())
-            .limit(5)
-        ).all() if company_id else []
+        tasks = (
+            db.exec(
+                select(TaskRequest)
+                .where(TaskRequest.company_id == company_id)
+                .where(TaskRequest.status == "assigned")
+                .order_by(TaskRequest.created_at.desc())
+                .limit(5)
+            ).all()
+            if company_id
+            else []
+        )
 
         a2as = db.exec(
             select(A2ARequest)
@@ -181,25 +208,37 @@ def _pending_approvals_text_and_keyboard(company_id: str | None) -> tuple[str, d
 
     for t in tasks:
         lines.append(f"📌 <b>[Görev]</b> {t.title}\n<i>{t.body[:100]}...</i>")
-        buttons.append([
-            {"text": f"✅ Onayla — {t.title[:20]}", "callback_data": f"approve_task:{t.id}"},
-            {"text": "❌ Reddet", "callback_data": f"reject_task:{t.id}"},
-        ])
+        buttons.append(
+            [
+                {
+                    "text": f"✅ Onayla — {t.title[:20]}",
+                    "callback_data": f"approve_task:{t.id}",
+                },
+                {"text": "❌ Reddet", "callback_data": f"reject_task:{t.id}"},
+            ]
+        )
 
     for a in a2as:
         lines.append(f"🤝 <b>[A2A]</b> {a.task_title or 'Delegasyon'}")
-        buttons.append([
-            {"text": f"✅ Onayla — {(a.task_title or 'A2A')[:20]}", "callback_data": f"approve_a2a:{a.id}"},
-            {"text": "❌ Reddet", "callback_data": f"reject_a2a:{a.id}"},
-        ])
+        buttons.append(
+            [
+                {
+                    "text": f"✅ Onayla — {(a.task_title or 'A2A')[:20]}",
+                    "callback_data": f"approve_a2a:{a.id}",
+                },
+                {"text": "❌ Reddet", "callback_data": f"reject_a2a:{a.id}"},
+            ]
+        )
 
     return "\n".join(lines), {"inline_keyboard": buttons}
 
 
 # ── Agent runner (sync wrapper around async run_session) ──────────────────────
 
+
 async def _run_agent(session_id: str, message: str) -> str:
     from services.agent_runtime import run_session
+
     parts = []
     async for event in run_session(session_id, message):
         if event.get("type") == "text":
@@ -232,6 +271,7 @@ def _ensure_session(state: TelegramBotState) -> str:
 
 # ── Update processor ───────────────────────────────────────────────────────────
 
+
 def process_telegram_update(data: dict) -> None:
     """Synchronous entry point called from BackgroundTasks."""
     asyncio.run(_process_async(data))
@@ -261,10 +301,13 @@ async def _process_async(data: dict) -> None:
                 state.selected_agent_name = agent.name
                 state.active_session_id = None  # fresh session for new agent
                 _save_state(state)
-                _send(token, chat_id,
-                      f"✅ <b>{agent.name}</b> seçildi.\n\n"
-                      f"Mesajını yaz, doğrudan ona iletiyorum.\n"
-                      f"<i>Değiştirmek için /degistir</i>")
+                _send(
+                    token,
+                    chat_id,
+                    f"✅ <b>{agent.name}</b> seçildi.\n\n"
+                    f"Mesajını yaz, doğrudan ona iletiyorum.\n"
+                    f"<i>Değiştirmek için /degistir</i>",
+                )
             return
 
         if cb_data.startswith("approve_task:"):
@@ -332,9 +375,12 @@ async def _process_async(data: dict) -> None:
     # Commands
     if text in ("/start", "/ajanlar"):
         keyboard = _agent_keyboard(state.company_id)
-        _send(token, chat_id,
-              "🤖 <b>Fabrika Yapay Zeka</b>\n\nHangi ajanla çalışmak istiyorsun?",
-              reply_markup=keyboard)
+        _send(
+            token,
+            chat_id,
+            "🤖 <b>Fabrika Yapay Zeka</b>\n\nHangi ajanla çalışmak istiyorsun?",
+            reply_markup=keyboard,
+        )
         return
 
     if text == "/degistir":
@@ -343,11 +389,18 @@ async def _process_async(data: dict) -> None:
         return
 
     if text == "/durum":
-        agent_info = f"🤖 Seçili ajan: <b>{state.selected_agent_name}</b>" if state.selected_agent_name else "⚠️ Henüz ajan seçilmedi."
-        _send(token, chat_id,
-              f"{agent_info}\n\n"
-              f"🏢 Şirket: {state.company_id or '?'}\n"
-              f"📋 Oturum: {state.active_session_id or 'Yeni oluşturulacak'}")
+        agent_info = (
+            f"🤖 Seçili ajan: <b>{state.selected_agent_name}</b>"
+            if state.selected_agent_name
+            else "⚠️ Henüz ajan seçilmedi."
+        )
+        _send(
+            token,
+            chat_id,
+            f"{agent_info}\n\n"
+            f"🏢 Şirket: {state.company_id or '?'}\n"
+            f"📋 Oturum: {state.active_session_id or 'Yeni oluşturulacak'}",
+        )
         return
 
     if text == "/onaylar":
@@ -358,9 +411,7 @@ async def _process_async(data: dict) -> None:
     # Route to selected agent
     if not state.selected_agent_id:
         keyboard = _agent_keyboard(state.company_id)
-        _send(token, chat_id,
-              "⚠️ Önce bir ajan seçmelisin:",
-              reply_markup=keyboard)
+        _send(token, chat_id, "⚠️ Önce bir ajan seçmelisin:", reply_markup=keyboard)
         return
 
     # Send "thinking" message
@@ -402,11 +453,14 @@ def _polling_loop() -> None:
             continue
         try:
             with httpx.Client(timeout=40) as c:
-                r = c.get(_tg_url(token, "getUpdates"), params={
-                    "timeout": 30,
-                    "offset": offset,
-                    "allowed_updates": ["message", "callback_query"],
-                })
+                r = c.get(
+                    _tg_url(token, "getUpdates"),
+                    params={
+                        "timeout": 30,
+                        "offset": offset,
+                        "allowed_updates": ["message", "callback_query"],
+                    },
+                )
             if r.status_code != 200:
                 time.sleep(5)
                 continue
@@ -424,7 +478,9 @@ def _polling_loop() -> None:
 def start_polling() -> None:
     global _polling_thread, _polling_active
     _polling_active = True
-    _polling_thread = threading.Thread(target=_polling_loop, daemon=True, name="tg-polling")
+    _polling_thread = threading.Thread(
+        target=_polling_loop, daemon=True, name="tg-polling"
+    )
     _polling_thread.start()
 
 
@@ -434,6 +490,7 @@ def stop_polling() -> None:
 
 
 # ── Status endpoint ────────────────────────────────────────────────────────────
+
 
 @router.get("/telegram/bot-status")
 async def bot_status():

@@ -16,9 +16,14 @@ engine = create_engine(
 def _is_fresh_db() -> bool:
     """Return True if the database has no alembic_version table (brand-new install)."""
     from sqlalchemy import text
+
     with engine.connect() as conn:
         try:
-            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'"))
+            result = conn.execute(
+                text(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'"
+                )
+            )
             return result.fetchone() is None
         except Exception:
             return True
@@ -29,6 +34,7 @@ def init_db() -> None:
 
     from alembic import command
     from alembic.config import Config
+
     ini_path = os.path.join(os.path.dirname(__file__), "alembic.ini")
     alembic_cfg = Config(ini_path)
 
@@ -37,6 +43,7 @@ def init_db() -> None:
         # then stamp alembic_version to the current head so incremental migrations
         # don't try to add columns to tables that already have them.
         import models  # noqa: F401 — ensure all SQLModel tables are registered
+
         SQLModel.metadata.create_all(engine)
         command.stamp(alembic_cfg, "head")
     else:

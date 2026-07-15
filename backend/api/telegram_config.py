@@ -1,4 +1,5 @@
 """Telegram bot configuration — CRUD + test."""
+
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -45,12 +46,17 @@ def save_config(body: dict, user: User = Depends(require_founder)):
     bot_token: str | None = body.get("bot_token")
     admin_chat_id: str | None = body.get("admin_chat_id")
     if not bot_token or not admin_chat_id:
-        raise HTTPException(status_code=422, detail="bot_token ve admin_chat_id gerekli")
+        raise HTTPException(
+            status_code=422, detail="bot_token ve admin_chat_id gerekli"
+        )
 
     # Validate token via getMe
     info = test_bot(bot_token)
     if not info:
-        raise HTTPException(status_code=400, detail="Bot token geçersiz — BotFather'dan aldığınız token'ı kontrol edin")
+        raise HTTPException(
+            status_code=400,
+            detail="Bot token geçersiz — BotFather'dan aldığınız token'ı kontrol edin",
+        )
 
     with get_session() as session:
         company_id = _get_company_id(user, session)
@@ -86,13 +92,21 @@ def test_config(user: User = Depends(require_founder)):
             select(TelegramConfig).where(TelegramConfig.company_id == company_id)
         ).first()
         if not cfg:
-            raise HTTPException(status_code=404, detail="Telegram yapılandırması bulunamadı")
+            raise HTTPException(
+                status_code=404, detail="Telegram yapılandırması bulunamadı"
+            )
         token = decrypt(cfg.encrypted_token)
         chat_id = cfg.admin_chat_id
 
-    ok = send_message(token, chat_id, "✅ <b>3rdParty Agent Platform</b>\nTelegram bildirimleri aktif!")
+    ok = send_message(
+        token,
+        chat_id,
+        "✅ <b>3rdParty Agent Platform</b>\nTelegram bildirimleri aktif!",
+    )
     if not ok:
-        raise HTTPException(status_code=400, detail="Mesaj gönderilemedi — Chat ID'yi kontrol edin")
+        raise HTTPException(
+            status_code=400, detail="Mesaj gönderilemedi — Chat ID'yi kontrol edin"
+        )
     return {"sent": True}
 
 

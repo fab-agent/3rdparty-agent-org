@@ -72,17 +72,25 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request, call_next):
     import time
+
     t0 = time.monotonic()
     response = await call_next(request)
     ms = round((time.monotonic() - t0) * 1000)
     level = logging.WARNING if response.status_code >= 400 else logging.INFO
-    logger.log(level, "http", extra={"extra": {
-        "method": request.method,
-        "path": request.url.path,
-        "status": response.status_code,
-        "ms": ms,
-    }})
+    logger.log(
+        level,
+        "http",
+        extra={
+            "extra": {
+                "method": request.method,
+                "path": request.url.path,
+                "status": response.status_code,
+                "ms": ms,
+            }
+        },
+    )
     return response
+
 
 app.include_router(auth_router)
 app.include_router(users_router)
@@ -120,6 +128,7 @@ def _reload_flow_schedules():
     """Load all enabled flows from DB and schedule them."""
     from models import Flow
     from services.flow_runner import run_flow
+
     _scheduler.remove_all_jobs()
     with get_session() as session:
         flows = session.exec(select(Flow).where(Flow.enabled == True)).all()
@@ -130,17 +139,27 @@ def _reload_flow_schedules():
                     minute, hour, day, month, day_of_week = parts
                     _scheduler.add_job(
                         run_flow,
-                        CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=day_of_week),
+                        CronTrigger(
+                            minute=minute,
+                            hour=hour,
+                            day=day,
+                            month=month,
+                            day_of_week=day_of_week,
+                        ),
                         args=[flow.id],
                         id=flow.id,
                         replace_existing=True,
                     )
             except Exception as e:
-                logger.warning("Failed to schedule flow", extra={"extra": {"flow_id": flow.id, "error": str(e)}})
+                logger.warning(
+                    "Failed to schedule flow",
+                    extra={"extra": {"flow_id": flow.id, "error": str(e)}},
+                )
     logger.info("Flows scheduled", extra={"extra": {"count": len(flows)}})
 
 
 # ── Startup ────────────────────────────────────────────────────────────────────
+
 
 @app.on_event("startup")
 def on_startup():
@@ -152,6 +171,7 @@ def on_startup():
     _reload_flow_schedules()
     _scheduler.start()
     from api.telegram_bot import start_polling
+
     start_polling()
     logger.info("Application started")
 
@@ -160,6 +180,7 @@ def on_startup():
 def on_shutdown():
     _scheduler.shutdown(wait=False)
     from api.telegram_bot import stop_polling
+
     stop_polling()
     logger.info("Application shutdown")
 
@@ -169,8 +190,8 @@ def _sync_env_config():
     from models import AppConfig
 
     mapping = {
-        "company_name":    os.getenv("COMPANY_NAME", ""),
-        "company_sector":  os.getenv("COMPANY_SECTOR", ""),
+        "company_name": os.getenv("COMPANY_NAME", ""),
+        "company_sector": os.getenv("COMPANY_SECTOR", ""),
         "company_website": os.getenv("COMPANY_WEBSITE", ""),
     }
 
@@ -194,10 +215,10 @@ def _sync_env_provider_keys():
 
     env_map = {
         "anthropic": "ANTHROPIC_API_KEY",
-        "openai":    "OPENAI_API_KEY",
-        "google":    "GOOGLE_API_KEY",
-        "mistral":   "MISTRAL_API_KEY",
-        "qwen":      "QWEN_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "google": "GOOGLE_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
+        "qwen": "QWEN_API_KEY",
     }
 
     with get_session() as session:
@@ -213,12 +234,14 @@ def _sync_env_provider_keys():
                 continue  # already configured via UI — don't overwrite
 
             valid = test_provider_key(provider, plain_key)
-            session.add(ProviderKey(
-                provider=provider,
-                encrypted_key=encrypt(plain_key),
-                status="active" if valid else "invalid",
-                last_tested=datetime.utcnow(),
-            ))
+            session.add(
+                ProviderKey(
+                    provider=provider,
+                    encrypted_key=encrypt(plain_key),
+                    status="active" if valid else "invalid",
+                    last_tested=datetime.utcnow(),
+                )
+            )
             print(f"  → provider sync: {provider} {'✓' if valid else '✗'}")
             changed = True
         if changed:
@@ -226,6 +249,7 @@ def _sync_env_provider_keys():
 
 
 # ── Root ───────────────────────────────────────────────────────────────────────
+
 
 @app.get("/")
 def root():
@@ -239,4 +263,5 @@ def health():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

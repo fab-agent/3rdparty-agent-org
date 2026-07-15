@@ -11,6 +11,7 @@ Strategy:
 - init_db / run_seed / env-key sync are mocked (no alembic, no demo noise).
 - A logged-in `auth_client` fixture provides an authenticated TestClient.
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -23,6 +24,7 @@ import models
 from services.auth import create_access_token, hash_password
 
 # ── DB fixture ────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def test_engine(tmp_path):
@@ -45,6 +47,7 @@ def patch_engine(test_engine, monkeypatch):
 
 # ── App / TestClient ──────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 def client(patch_engine):
     """TestClient with seed, env-key sync, and init_db suppressed.
@@ -54,15 +57,19 @@ def client(patch_engine):
     test_engine's create_all() above.
     """
     from main import app
-    with patch("main.run_seed"), \
-         patch("main._sync_env_config"), \
-         patch("main._sync_env_provider_keys"), \
-         patch("main.init_db"):
+
+    with (
+        patch("main.run_seed"),
+        patch("main._sync_env_config"),
+        patch("main._sync_env_provider_keys"),
+        patch("main.init_db"),
+    ):
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
 
 
 # ── Direct DB session ─────────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def db_session(test_engine):
@@ -72,6 +79,7 @@ def db_session(test_engine):
 
 # ── Seed helpers ──────────────────────────────────────────────────────────────
 
+
 def make_company(session, name="Test Corp", slug="test-corp"):
     co = models.Company(name=name, slug=slug)
     session.add(co)
@@ -79,10 +87,15 @@ def make_company(session, name="Test Corp", slug="test-corp"):
     return co
 
 
-def make_user(session, email="admin@test.com", name="Admin",
-              password="test1234", is_active=True):
-    u = models.User(email=email, name=name,
-                    password_hash=hash_password(password), is_active=is_active)
+def make_user(
+    session, email="admin@test.com", name="Admin", password="test1234", is_active=True
+):
+    u = models.User(
+        email=email,
+        name=name,
+        password_hash=hash_password(password),
+        is_active=is_active,
+    )
     session.add(u)
     session.flush()
     return u
@@ -95,26 +108,38 @@ def make_member(session, user_id, company_id, role="founder"):
     return m
 
 
-def make_company_for_user(session, user, name="Test Corp", slug="test-corp", role="founder"):
+def make_company_for_user(
+    session, user, name="Test Corp", slug="test-corp", role="founder"
+):
     """Create a company and immediately add user as a member (mirrors the API create flow)."""
     co = make_company(session, name=name, slug=slug)
     make_member(session, user.id, co.id, role=role)
     return co
 
 
-def make_personnel(session, company_id, name="BotAgent", slug="bot-agent",
-                   type="agent", title="Test Agent"):
-    p = models.Personnel(name=name, slug=slug, type=type,
-                          title=title, company_id=company_id)
+def make_personnel(
+    session,
+    company_id,
+    name="BotAgent",
+    slug="bot-agent",
+    type="agent",
+    title="Test Agent",
+):
+    p = models.Personnel(
+        name=name, slug=slug, type=type, title=title, company_id=company_id
+    )
     session.add(p)
     session.flush()
     return p
 
 
-def make_agent_config(session, personnel_id, model="gpt-4o-mini",
-                      responsible_id=None):
-    cfg = models.AgentConfig(personnel_id=personnel_id, model=model,
-                              status="active", responsible_id=responsible_id)
+def make_agent_config(session, personnel_id, model="gpt-4o-mini", responsible_id=None):
+    cfg = models.AgentConfig(
+        personnel_id=personnel_id,
+        model=model,
+        status="active",
+        responsible_id=responsible_id,
+    )
     session.add(cfg)
     session.flush()
     return cfg
@@ -122,14 +147,17 @@ def make_agent_config(session, personnel_id, model="gpt-4o-mini",
 
 def make_provider_key(session, provider="openai", plain_key="sk-test"):
     from core.security import encrypt
-    pk = models.ProviderKey(provider=provider,
-                             encrypted_key=encrypt(plain_key), status="active")
+
+    pk = models.ProviderKey(
+        provider=provider, encrypted_key=encrypt(plain_key), status="active"
+    )
     session.add(pk)
     session.flush()
     return pk
 
 
 # ── Authenticated client ──────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def auth_client(client, db_session):

@@ -1,10 +1,12 @@
 """
 Dashboard stats and personal telemetry tests.
 """
+
 import models
 from tests.conftest import make_agent_config, make_personnel
 
 # ── /dashboard/stats ──────────────────────────────────────────────────────────
+
 
 def test_stats_requires_auth(client):
     r = client.get("/dashboard/stats")
@@ -49,7 +51,9 @@ def test_stats_resolves_company_from_membership(auth_client):
 
 def test_stats_with_sessions(auth_client, db_session):
     co = auth_client._test_company
-    agent = make_personnel(db_session, co.id, name="SessionBot", slug="sbot", type="agent")
+    agent = make_personnel(
+        db_session, co.id, name="SessionBot", slug="sbot", type="agent"
+    )
     make_agent_config(db_session, agent.id)
     sess = models.AgentSession(personnel_id=agent.id, title="Test Run")
     db_session.add(sess)
@@ -61,6 +65,7 @@ def test_stats_with_sessions(auth_client, db_session):
 
 
 # ── /dashboard/me ─────────────────────────────────────────────────────────────
+
 
 def test_me_requires_auth(client):
     r = client.get("/dashboard/me")
@@ -77,7 +82,9 @@ def test_me_no_linked_personnel(auth_client):
 def test_me_with_linked_personnel(auth_client, db_session):
     co = auth_client._test_company
     user = auth_client._test_user
-    person = make_personnel(db_session, co.id, name="Alice Human", slug="alice-h", type="human")
+    person = make_personnel(
+        db_session, co.id, name="Alice Human", slug="alice-h", type="human"
+    )
     person.user_id = user.id
     db_session.add(person)
     db_session.commit()

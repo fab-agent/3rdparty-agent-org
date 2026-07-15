@@ -24,6 +24,7 @@ router = APIRouter(tags=["providers"])
 
 # ── Platform Config ────────────────────────────────────────────────────────────
 
+
 @router.get("/config")
 def get_config(_: User = Depends(get_current_user)):
     with get_session() as session:
@@ -47,11 +48,16 @@ def patch_config(body: ConfigPatch, _: User = Depends(require_manager)):
 
 # ── Providers ──────────────────────────────────────────────────────────────────
 
+
 def _provider_row(session, provider: str) -> ProviderKey | None:
-    return session.exec(select(ProviderKey).where(ProviderKey.provider == provider)).first()
+    return session.exec(
+        select(ProviderKey).where(ProviderKey.provider == provider)
+    ).first()
 
 
-def _provider_status_dict(row: ProviderKey | None, provider: str, plain_key: str | None = None) -> dict:
+def _provider_status_dict(
+    row: ProviderKey | None, provider: str, plain_key: str | None = None
+) -> dict:
     cfg = PROVIDER_CONFIGS[provider]
     if not row or row.status == "unconfigured":
         return {
@@ -62,7 +68,11 @@ def _provider_status_dict(row: ProviderKey | None, provider: str, plain_key: str
             "models": [],
             "last_tested": None,
         }
-    models = get_provider_models(provider, plain_key, base_url=row.base_url) if row.status == "active" else []
+    models = (
+        get_provider_models(provider, plain_key, base_url=row.base_url)
+        if row.status == "active"
+        else []
+    )
     if models:
         try:
             save_model_capabilities(models)
@@ -97,20 +107,25 @@ def list_available_models(_: User = Depends(get_current_user)):
         models = []
         for row in active:
             plain_key = decrypt(row.encrypted_key)
-            models.extend(get_provider_models(row.provider, plain_key, base_url=row.base_url))
+            models.extend(
+                get_provider_models(row.provider, plain_key, base_url=row.base_url)
+            )
         return models
 
 
 @router.post("/providers/{provider}/key", status_code=201)
-def set_provider_key(provider: str, body: SetProviderKey,
-                     _: User = Depends(require_manager)):
+def set_provider_key(
+    provider: str, body: SetProviderKey, _: User = Depends(require_manager)
+):
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
 
     if provider in LOCAL_PROVIDERS:
         # Local providers: key is ignored, base_url is what matters
         plain_key = "local"
-        base_url = (body.base_url or "").strip() or PROVIDER_CONFIGS[provider].get("default_base_url", "")
+        base_url = (body.base_url or "").strip() or PROVIDER_CONFIGS[provider].get(
+            "default_base_url", ""
+        )
         valid = test_provider_key(provider, plain_key, base_url=base_url)
     else:
         plain_key = body.key.strip()
@@ -144,7 +159,12 @@ def set_provider_key(provider: str, body: SetProviderKey,
                 last_tested=now,
             )
             session.add(row)
-        log_action(session, "update" if is_update else "create", "provider_key", entity_name=provider)
+        log_action(
+            session,
+            "update" if is_update else "create",
+            "provider_key",
+            entity_name=provider,
+        )
         session.commit()
         session.refresh(row)
         return _provider_status_dict(row, provider, plain_key if valid else None)
@@ -174,7 +194,9 @@ def test_existing_key(provider: str, _: User = Depends(require_manager)):
     with get_session() as session:
         row = _provider_row(session, provider)
         if not row:
-            raise HTTPException(status_code=404, detail="No key configured for this provider")
+            raise HTTPException(
+                status_code=404, detail="No key configured for this provider"
+            )
 
         plain_key = decrypt(row.encrypted_key)
         if provider in LOCAL_PROVIDERS:
@@ -188,7 +210,13 @@ def test_existing_key(provider: str, _: User = Depends(require_manager)):
         row.status = "active" if valid else "invalid"
         row.last_tested = datetime.utcnow()
         session.add(row)
-        log_action(session, "test", "provider_key", entity_name=provider, details={"valid": valid})
+        log_action(
+            session,
+            "test",
+            "provider_key",
+            entity_name=provider,
+            details={"valid": valid},
+        )
         session.commit()
         session.refresh(row)
         return _provider_status_dict(row, provider, plain_key if valid else None)

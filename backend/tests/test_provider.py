@@ -1,18 +1,22 @@
 """Provider service unit tests + provider API endpoints."""
+
 from unittest.mock import MagicMock, patch
 
 from tests.conftest import make_provider_key
 
 # ── PROVIDER_CONFIGS completeness ─────────────────────────────────────────────
 
+
 def test_all_five_providers_present():
     from services.provider_service import PROVIDER_CONFIGS
+
     for p in ("anthropic", "openai", "google", "mistral", "qwen"):
         assert p in PROVIDER_CONFIGS, f"Missing provider: {p}"
 
 
 def test_each_provider_has_required_keys():
     from services.provider_service import PROVIDER_CONFIGS
+
     required = {"display_name", "url", "method", "headers", "models"}
     for name, cfg in PROVIDER_CONFIGS.items():
         missing = required - cfg.keys()
@@ -21,6 +25,7 @@ def test_each_provider_has_required_keys():
 
 def test_each_provider_has_models():
     from services.provider_service import PROVIDER_CONFIGS
+
     for name, cfg in PROVIDER_CONFIGS.items():
         assert len(cfg["models"]) >= 1, f"{name} has no models"
         for m in cfg["models"]:
@@ -29,11 +34,13 @@ def test_each_provider_has_models():
 
 def test_qwen_uses_dashscope_url():
     from services.provider_service import PROVIDER_CONFIGS
+
     assert "dashscope" in PROVIDER_CONFIGS["qwen"]["url"]
 
 
 def test_qwen_models():
     from services.provider_service import get_provider_models
+
     models = get_provider_models("qwen")
     ids = [m["id"] for m in models]
     assert "qwen-turbo" in ids
@@ -42,20 +49,24 @@ def test_qwen_models():
 
 # ── detect_provider ───────────────────────────────────────────────────────────
 
+
 def test_detect_google():
     from services.agent_runtime import detect_provider
+
     assert detect_provider("gemini-2.0-flash") == "google"
     assert detect_provider("gemini-2.5-pro") == "google"
 
 
 def test_detect_anthropic():
     from services.agent_runtime import detect_provider
+
     assert detect_provider("claude-sonnet-4-6") == "anthropic"
     assert detect_provider("claude-opus-4-7") == "anthropic"
 
 
 def test_detect_openai():
     from services.agent_runtime import detect_provider
+
     assert detect_provider("gpt-4o") == "openai"
     assert detect_provider("gpt-4o-mini") == "openai"
     assert detect_provider("o1-mini") == "openai"
@@ -64,6 +75,7 @@ def test_detect_openai():
 
 def test_detect_qwen():
     from services.agent_runtime import detect_provider
+
     assert detect_provider("qwen-max") == "qwen"
     assert detect_provider("qwen-turbo") == "qwen"
     assert detect_provider("qwen-plus") == "qwen"
@@ -72,6 +84,7 @@ def test_detect_qwen():
 
 def test_detect_unknown_defaults_to_google():
     from services.agent_runtime import detect_provider
+
     assert detect_provider("unknown-model-xyz") == "google"
     assert detect_provider("") == "google"
     assert detect_provider(None) == "google"
@@ -79,8 +92,10 @@ def test_detect_unknown_defaults_to_google():
 
 # ── test_provider_key (mocked HTTP) ──────────────────────────────────────────
 
+
 def test_valid_key_returns_true():
     from services.provider_service import test_provider_key
+
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     with patch("services.provider_service.httpx.Client") as mock_client_cls:
@@ -93,6 +108,7 @@ def test_valid_key_returns_true():
 
 def test_invalid_key_returns_false():
     from services.provider_service import test_provider_key
+
     mock_resp = MagicMock()
     mock_resp.status_code = 401
     with patch("services.provider_service.httpx.Client") as mock_client_cls:
@@ -105,6 +121,7 @@ def test_invalid_key_returns_false():
 
 def test_network_error_returns_false():
     from services.provider_service import test_provider_key
+
     with patch("services.provider_service.httpx.Client") as mock_client_cls:
         mock_client = MagicMock()
         mock_client_cls.return_value.__enter__.return_value = mock_client
@@ -115,10 +132,12 @@ def test_network_error_returns_false():
 
 def test_unknown_provider_returns_false():
     from services.provider_service import test_provider_key
+
     assert test_provider_key("nonexistent", "key") is False
 
 
 # ── Provider API endpoints ─────────────────────────────────────────────────────
+
 
 def test_get_provider_status(auth_client, db_session):
     r = auth_client.get("/providers/status")

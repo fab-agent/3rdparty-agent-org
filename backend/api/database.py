@@ -1,4 +1,5 @@
 """Database connection management — CRUD, schema discovery, semantic annotations, query."""
+
 import json
 import logging
 from datetime import datetime, timezone
@@ -24,16 +25,18 @@ router = APIRouter(prefix="/databases", tags=["databases"])
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+
 class DBCreate(BaseModel):
     name: str
-    db_type: str          # "sqlite" | "postgresql" | "mysql"
-    dsn: str              # plain connection string
+    db_type: str  # "sqlite" | "postgresql" | "mysql"
+    dsn: str  # plain connection string
     company_id: str | None = None
 
 
 class DBAnnotate(BaseModel):
     """Partial update: set semantic descriptions on tables/columns + example queries."""
-    schema_json: str | None = None    # full annotated schema JSON
+
+    schema_json: str | None = None  # full annotated schema JSON
     examples_json: str | None = None  # [{sql, description}]
 
 
@@ -83,6 +86,7 @@ def _to_resp(row: DatabaseConnection, include_schema: bool = False) -> DBRespons
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
+
 @router.get("/")
 def list_databases(
     company_id: str | None = None,
@@ -108,7 +112,9 @@ def get_database(db_id: str, _: User = Depends(get_current_user)) -> DBResponse:
 @router.post("/", status_code=201)
 def create_database(body: DBCreate, _: User = Depends(require_manager)) -> DBResponse:
     if body.db_type not in ("sqlite", "postgresql", "mysql"):
-        raise HTTPException(status_code=422, detail="db_type must be sqlite, postgresql, or mysql")
+        raise HTTPException(
+            status_code=422, detail="db_type must be sqlite, postgresql, or mysql"
+        )
 
     ok, err = test_connection(body.dsn, body.db_type)
     with get_session() as session:
@@ -123,9 +129,10 @@ def create_database(body: DBCreate, _: User = Depends(require_manager)) -> DBRes
         session.add(row)
         session.commit()
         session.refresh(row)
-        logger.info("Database connection created", extra={"extra": {
-            "id": row.id, "type": body.db_type, "ok": ok
-        }})
+        logger.info(
+            "Database connection created",
+            extra={"extra": {"id": row.id, "type": body.db_type, "ok": ok}},
+        )
         if not ok:
             logger.warning("DB connection failed", extra={"extra": {"error": err}})
         return _to_resp(row)
@@ -142,6 +149,7 @@ def delete_database(db_id: str, _: User = Depends(require_manager)):
 
 
 # ── Schema discovery ───────────────────────────────────────────────────────────
+
 
 @router.post("/{db_id}/discover")
 def discover(db_id: str, _: User = Depends(require_manager)) -> DBResponse:
@@ -167,7 +175,9 @@ def discover(db_id: str, _: User = Depends(require_manager)) -> DBResponse:
                         tdata["description"] = ex_t.get("description", "")
                         for cname, cdata in tdata["columns"].items():
                             if cname in ex_t.get("columns", {}):
-                                cdata["description"] = ex_t["columns"][cname].get("description", "")
+                                cdata["description"] = ex_t["columns"][cname].get(
+                                    "description", ""
+                                )
             except Exception:
                 pass
 
@@ -182,8 +192,11 @@ def discover(db_id: str, _: User = Depends(require_manager)) -> DBResponse:
 
 # ── Semantic annotations ───────────────────────────────────────────────────────
 
+
 @router.patch("/{db_id}/annotate")
-def annotate(db_id: str, body: DBAnnotate, _: User = Depends(require_manager)) -> DBResponse:
+def annotate(
+    db_id: str, body: DBAnnotate, _: User = Depends(require_manager)
+) -> DBResponse:
     """Save user-provided semantic descriptions and example queries."""
     with get_session() as session:
         row = session.get(DatabaseConnection, db_id)
@@ -201,6 +214,7 @@ def annotate(db_id: str, body: DBAnnotate, _: User = Depends(require_manager)) -
 
 # ── Query ─────────────────────────────────────────────────────────────────────
 
+
 @router.post("/query")
 def query(body: QueryRequest, _: User = Depends(get_current_user)) -> dict:
     """Execute a SELECT query against a configured database."""
@@ -212,9 +226,10 @@ def query(body: QueryRequest, _: User = Depends(get_current_user)) -> dict:
 
     try:
         result = execute_query(dsn, row.db_type, body.sql, limit=min(body.limit, 500))
-        logger.info("DB query executed", extra={"extra": {
-            "db_id": body.db_id, "rows": result["row_count"]
-        }})
+        logger.info(
+            "DB query executed",
+            extra={"extra": {"db_id": body.db_id, "rows": result["row_count"]}},
+        )
         return result
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -224,6 +239,7 @@ def query(body: QueryRequest, _: User = Depends(get_current_user)) -> dict:
 
 
 # ── Schema context (for agent tool injection) ──────────────────────────────────
+
 
 @router.get("/{db_id}/context")
 def schema_context(db_id: str, _: User = Depends(get_current_user)) -> dict:

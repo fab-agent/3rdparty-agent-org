@@ -22,7 +22,9 @@ router = APIRouter(tags=["sessions"])
 _session_queues: dict[str, "asyncio.Queue[dict | None]"] = {}
 
 
-def _session_to_dict(s: AgentSession, messages: list[SessionMessage] | None = None) -> dict:
+def _session_to_dict(
+    s: AgentSession, messages: list[SessionMessage] | None = None
+) -> dict:
     d = {
         "id": s.id,
         "personnel_id": s.personnel_id,
@@ -51,9 +53,13 @@ def _message_to_dict(m: SessionMessage) -> dict:
 
 # ── Session CRUD ──────────────────────────────────────────────────────────────
 
+
 @router.get("/sessions")
-def list_sessions(personnel_id: str | None = None, status: str | None = None,
-                  _: User = Depends(get_current_user)):
+def list_sessions(
+    personnel_id: str | None = None,
+    status: str | None = None,
+    _: User = Depends(get_current_user),
+):
     with get_session() as session:
         q = select(AgentSession).order_by(AgentSession.updated_at.desc())
         if personnel_id:
@@ -93,6 +99,7 @@ def create_session(body: SessionCreate, _: User = Depends(get_current_user)):
 
 # ── Memory ───────────────────────────────────────────────────────────────────
 
+
 @router.get("/sessions/memories")
 def list_memories(personnel_id: str | None = None, _: User = Depends(get_current_user)):
     with get_session() as session:
@@ -127,8 +134,11 @@ def get_session_detail(session_id: str, _: User = Depends(get_current_user)):
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
-async def close_session(session_id: str, background_tasks: BackgroundTasks,
-                        _: User = Depends(get_current_user)):
+async def close_session(
+    session_id: str,
+    background_tasks: BackgroundTasks,
+    _: User = Depends(get_current_user),
+):
     with get_session() as session:
         sess = session.get(AgentSession, session_id)
         if not sess:
@@ -141,6 +151,7 @@ async def close_session(session_id: str, background_tasks: BackgroundTasks,
 
 
 # ── Status polling (for reconnect after navigation away) ─────────────────────
+
 
 @router.get("/sessions/{session_id}/status")
 def get_session_status(session_id: str, _: User = Depends(get_current_user)):
@@ -163,9 +174,11 @@ def get_session_status(session_id: str, _: User = Depends(get_current_user)):
 
 # ── File upload ───────────────────────────────────────────────────────────────
 
+
 @router.post("/sessions/{session_id}/files")
-async def upload_file(session_id: str, file: UploadFile = File(...),
-                      _: User = Depends(get_current_user)):
+async def upload_file(
+    session_id: str, file: UploadFile = File(...), _: User = Depends(get_current_user)
+):
     """Upload a file (PDF or image) to be included in the next message."""
     with get_session() as db:
         sess = db.get(AgentSession, session_id)
@@ -201,14 +214,23 @@ async def upload_file(session_id: str, file: UploadFile = File(...),
         # Try to read as plain text
         try:
             text = content_bytes.decode("utf-8")
-            return {"type": "text", "filename": filename, "content": text, "mime_type": "text/plain"}
+            return {
+                "type": "text",
+                "filename": filename,
+                "content": text,
+                "mime_type": "text/plain",
+            }
         except UnicodeDecodeError:
-            raise HTTPException(status_code=400, detail="Desteklenmeyen dosya formatı. PDF veya görsel yükleyin.")
+            raise HTTPException(
+                status_code=400,
+                detail="Desteklenmeyen dosya formatı. PDF veya görsel yükleyin.",
+            )
 
 
 def _extract_pdf_text(content: bytes) -> str:
     try:
         import pypdf
+
         reader = pypdf.PdfReader(io.BytesIO(content))
         parts = []
         for page in reader.pages:
@@ -221,6 +243,7 @@ def _extract_pdf_text(content: bytes) -> str:
 
 
 # ── Background task runner ────────────────────────────────────────────────────
+
 
 async def _run_background(
     session_id: str,
@@ -275,9 +298,11 @@ async def _run_background(
 
 # ── Message streaming ─────────────────────────────────────────────────────────
 
+
 @router.post("/sessions/{session_id}/messages")
-async def send_message(session_id: str, body: MessageCreate,
-                       _: User = Depends(get_current_user)):
+async def send_message(
+    session_id: str, body: MessageCreate, _: User = Depends(get_current_user)
+):
     """
     Send a message and stream the response via SSE.
     The agent runs in a background task — navigation away does not kill the run.
@@ -290,7 +315,10 @@ async def send_message(session_id: str, body: MessageCreate,
         if sess.status == "closed":
             raise HTTPException(status_code=409, detail="Session is closed")
         if sess.status == "running":
-            raise HTTPException(status_code=409, detail="Session already running — check /status to poll")
+            raise HTTPException(
+                status_code=409,
+                detail="Session already running — check /status to poll",
+            )
 
     queue: asyncio.Queue[dict | None] = asyncio.Queue(maxsize=512)
     _session_queues[session_id] = queue

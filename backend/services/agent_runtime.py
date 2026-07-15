@@ -6,6 +6,7 @@ Supported providers (routed by model name prefix):
   claude-*   → Anthropic Claude
   gpt-*      → OpenAI GPT
 """
+
 import asyncio
 import json
 from collections.abc import AsyncGenerator
@@ -31,7 +32,10 @@ from services.memory_service import load_agent_memories
 
 # ── Attachment helpers ────────────────────────────────────────────────────────
 
-def _build_message_with_attachments(user_message: str, attachments: list[dict] | None) -> str:
+
+def _build_message_with_attachments(
+    user_message: str, attachments: list[dict] | None
+) -> str:
     """Prepend file attachment content to the user message for the LLM."""
     if not attachments:
         return user_message
@@ -54,6 +58,7 @@ def _build_message_with_attachments(user_message: str, attachments: list[dict] |
 
 
 # ── System prompt builder ─────────────────────────────────────────────────────
+
 
 def build_system_prompt(
     person: Personnel,
@@ -80,7 +85,9 @@ def build_system_prompt(
     if skills:
         active_skills = [s for s in skills if s.is_active]
         if active_skills:
-            lines.append("\nAvailable tools/skills: " + ", ".join(s.name for s in active_skills))
+            lines.append(
+                "\nAvailable tools/skills: " + ", ".join(s.name for s in active_skills)
+            )
 
     # Inject agent memory from past sessions
     try:
@@ -124,17 +131,32 @@ _BUILTIN_SCHEMAS: dict[str, dict] = {
     "delegate_to_agent": {
         "type": "object",
         "properties": {
-            "to_agent_slug": {"type": "string", "description": "Slug of the target agent personnel"},
-            "task": {"type": "string", "description": "Task description for the target agent"},
-            "context": {"type": "string", "description": "Additional context or data to pass"},
+            "to_agent_slug": {
+                "type": "string",
+                "description": "Slug of the target agent personnel",
+            },
+            "task": {
+                "type": "string",
+                "description": "Task description for the target agent",
+            },
+            "context": {
+                "type": "string",
+                "description": "Additional context or data to pass",
+            },
         },
         "required": ["to_agent_slug", "task"],
     },
     "journal_write": {
         "type": "object",
         "properties": {
-            "content": {"type": "string", "description": "Journal entry text (markdown supported)"},
-            "title": {"type": "string", "description": "Optional short title for the entry"},
+            "content": {
+                "type": "string",
+                "description": "Journal entry text (markdown supported)",
+            },
+            "title": {
+                "type": "string",
+                "description": "Optional short title for the entry",
+            },
         },
         "required": ["content"],
     },
@@ -148,15 +170,24 @@ _BUILTIN_SCHEMAS: dict[str, dict] = {
     "function": {
         "type": "object",
         "properties": {
-            "params": {"type": "string", "description": "JSON string of parameters to pass to the function"},
+            "params": {
+                "type": "string",
+                "description": "JSON string of parameters to pass to the function",
+            },
         },
         "required": [],
     },
     "instagram_post": {
         "type": "object",
         "properties": {
-            "image_url": {"type": "string", "description": "Public HTTPS URL of the image to post"},
-            "caption": {"type": "string", "description": "Post caption (hashtags allowed)"},
+            "image_url": {
+                "type": "string",
+                "description": "Public HTTPS URL of the image to post",
+            },
+            "caption": {
+                "type": "string",
+                "description": "Post caption (hashtags allowed)",
+            },
         },
         "required": ["image_url", "caption"],
     },
@@ -164,7 +195,10 @@ _BUILTIN_SCHEMAS: dict[str, dict] = {
         "type": "object",
         "properties": {
             "message": {"type": "string", "description": "Text message to send"},
-            "to": {"type": "string", "description": "Recipient phone number in E.164 format (optional — uses default if omitted)"},
+            "to": {
+                "type": "string",
+                "description": "Recipient phone number in E.164 format (optional — uses default if omitted)",
+            },
         },
         "required": ["message"],
     },
@@ -191,7 +225,9 @@ def build_tool_definitions(skills: list[Skill]) -> list[dict]:
             else:
                 parameters = {
                     "type": "object",
-                    "properties": {"input": {"type": "string", "description": "Tool input"}},
+                    "properties": {
+                        "input": {"type": "string", "description": "Tool input"}
+                    },
                     "required": ["input"],
                 }
         elif s.skill_type == "function":
@@ -208,33 +244,44 @@ def build_tool_definitions(skills: list[Skill]) -> list[dict]:
                 try:
                     from models import DatabaseConnection
                     from services.database_service import build_schema_context
+
                     with get_session() as _db:
                         db_row = _db.get(DatabaseConnection, db_id)
                     if db_row and db_row.schema_json:
-                        ctx = build_schema_context(db_row.schema_json, db_row.examples_json)
+                        ctx = build_schema_context(
+                            db_row.schema_json, db_row.examples_json
+                        )
                         description = f"{description}\n\n{ctx}"
                 except Exception:
                     pass
 
-        tools.append({
-            "name": s.name.replace(" ", "_").lower(),
-            "description": description,
-            "parameters": parameters,
-            "_skill_id": s.id,
-            "_skill_type": s.skill_type,
-            "_config": cfg,
-        })
+        tools.append(
+            {
+                "name": s.name.replace(" ", "_").lower(),
+                "description": description,
+                "parameters": parameters,
+                "_skill_id": s.id,
+                "_skill_type": s.skill_type,
+                "_config": cfg,
+            }
+        )
     return tools
 
 
 # ── Tool executor ─────────────────────────────────────────────────────────────
 
-async def execute_skill(tool_name: str, args: dict, skills: list[Skill], session_id: str | None = None, agent_id: str | None = None) -> str:
+
+async def execute_skill(
+    tool_name: str,
+    args: dict,
+    skills: list[Skill],
+    session_id: str | None = None,
+    agent_id: str | None = None,
+) -> str:
     """Find the matching skill and execute it."""
     normalized = tool_name.replace(" ", "_").lower()
     skill = next(
-        (s for s in skills if s.name.replace(" ", "_").lower() == normalized),
-        None
+        (s for s in skills if s.name.replace(" ", "_").lower() == normalized), None
     )
 
     if not skill:
@@ -245,7 +292,9 @@ async def execute_skill(tool_name: str, args: dict, skills: list[Skill], session
     try:
         if skill.skill_type == "builtin":
             fn_name = cfg.get("function_name", skill.name)
-            result = await execute_builtin(fn_name, args, session_id=session_id, agent_id=agent_id)
+            result = await execute_builtin(
+                fn_name, args, session_id=session_id, agent_id=agent_id
+            )
             return str(result)
 
         elif skill.skill_type == "mcp":
@@ -271,15 +320,23 @@ async def execute_skill(tool_name: str, args: dict, skills: list[Skill], session
         elif skill.skill_type == "function":
             # Inject the stored code into args so the builtin handler can run it
             code = cfg.get("code", "")
-            result = await execute_builtin("function", {**args, "__code__": code},
-                                           session_id=session_id, agent_id=agent_id)
+            result = await execute_builtin(
+                "function",
+                {**args, "__code__": code},
+                session_id=session_id,
+                agent_id=agent_id,
+            )
             return str(result)
 
         elif skill.skill_type == "database":
             # db_id stored in config; inject it so the builtin knows which DB to query
             db_id = cfg.get("db_id", "")
-            result = await execute_builtin("db_query", {**args, "db_id": db_id},
-                                           session_id=session_id, agent_id=agent_id)
+            result = await execute_builtin(
+                "db_query",
+                {**args, "db_id": db_id},
+                session_id=session_id,
+                agent_id=agent_id,
+            )
             return str(result)
 
     except Exception as e:
@@ -289,6 +346,7 @@ async def execute_skill(tool_name: str, args: dict, skills: list[Skill], session
 
 
 # ── Provider key retrieval ────────────────────────────────────────────────────
+
 
 def get_decrypted_key(provider: str) -> str | None:
     with get_session() as session:
@@ -323,6 +381,7 @@ def detect_provider(model: str) -> str:
 def is_image_gen_model(model: str) -> bool:
     """Check model type from the capabilities cache; fall back to prefix detection."""
     from services.provider_service import _infer_model_type, load_model_capabilities
+
     caps = load_model_capabilities()
     if model in caps:
         return caps[model] == "image"
@@ -330,6 +389,7 @@ def is_image_gen_model(model: str) -> bool:
 
 
 # ── Gemini streaming ──────────────────────────────────────────────────────────
+
 
 def _gemini_history(messages: list[SessionMessage]) -> list[dict]:
     """Convert stored messages to Gemini contents format."""
@@ -341,18 +401,22 @@ def _gemini_history(messages: list[SessionMessage]) -> list[dict]:
         if msg.tool_calls_json and role == "model":
             tool_calls = json.loads(msg.tool_calls_json)
             for tc in tool_calls:
-                parts.append({"function_call": {"name": tc["name"], "args": tc["args"]}})
+                parts.append(
+                    {"function_call": {"name": tc["name"], "args": tc["args"]}}
+                )
 
         if msg.tool_results_json and role == "user":
             # tool results are attached to the following user message as function_response
             tool_results = json.loads(msg.tool_results_json)
             for tr in tool_results:
-                parts.append({
-                    "function_response": {
-                        "name": tr["name"],
-                        "response": {"result": tr["result"]},
+                parts.append(
+                    {
+                        "function_response": {
+                            "name": tr["name"],
+                            "response": {"result": tr["result"]},
+                        }
                     }
-                })
+                )
 
         history.append({"role": role, "parts": parts})
     return history
@@ -414,10 +478,12 @@ async def _stream_gemini(
                 if hasattr(part, "text") and part.text:
                     text_parts.append(part.text)
                 elif hasattr(part, "function_call") and part.function_call:
-                    loop_tool_calls.append({
-                        "name": part.function_call.name,
-                        "args": dict(part.function_call.args),
-                    })
+                    loop_tool_calls.append(
+                        {
+                            "name": part.function_call.name,
+                            "args": dict(part.function_call.args),
+                        }
+                    )
 
         await asyncio.to_thread(_sync_call)
 
@@ -433,20 +499,26 @@ async def _stream_gemini(
         tool_response_parts = []
         for tc in loop_tool_calls:
             yield {"type": "tool_call", "name": tc["name"], "args": tc["args"]}
-            result = await execute_skill(tc["name"], tc["args"], skills, session_id=session_id, agent_id=agent_id)
+            result = await execute_skill(
+                tc["name"], tc["args"], skills, session_id=session_id, agent_id=agent_id
+            )
             yield {"type": "tool_result", "name": tc["name"], "result": result}
             all_tool_results.append({"name": tc["name"], "result": result})
-            tool_response_parts.append({
-                "function_response": {
-                    "name": tc["name"],
-                    "response": {"result": result},
+            tool_response_parts.append(
+                {
+                    "function_response": {
+                        "name": tc["name"],
+                        "response": {"result": result},
+                    }
                 }
-            })
+            )
 
         # Add model response and tool results to contents for next loop
         model_parts = []
         for tc in loop_tool_calls:
-            model_parts.append({"function_call": {"name": tc["name"], "args": tc["args"]}})
+            model_parts.append(
+                {"function_call": {"name": tc["name"], "args": tc["args"]}}
+            )
         contents.append({"role": "model", "parts": model_parts})
         contents.append({"role": "user", "parts": tool_response_parts})
 
@@ -460,6 +532,7 @@ async def _stream_gemini(
 def _schema_from_dict(d: dict) -> dict:
     """Convert a plain dict schema to keyword args for types.Schema."""
     from google.genai import types
+
     result: dict = {}
 
     type_map = {
@@ -479,8 +552,7 @@ def _schema_from_dict(d: dict) -> dict:
 
     if "properties" in d:
         result["properties"] = {
-            k: types.Schema(**_schema_from_dict(v))
-            for k, v in d["properties"].items()
+            k: types.Schema(**_schema_from_dict(v)) for k, v in d["properties"].items()
         }
 
     if "required" in d:
@@ -493,6 +565,7 @@ def _schema_from_dict(d: dict) -> dict:
 
 
 # ── Anthropic streaming ───────────────────────────────────────────────────────
+
 
 async def _stream_anthropic(
     model_name: str,
@@ -543,12 +616,16 @@ async def _stream_anthropic(
                 tools=ant_tools if ant_tools else [],
             )
             if resp.usage:
-                loop_tok[0] = (resp.usage.input_tokens or 0) + (resp.usage.output_tokens or 0)
+                loop_tok[0] = (resp.usage.input_tokens or 0) + (
+                    resp.usage.output_tokens or 0
+                )
             for block in resp.content:
                 if block.type == "text":
                     response_text = block.text
                 elif block.type == "tool_use":
-                    loop_tool_calls.append({"id": block.id, "name": block.name, "args": block.input})
+                    loop_tool_calls.append(
+                        {"id": block.id, "name": block.name, "args": block.input}
+                    )
 
         await asyncio.to_thread(_sync_call)
         total_tokens_anthropic += loop_tok[0]
@@ -560,22 +637,36 @@ async def _stream_anthropic(
             break
 
         all_tool_calls.extend(loop_tool_calls)
-        messages.append({"role": "assistant", "content": [
-            {"type": "tool_use", "id": tc["id"], "name": tc["name"], "input": tc["args"]}
-            for tc in loop_tool_calls
-        ]})
+        messages.append(
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": tc["id"],
+                        "name": tc["name"],
+                        "input": tc["args"],
+                    }
+                    for tc in loop_tool_calls
+                ],
+            }
+        )
 
         tool_result_blocks = []
         for tc in loop_tool_calls:
             yield {"type": "tool_call", "name": tc["name"], "args": tc["args"]}
-            result = await execute_skill(tc["name"], tc["args"], skills, session_id=session_id, agent_id=agent_id)
+            result = await execute_skill(
+                tc["name"], tc["args"], skills, session_id=session_id, agent_id=agent_id
+            )
             yield {"type": "tool_result", "name": tc["name"], "result": result}
             all_tool_results.append({"name": tc["name"], "result": result})
-            tool_result_blocks.append({
-                "type": "tool_result",
-                "tool_use_id": tc["id"],
-                "content": result,
-            })
+            tool_result_blocks.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tc["id"],
+                    "content": result,
+                }
+            )
 
         messages.append({"role": "user", "content": tool_result_blocks})
 
@@ -588,6 +679,7 @@ async def _stream_anthropic(
 
 
 # ── Image generation (Qwen wanx/qwen-image via DashScope task API, OpenAI dall-e) ────────
+
 
 def _qwen_task_base(stored_base_url: str | None) -> str:
     """Derive the DashScope root from the stored compatible-mode base_url."""
@@ -610,9 +702,16 @@ async def _generate_image_qwen(
 
     task_root = _qwen_task_base(stored_base_url)
     submit_url = f"{task_root}/api/v1/services/aigc/text2image/image-synthesis"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-               "X-DashScope-Async": "enable"}
-    body = {"model": model_name, "input": {"prompt": prompt}, "parameters": {"size": "1024*1024", "n": 1}}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "X-DashScope-Async": "enable",
+    }
+    body = {
+        "model": model_name,
+        "input": {"prompt": prompt},
+        "parameters": {"size": "1024*1024", "n": 1},
+    }
 
     def _submit():
         with httpx.Client(timeout=20) as c:
@@ -633,7 +732,9 @@ async def _generate_image_qwen(
             if status == "SUCCEEDED":
                 return data.get("output", {}).get("results", [])
             if status == "FAILED":
-                raise RuntimeError(data.get("output", {}).get("message", "Görev başarısız oldu"))
+                raise RuntimeError(
+                    data.get("output", {}).get("message", "Görev başarısız oldu")
+                )
         raise RuntimeError("Resim üretme zaman aşımına uğradı (90s)")
 
     try:
@@ -665,7 +766,9 @@ async def _generate_image_qwen(
             parts.append(f"![Üretilen resim]({img_url})")
         revised = img.get("actual_prompt", "")
         if revised and revised != prompt:
-            parts.append(f"\n<details><summary>Genişletilmiş prompt</summary>{revised}</details>")
+            parts.append(
+                f"\n<details><summary>Genişletilmiş prompt</summary>{revised}</details>"
+            )
 
     if not parts:
         yield {"type": "error", "message": "Resim üretilemedi: sonuç boş döndü"}
@@ -728,11 +831,14 @@ async def _generate_image(
 
         from database import get_session as _gs
         from models import ProviderKey as _PK
+
         with _gs() as _db:
             _row = _db.exec(_sel(_PK).where(_PK.provider == "qwen")).first()
             if _row:
                 stored_base_url = _row.base_url
-        async for ev in _generate_image_qwen(api_key, model_name, prompt, stored_base_url):
+        async for ev in _generate_image_qwen(
+            api_key, model_name, prompt, stored_base_url
+        ):
             yield ev
     else:
         async for ev in _generate_image_openai(api_key, model_name, prompt):
@@ -742,11 +848,12 @@ async def _generate_image(
 # ── OpenAI-compatible streaming (OpenAI + Qwen) ───────────────────────────────
 
 _OPENAI_BASE_URLS = {
-    "openai":    "https://api.openai.com/v1",
-    "qwen":      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-    "ollama":    "http://localhost:11434/v1",
-    "lmstudio":  "http://localhost:1234/v1",
+    "openai": "https://api.openai.com/v1",
+    "qwen": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "ollama": "http://localhost:11434/v1",
+    "lmstudio": "http://localhost:1234/v1",
 }
+
 
 async def _stream_openai_compatible(
     provider: str,
@@ -768,6 +875,7 @@ async def _stream_openai_compatible(
 
         from database import get_session as _gs
         from models import ProviderKey as _PK
+
         with _gs() as _db:
             _row = _db.exec(_sel(_PK).where(_PK.provider == "qwen")).first()
             if _row and _row.base_url:
@@ -803,25 +911,33 @@ async def _stream_openai_compatible(
 
         def _sync_call():
             nonlocal response_text, loop_tool_calls
-            kwargs: dict = {"model": model_name, "messages": messages, "max_tokens": 4096}
+            kwargs: dict = {
+                "model": model_name,
+                "messages": messages,
+                "max_tokens": 4096,
+            }
             if oai_tools:
                 kwargs["tools"] = oai_tools
             resp = client.chat.completions.create(**kwargs)
             if resp.usage:
                 t = getattr(resp.usage, "total_tokens", None)
                 if not t:
-                    t = (getattr(resp.usage, "prompt_tokens", 0) or 0) + (getattr(resp.usage, "completion_tokens", 0) or 0)
+                    t = (getattr(resp.usage, "prompt_tokens", 0) or 0) + (
+                        getattr(resp.usage, "completion_tokens", 0) or 0
+                    )
                 loop_tokens[0] = t or 0
             choice = resp.choices[0]
             if choice.message.content:
                 response_text = choice.message.content
             if choice.message.tool_calls:
                 for tc in choice.message.tool_calls:
-                    loop_tool_calls.append({
-                        "id": tc.id,
-                        "name": tc.function.name,
-                        "args": json.loads(tc.function.arguments or "{}"),
-                    })
+                    loop_tool_calls.append(
+                        {
+                            "id": tc.id,
+                            "name": tc.function.name,
+                            "args": json.loads(tc.function.arguments or "{}"),
+                        }
+                    )
 
         await asyncio.to_thread(_sync_call)
         accumulated_tokens += loop_tokens[0]
@@ -833,22 +949,44 @@ async def _stream_openai_compatible(
             break
 
         all_tool_calls.extend(loop_tool_calls)
-        messages.append({"role": "assistant", "tool_calls": [
-            {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": json.dumps(tc["args"])}}
-            for tc in loop_tool_calls
-        ]})
+        messages.append(
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": json.dumps(tc["args"]),
+                        },
+                    }
+                    for tc in loop_tool_calls
+                ],
+            }
+        )
 
         for tc in loop_tool_calls:
             yield {"type": "tool_call", "name": tc["name"], "args": tc["args"]}
-            result = await execute_skill(tc["name"], tc["args"], skills, session_id=session_id, agent_id=agent_id)
+            result = await execute_skill(
+                tc["name"], tc["args"], skills, session_id=session_id, agent_id=agent_id
+            )
             yield {"type": "tool_result", "name": tc["name"], "result": result}
             all_tool_results.append({"name": tc["name"], "result": result})
-            messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+            messages.append(
+                {"role": "tool", "tool_call_id": tc["id"], "content": result}
+            )
 
-    yield {"type": "_meta", "tool_calls": all_tool_calls, "tool_results": all_tool_results, "tokens_used": accumulated_tokens}
+    yield {
+        "type": "_meta",
+        "tool_calls": all_tool_calls,
+        "tool_results": all_tool_results,
+        "tokens_used": accumulated_tokens,
+    }
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
+
 
 async def run_session(
     session_id: str,
@@ -878,10 +1016,17 @@ async def run_session(
             select(AgentConfig).where(AgentConfig.personnel_id == person.id)
         ).first()
         if not cfg:
-            yield {"type": "error", "message": "Agent config not found — this person has no AI model configured"}
+            yield {
+                "type": "error",
+                "message": "Agent config not found — this person has no AI model configured",
+            }
             return
 
-        dept = session.get(Department, person.department_id) if person.department_id else None
+        dept = (
+            session.get(Department, person.department_id)
+            if person.department_id
+            else None
+        )
         skills = session.exec(select(Skill).where(Skill.agent_id == cfg.id)).all()
         history_rows = session.exec(
             select(SessionMessage)
@@ -914,7 +1059,9 @@ async def run_session(
                 policy_names.append(p.name)
                 seen_ids.add(p.id)
 
-        system_prompt = build_system_prompt(person, dept, list(skills), policy_names or None)
+        system_prompt = build_system_prompt(
+            person, dept, list(skills), policy_names or None
+        )
         tool_defs = build_tool_definitions(list(skills))
 
         # Persist user message (display original text; full_message goes to LLM)
@@ -938,7 +1085,10 @@ async def run_session(
         provider = detect_provider(model_name)
         api_key = get_decrypted_key(provider)
         if not api_key:
-            yield {"type": "error", "message": f"No active API key for provider '{provider}'. Please configure it in Settings → AI Sağlayıcılar."}
+            yield {
+                "type": "error",
+                "message": f"No active API key for provider '{provider}'. Please configure it in Settings → AI Sağlayıcılar.",
+            }
             return
 
         gemini_history = _gemini_history(list(history_rows))
@@ -951,11 +1101,42 @@ async def run_session(
     if is_image_gen_model(model_name):
         gen = _generate_image(provider, model_name, api_key, full_message)
     elif provider == "google":
-        gen = _stream_gemini(model_name, api_key, system_prompt, gemini_history, full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
+        gen = _stream_gemini(
+            model_name,
+            api_key,
+            system_prompt,
+            gemini_history,
+            full_message,
+            tool_defs,
+            list(skills),
+            session_id=session_id,
+            agent_id=person.id,
+        )
     elif provider == "anthropic":
-        gen = _stream_anthropic(model_name, api_key, system_prompt, list(history_rows), full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
+        gen = _stream_anthropic(
+            model_name,
+            api_key,
+            system_prompt,
+            list(history_rows),
+            full_message,
+            tool_defs,
+            list(skills),
+            session_id=session_id,
+            agent_id=person.id,
+        )
     elif provider in _OPENAI_BASE_URLS:
-        gen = _stream_openai_compatible(provider, model_name, api_key, system_prompt, list(history_rows), full_message, tool_defs, list(skills), session_id=session_id, agent_id=person.id)
+        gen = _stream_openai_compatible(
+            provider,
+            model_name,
+            api_key,
+            system_prompt,
+            list(history_rows),
+            full_message,
+            tool_defs,
+            list(skills),
+            session_id=session_id,
+            agent_id=person.id,
+        )
     else:
         yield {"type": "error", "message": f"Provider '{provider}' desteklenmiyor"}
         return
@@ -978,7 +1159,9 @@ async def run_session(
             role="assistant",
             content="".join(full_text_parts),
             tool_calls_json=json.dumps(all_tool_calls) if all_tool_calls else None,
-            tool_results_json=json.dumps(all_tool_results) if all_tool_results else None,
+            tool_results_json=json.dumps(all_tool_results)
+            if all_tool_results
+            else None,
             tokens_used=tokens_used if tokens_used else None,
         )
         session.add(asst_msg)
@@ -986,6 +1169,7 @@ async def run_session(
         sess = session.get(AgentSession, session_id)
         if sess:
             from datetime import datetime
+
             sess.updated_at = datetime.utcnow()
             session.add(sess)
 

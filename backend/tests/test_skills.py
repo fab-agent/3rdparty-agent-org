@@ -1,9 +1,11 @@
 """
 Company skill CRUD and agent-assignment tests.
 """
+
 from tests.conftest import make_agent_config, make_personnel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _create_skill(client, company_id, **overrides):
     payload = {
@@ -19,6 +21,7 @@ def _create_skill(client, company_id, **overrides):
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
+
 def test_create_skill_201(auth_client):
     co = auth_client._test_company
     r = _create_skill(auth_client, co.id)
@@ -32,22 +35,30 @@ def test_create_skill_201(auth_client):
 
 
 def test_create_skill_requires_auth(client):
-    r = client.post("/company-skills", json={
-        "company_id": "x", "name": "X", "slug": "x", "skill_type": "builtin"
-    })
+    r = client.post(
+        "/company-skills",
+        json={"company_id": "x", "name": "X", "slug": "x", "skill_type": "builtin"},
+    )
     assert r.status_code == 401
 
 
 def test_create_skill_with_content(auth_client):
     co = auth_client._test_company
-    r = _create_skill(auth_client, co.id, name="Custom Skill", slug="custom",
-                      skill_type="custom", content="Do something useful")
+    r = _create_skill(
+        auth_client,
+        co.id,
+        name="Custom Skill",
+        slug="custom",
+        skill_type="custom",
+        content="Do something useful",
+    )
     assert r.status_code == 201
     assert r.json()["content"] == "Do something useful"
     assert r.json()["skill_type"] == "custom"
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 
 def test_list_skills_empty(auth_client):
     r = auth_client.get(f"/company-skills?company_id={auth_client._test_company.id}")
@@ -76,6 +87,7 @@ def test_list_skills_no_filter(auth_client):
 
 # ── Get ───────────────────────────────────────────────────────────────────────
 
+
 def test_get_skill(auth_client):
     co = auth_client._test_company
     skill_id = _create_skill(auth_client, co.id).json()["id"]
@@ -90,6 +102,7 @@ def test_get_skill_not_found(auth_client):
 
 
 # ── Update ────────────────────────────────────────────────────────────────────
+
 
 def test_update_skill(auth_client):
     co = auth_client._test_company
@@ -129,6 +142,7 @@ def test_update_skill_propose_cr(auth_client, db_session):
 
 # ── Delete ────────────────────────────────────────────────────────────────────
 
+
 def test_delete_skill(auth_client):
     co = auth_client._test_company
     skill_id = _create_skill(auth_client, co.id).json()["id"]
@@ -143,6 +157,7 @@ def test_delete_skill_not_found(auth_client):
 
 
 # ── Assign / Unassign ─────────────────────────────────────────────────────────
+
 
 def test_assign_skill_to_agent(auth_client, db_session):
     co = auth_client._test_company

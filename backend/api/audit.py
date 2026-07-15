@@ -1,4 +1,5 @@
 """Audit log API — read-only, admin/executive only in production."""
+
 import json
 from datetime import datetime
 

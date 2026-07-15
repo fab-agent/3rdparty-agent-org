@@ -2,6 +2,7 @@
 Flow CRUD and run tests.
 _reload_flow_schedules is wrapped in try/except in flows.py so no mock needed.
 """
+
 from unittest.mock import patch
 
 from tests.conftest import (
@@ -11,6 +12,7 @@ from tests.conftest import (
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _make_flow(client, company_id, personnel_id, **overrides):
     payload = {
@@ -32,6 +34,7 @@ def _flow_setup(auth_client, db_session):
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
+
 def test_create_flow_201(auth_client, db_session):
     company_id, personnel_id = _flow_setup(auth_client, db_session)
     r = _make_flow(auth_client, company_id, personnel_id)
@@ -48,9 +51,15 @@ def test_create_flow_requires_auth(client, db_session):
     u = make_user(db_session, email="u@t.com")
     p = make_personnel(db_session, co.id, name="B", slug="b")
     db_session.commit()
-    r = client.post(f"/flows?company_id={co.id}", json={
-        "personnel_id": p.id, "name": "X", "schedule": "* * * * *", "prompt": "go"
-    })
+    r = client.post(
+        f"/flows?company_id={co.id}",
+        json={
+            "personnel_id": p.id,
+            "name": "X",
+            "schedule": "* * * * *",
+            "prompt": "go",
+        },
+    )
     assert r.status_code == 401
 
 
@@ -62,6 +71,7 @@ def test_create_flow_disabled(auth_client, db_session):
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 
 def test_list_flows_empty(auth_client, db_session):
     company_id, _ = _flow_setup(auth_client, db_session)
@@ -91,6 +101,7 @@ def test_list_flows_without_company_filter(auth_client, db_session):
 
 # ── Get ───────────────────────────────────────────────────────────────────────
 
+
 def test_get_flow(auth_client, db_session):
     company_id, personnel_id = _flow_setup(auth_client, db_session)
     created = _make_flow(auth_client, company_id, personnel_id).json()
@@ -106,6 +117,7 @@ def test_get_flow_not_found(auth_client):
 
 
 # ── Update ────────────────────────────────────────────────────────────────────
+
 
 def test_update_flow_name(auth_client, db_session):
     company_id, personnel_id = _flow_setup(auth_client, db_session)
@@ -130,6 +142,7 @@ def test_update_flow_not_found(auth_client):
 
 # ── Delete ────────────────────────────────────────────────────────────────────
 
+
 def test_delete_flow(auth_client, db_session):
     company_id, personnel_id = _flow_setup(auth_client, db_session)
     flow_id = _make_flow(auth_client, company_id, personnel_id).json()["id"]
@@ -144,6 +157,7 @@ def test_delete_flow_not_found(auth_client):
 
 
 # ── Manual run ────────────────────────────────────────────────────────────────
+
 
 def test_run_flow_now(auth_client, db_session):
     company_id, personnel_id = _flow_setup(auth_client, db_session)

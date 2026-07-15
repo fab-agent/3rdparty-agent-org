@@ -1,7 +1,7 @@
-
 from pydantic import BaseModel, field_validator
 
 # ── Auth ────────────────────────────────────────────────────────────────────────
+
 
 class LoginRequest(BaseModel):
     email: str
@@ -58,6 +58,7 @@ class InviteRequest(BaseModel):
 
 # ── Company ────────────────────────────────────────────────────────────────────
 
+
 class CompanyCreate(BaseModel):
     name: str
     slug: str
@@ -77,6 +78,7 @@ class CompanyUpdate(BaseModel):
 
 
 # ── Department ─────────────────────────────────────────────────────────────────
+
 
 class DepartmentCreate(BaseModel):
     name: str
@@ -113,6 +115,7 @@ class DepartmentUpdate(BaseModel):
 
 
 # ── Personnel ──────────────────────────────────────────────────────────────────
+
 
 class PersonnelCreate(BaseModel):
     name: str
@@ -153,6 +156,7 @@ class PersonnelUpdate(BaseModel):
 
 # ── AgentConfig ────────────────────────────────────────────────────────────────
 
+
 class AgentConfigCreate(BaseModel):
     model: str
     model_version: str | None = None
@@ -185,35 +189,44 @@ class AgentConfigUpdate(BaseModel):
 
 SKILL_TYPES = ("builtin", "mcp", "http", "function")
 
+
 class McpConfig(BaseModel):
     """Config for skill_type='mcp'"""
-    transport: str = "sse"           # sse | stdio | http
-    url: str                          # MCP server URL
-    auth_type: str = "none"          # none | api_key | bearer | oauth2
+
+    transport: str = "sse"  # sse | stdio | http
+    url: str  # MCP server URL
+    auth_type: str = "none"  # none | api_key | bearer | oauth2
     auth_value: str | None = None  # stored encrypted in config_json
+
 
 class HttpConfig(BaseModel):
     """Config for skill_type='http'"""
+
     url: str
     method: str = "POST"
     headers: dict[str, str] = {}
     input_schema: dict | None = None
 
+
 class BuiltinConfig(BaseModel):
     """Config for skill_type='builtin'"""
+
     function_name: str  # web_search | code_execution | file_read | text_to_chart
+
 
 class FunctionConfig(BaseModel):
     """Config for skill_type='function'"""
+
     language: str = "python"
     code: str
+
 
 class SkillCreate(BaseModel):
     name: str
     version: str
     description: str | None = None
     skill_type: str = "builtin"
-    config: dict | None = None    # typed per skill_type, stored as config_json
+    config: dict | None = None  # typed per skill_type, stored as config_json
     is_active: bool = True
 
     @field_validator("skill_type")
@@ -222,6 +235,7 @@ class SkillCreate(BaseModel):
         if v not in SKILL_TYPES:
             raise ValueError(f"skill_type must be one of {SKILL_TYPES}")
         return v
+
 
 class SkillUpdate(BaseModel):
     name: str | None = None
@@ -234,6 +248,7 @@ class SkillUpdate(BaseModel):
 
 # ── Provider ───────────────────────────────────────────────────────────────────
 
+
 class SetProviderKey(BaseModel):
     key: str
     base_url: str | None = None
@@ -244,6 +259,7 @@ class ConfigPatch(BaseModel):
 
 
 # ── Git ────────────────────────────────────────────────────────────────────────
+
 
 class GitConfigCreate(BaseModel):
     provider: str
@@ -274,15 +290,16 @@ class PushRequest(BaseModel):
 
 # ── Sessions ───────────────────────────────────────────────────────────────────
 
+
 class SessionCreate(BaseModel):
     personnel_id: str
     title: str | None = None
 
 
 class Attachment(BaseModel):
-    type: str        # "pdf" | "image"
+    type: str  # "pdf" | "image"
     filename: str
-    content: str     # extracted text for PDF, base64 data URI for image
+    content: str  # extracted text for PDF, base64 data URI for image
     mime_type: str | None = None
 
 
@@ -293,17 +310,19 @@ class MessageCreate(BaseModel):
 
 # ── Policy links ───────────────────────────────────────────────────────────────
 
+
 class PolicyLinkSet(BaseModel):
     policy_ids: list[str]
 
 
 # ── Change Request ─────────────────────────────────────────────────────────────
 
+
 class ChangeRequestCreate(BaseModel):
     personnel_id: str
-    change_type: str     # "agent_config" | "skill" | "policy"
+    change_type: str  # "agent_config" | "skill" | "policy"
     title: str
-    proposed: dict       # will be JSON-serialized
+    proposed: dict  # will be JSON-serialized
     original: dict | None = None
 
 
@@ -316,6 +335,7 @@ class ChangeRequestReject(BaseModel):
 
 
 # ── A2A ────────────────────────────────────────────────────────────────────────
+
 
 class A2ARequestCreate(BaseModel):
     from_session_id: str | None = None

@@ -5,6 +5,7 @@ Lifecycle:
   submitted → dept_head_approved → admin_approved → committed
            ↘ rejected (at any stage by the responsible stage)
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +13,7 @@ import pytest
 from tests.conftest import make_personnel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _post_cr(client, company_id, personnel_id, **overrides):
     """POST /change-requests with sensible defaults."""
@@ -46,17 +48,25 @@ def _admin_reject(client, cr_id, note="Rejected"):
 
 # ── Fixture ───────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 def cr_setup(auth_client, db_session):
     """Company + one agent personnel ready to receive change requests."""
     co = auth_client._test_company
-    agent = make_personnel(db_session, co.id, name="ChangeBot",
-                           slug="changebot", type="agent", title="Test Agent")
+    agent = make_personnel(
+        db_session,
+        co.id,
+        name="ChangeBot",
+        slug="changebot",
+        type="agent",
+        title="Test Agent",
+    )
     db_session.commit()
     return {"company_id": co.id, "personnel_id": agent.id}
 
 
 # ── Create ────────────────────────────────────────────────────────────────────
+
 
 def test_create_cr_returns_submitted(auth_client, cr_setup):
     r = _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"])
@@ -74,7 +84,9 @@ def test_create_cr_returns_submitted(auth_client, cr_setup):
 
 def test_create_cr_with_original_snapshot(auth_client, cr_setup):
     r = _post_cr(
-        auth_client, cr_setup["company_id"], cr_setup["personnel_id"],
+        auth_client,
+        cr_setup["company_id"],
+        cr_setup["personnel_id"],
         change_type="agent_config",
         title="Switch model",
         proposed={"model": "claude-sonnet-4-6"},
@@ -88,7 +100,9 @@ def test_create_cr_with_original_snapshot(auth_client, cr_setup):
 
 def test_create_cr_policy_type(auth_client, cr_setup):
     r = _post_cr(
-        auth_client, cr_setup["company_id"], cr_setup["personnel_id"],
+        auth_client,
+        cr_setup["company_id"],
+        cr_setup["personnel_id"],
         change_type="policy",
         title="No PII logging policy",
         proposed={"content": "Agents must not log PII."},
@@ -104,8 +118,11 @@ def test_create_cr_invalid_personnel(auth_client, cr_setup):
 
 # ── Get & List ────────────────────────────────────────────────────────────────
 
+
 def test_get_cr_by_id(auth_client, cr_setup):
-    created = _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"]).json()
+    created = _post_cr(
+        auth_client, cr_setup["company_id"], cr_setup["personnel_id"]
+    ).json()
     r = auth_client.get(f"/change-requests/{created['id']}")
     assert r.status_code == 200
     assert r.json()["id"] == created["id"]
@@ -118,8 +135,12 @@ def test_get_cr_not_found(auth_client):
 
 
 def test_list_crs_returns_all(auth_client, cr_setup):
-    _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="CR 1")
-    _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="CR 2")
+    _post_cr(
+        auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="CR 1"
+    )
+    _post_cr(
+        auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="CR 2"
+    )
     r = auth_client.get("/change-requests")
     assert r.status_code == 200
     assert len(r.json()) >= 2
@@ -147,14 +168,19 @@ def test_list_filter_by_personnel(auth_client, cr_setup):
 
 
 def test_list_ordered_newest_first(auth_client, cr_setup):
-    _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="First")
-    _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="Second")
+    _post_cr(
+        auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="First"
+    )
+    _post_cr(
+        auth_client, cr_setup["company_id"], cr_setup["personnel_id"], title="Second"
+    )
     crs = auth_client.get("/change-requests").json()
     # Most recently created should appear first
     assert crs[0]["title"] == "Second"
 
 
 # ── Stage 1: Dept Head Approval ───────────────────────────────────────────────
+
 
 def test_dept_approve_transitions_status(auth_client, cr_setup):
     cr = _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"]).json()
@@ -208,6 +234,7 @@ def test_dept_reject_wrong_status_returns_400(auth_client, cr_setup):
 
 # ── Stage 2: Admin Approval ───────────────────────────────────────────────────
 
+
 def test_admin_approve_without_git_config(auth_client, cr_setup):
     """No GitConfig → status=committed but commit_sha is None."""
     cr = _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"]).json()
@@ -259,6 +286,7 @@ def test_admin_reject_wrong_status_returns_400(auth_client, cr_setup):
 
 # ── GitHub commit integration ─────────────────────────────────────────────────
 
+
 def test_admin_approve_with_git_config_commits(auth_client, cr_setup, db_session):
     """With a GitConfig present, admin approve should call commit_change_request."""
     from core.security import encrypt
@@ -274,12 +302,18 @@ def test_admin_approve_with_git_config_commits(auth_client, cr_setup, db_session
     db_session.add(git_cfg)
     db_session.commit()
 
-    cr = _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"],
-                  title="Policy: no PII").json()
+    cr = _post_cr(
+        auth_client,
+        cr_setup["company_id"],
+        cr_setup["personnel_id"],
+        title="Policy: no PII",
+    ).json()
     _dept_approve(auth_client, cr["id"])
 
-    with patch("api.change_requests.commit_change_request",
-               return_value=("deadbeef", "https://github.com/test/repo/commit/deadbeef")):
+    with patch(
+        "api.change_requests.commit_change_request",
+        return_value=("deadbeef", "https://github.com/test/repo/commit/deadbeef"),
+    ):
         r = _admin_approve(auth_client, cr["id"], cr_setup["company_id"])
 
     d = r.json()
@@ -303,14 +337,21 @@ def test_admin_approve_commit_failure_saved_in_note(auth_client, cr_setup, db_se
     db_session.add(git_cfg)
     db_session.commit()
 
-    cr = _post_cr(auth_client, cr_setup["company_id"], cr_setup["personnel_id"],
-                  title="Failing CR").json()
+    cr = _post_cr(
+        auth_client,
+        cr_setup["company_id"],
+        cr_setup["personnel_id"],
+        title="Failing CR",
+    ).json()
     _dept_approve(auth_client, cr["id"])
 
-    with patch("api.change_requests.commit_change_request",
-               side_effect=Exception("GitHub rate limit exceeded")):
-        r = _admin_approve(auth_client, cr["id"], cr_setup["company_id"],
-                           note="Approved despite error")
+    with patch(
+        "api.change_requests.commit_change_request",
+        side_effect=Exception("GitHub rate limit exceeded"),
+    ):
+        r = _admin_approve(
+            auth_client, cr["id"], cr_setup["company_id"], note="Approved despite error"
+        )
 
     d = r.json()
     assert d["status"] == "admin_approved"
@@ -321,10 +362,13 @@ def test_admin_approve_commit_failure_saved_in_note(auth_client, cr_setup, db_se
 
 # ── Full happy-path flows ─────────────────────────────────────────────────────
 
+
 def test_full_flow_no_git(auth_client, cr_setup):
     """submitted → dept_head_approved → committed (no git config)."""
     cr = _post_cr(
-        auth_client, cr_setup["company_id"], cr_setup["personnel_id"],
+        auth_client,
+        cr_setup["company_id"],
+        cr_setup["personnel_id"],
         change_type="policy",
         title="Data retention policy",
         proposed={"retention_days": 90},
@@ -335,7 +379,9 @@ def test_full_flow_no_git(auth_client, cr_setup):
     r = _dept_approve(auth_client, cr["id"], note="Reviewed and approved")
     assert r.json()["status"] == "dept_head_approved"
 
-    r = _admin_approve(auth_client, cr["id"], cr_setup["company_id"], note="Final sign-off")
+    r = _admin_approve(
+        auth_client, cr["id"], cr_setup["company_id"], note="Final sign-off"
+    )
     d = r.json()
     assert d["status"] == "committed"
     assert d["dept_head_note"] == "Reviewed and approved"
@@ -348,17 +394,21 @@ def test_full_flow_with_github_commit(auth_client, cr_setup, db_session):
     from core.security import encrypt
     from models import GitConfig
 
-    db_session.add(GitConfig(
-        company_id=cr_setup["company_id"],
-        provider="github",
-        repo_url="https://github.com/fab/org",
-        branch="main",
-        encrypted_token=encrypt("ghp_test"),
-    ))
+    db_session.add(
+        GitConfig(
+            company_id=cr_setup["company_id"],
+            provider="github",
+            repo_url="https://github.com/fab/org",
+            branch="main",
+            encrypted_token=encrypt("ghp_test"),
+        )
+    )
     db_session.commit()
 
     cr = _post_cr(
-        auth_client, cr_setup["company_id"], cr_setup["personnel_id"],
+        auth_client,
+        cr_setup["company_id"],
+        cr_setup["personnel_id"],
         change_type="agent_config",
         title="Upgrade agent model",
         proposed={"model": "claude-opus-4-8"},
@@ -367,8 +417,10 @@ def test_full_flow_with_github_commit(auth_client, cr_setup, db_session):
 
     _dept_approve(auth_client, cr["id"])
 
-    with patch("api.change_requests.commit_change_request",
-               return_value=("c0ffee42", "https://github.com/fab/org/commit/c0ffee42")):
+    with patch(
+        "api.change_requests.commit_change_request",
+        return_value=("c0ffee42", "https://github.com/fab/org/commit/c0ffee42"),
+    ):
         r = _admin_approve(auth_client, cr["id"], cr_setup["company_id"])
 
     d = r.json()

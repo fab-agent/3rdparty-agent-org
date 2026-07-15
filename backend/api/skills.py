@@ -230,7 +230,9 @@ def delete_skill(skill_id: str, _: User = Depends(require_manager)):
 
 
 @router.post("/company-skills/{skill_id}/assign/{agent_config_id}", status_code=201)
-def assign_skill(skill_id: str, agent_config_id: str, _: User = Depends(require_manager)):
+def assign_skill(
+    skill_id: str, agent_config_id: str, _: User = Depends(require_manager)
+):
     with get_session() as session:
         if not session.get(CompanySkill, skill_id):
             raise HTTPException(status_code=404, detail="Skill not found")
@@ -243,14 +245,18 @@ def assign_skill(skill_id: str, agent_config_id: str, _: User = Depends(require_
         ).first()
         if existing:
             return {"status": "already_assigned"}
-        link = AgentSkillLink(agent_config_id=agent_config_id, company_skill_id=skill_id)
+        link = AgentSkillLink(
+            agent_config_id=agent_config_id, company_skill_id=skill_id
+        )
         session.add(link)
         session.commit()
         return {"status": "assigned"}
 
 
 @router.delete("/company-skills/{skill_id}/assign/{agent_config_id}", status_code=204)
-def unassign_skill(skill_id: str, agent_config_id: str, _: User = Depends(require_manager)):
+def unassign_skill(
+    skill_id: str, agent_config_id: str, _: User = Depends(require_manager)
+):
     with get_session() as session:
         link = session.exec(
             select(AgentSkillLink)

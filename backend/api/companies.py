@@ -11,7 +11,13 @@ from schemas import CompanyCreate, CompanyUpdate
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
-_ROLE_WEIGHT = {"founder": 5, "executive": 4, "dept_head": 3, "agent_owner": 2, "user": 1}
+_ROLE_WEIGHT = {
+    "founder": 5,
+    "executive": 4,
+    "dept_head": 3,
+    "agent_owner": 2,
+    "user": 1,
+}
 
 
 def _parse_meta(company: Company) -> dict:
@@ -48,10 +54,10 @@ def _company_to_dict(company: Company, session) -> dict:
             "personnel": personnel_count,
             "agents": agent_count,
         },
-        "vision":  meta.get("vision"),
+        "vision": meta.get("vision"),
         "mission": meta.get("mission"),
-        "values":  meta.get("values", []),
-        "goals":   meta.get("goals", []),
+        "values": meta.get("values", []),
+        "goals": meta.get("goals", []),
     }
 
 
@@ -79,12 +85,16 @@ def create_company(body: CompanyCreate, current_user: User = Depends(get_current
         )
         session.add(company)
         session.flush()
-        session.add(CompanyMember(
-            user_id=current_user.id,
-            company_id=company.id,
-            role="founder",
-        ))
-        log_action(session, "create", "company", entity_id=company.id, entity_name=company.name)
+        session.add(
+            CompanyMember(
+                user_id=current_user.id,
+                company_id=company.id,
+                role="founder",
+            )
+        )
+        log_action(
+            session, "create", "company", entity_id=company.id, entity_name=company.name
+        )
         session.commit()
         session.refresh(company)
         return _company_to_dict(company, session)
@@ -101,30 +111,44 @@ def get_company(company_id: str, current_user: User = Depends(get_current_user))
 
 
 @router.patch("/{company_id}")
-def update_company(company_id: str, body: CompanyUpdate, current_user: User = Depends(get_current_user)):
+def update_company(
+    company_id: str, body: CompanyUpdate, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         member = check_company_membership(current_user.id, company_id, session)
         if _ROLE_WEIGHT.get(member.role, 0) < _ROLE_WEIGHT["executive"]:
-            raise HTTPException(status_code=403, detail="Bu işlem için yönetici yetkisi gerekli")
+            raise HTTPException(
+                status_code=403, detail="Bu işlem için yönetici yetkisi gerekli"
+            )
         company = session.get(Company, company_id)
         if not company:
             raise HTTPException(status_code=404, detail="Company not found")
-        if body.name is not None:    company.name    = body.name
-        if body.slug is not None:    company.slug    = body.slug
-        if body.sector is not None:  company.sector  = body.sector
-        if body.website is not None: company.website = body.website
+        if body.name is not None:
+            company.name = body.name
+        if body.slug is not None:
+            company.slug = body.slug
+        if body.sector is not None:
+            company.sector = body.sector
+        if body.website is not None:
+            company.website = body.website
         # Persist metadata fields
         meta_patch = {}
-        if body.vision  is not None: meta_patch["vision"]  = body.vision
-        if body.mission is not None: meta_patch["mission"] = body.mission
-        if body.values  is not None: meta_patch["values"]  = body.values
-        if body.goals   is not None: meta_patch["goals"]   = body.goals
+        if body.vision is not None:
+            meta_patch["vision"] = body.vision
+        if body.mission is not None:
+            meta_patch["mission"] = body.mission
+        if body.values is not None:
+            meta_patch["values"] = body.values
+        if body.goals is not None:
+            meta_patch["goals"] = body.goals
         if meta_patch:
             meta = _parse_meta(company)
             meta.update(meta_patch)
             company.metadata_json = json.dumps(meta, ensure_ascii=False)
         session.add(company)
-        log_action(session, "update", "company", entity_id=company.id, entity_name=company.name)
+        log_action(
+            session, "update", "company", entity_id=company.id, entity_name=company.name
+        )
         session.commit()
         session.refresh(company)
         return _company_to_dict(company, session)
@@ -135,10 +159,14 @@ def delete_company(company_id: str, current_user: User = Depends(get_current_use
     with get_session() as session:
         member = check_company_membership(current_user.id, company_id, session)
         if member.role != "founder":
-            raise HTTPException(status_code=403, detail="Sadece kurucu şirketi silebilir")
+            raise HTTPException(
+                status_code=403, detail="Sadece kurucu şirketi silebilir"
+            )
         company = session.get(Company, company_id)
         if not company:
             raise HTTPException(status_code=404, detail="Company not found")
-        log_action(session, "delete", "company", entity_id=company.id, entity_name=company.name)
+        log_action(
+            session, "delete", "company", entity_id=company.id, entity_name=company.name
+        )
         session.delete(company)
         session.commit()

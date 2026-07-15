@@ -1,4 +1,5 @@
 """Social media credential management + publish endpoints."""
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,10 +14,10 @@ logger = logging.getLogger("app")
 router = APIRouter(prefix="/social-media", tags=["social-media"])
 
 # AppConfig keys
-_IG_USER_ID  = "sm_ig_user_id"
-_IG_TOKEN    = "sm_ig_access_token_enc"
+_IG_USER_ID = "sm_ig_user_id"
+_IG_TOKEN = "sm_ig_access_token_enc"
 _WA_PHONE_ID = "sm_wa_phone_number_id"
-_WA_TOKEN    = "sm_wa_access_token_enc"
+_WA_TOKEN = "sm_wa_access_token_enc"
 _WA_DEFAULT_TO = "sm_wa_default_to"
 
 
@@ -36,12 +37,13 @@ def _set(session, key: str, value: str) -> None:
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+
 class SocialConfig(BaseModel):
     ig_user_id: str | None = None
-    ig_access_token: str | None = None       # plain on write
+    ig_access_token: str | None = None  # plain on write
     wa_phone_number_id: str | None = None
-    wa_access_token: str | None = None        # plain on write
-    wa_default_to: str | None = None          # default WhatsApp recipient
+    wa_access_token: str | None = None  # plain on write
+    wa_default_to: str | None = None  # default WhatsApp recipient
 
 
 class SocialConfigResponse(BaseModel):
@@ -59,18 +61,19 @@ class InstagramPostRequest(BaseModel):
 
 class WhatsAppMessageRequest(BaseModel):
     message: str
-    to: str | None = None   # overrides default_to if provided
+    to: str | None = None  # overrides default_to if provided
 
 
 # ── Config endpoints ───────────────────────────────────────────────────────────
+
 
 @router.get("/config", response_model=SocialConfigResponse)
 def get_social_config(_: User = Depends(get_current_user)):
     with get_session() as session:
         ig_user_id = _get(session, _IG_USER_ID)
-        ig_token   = _get(session, _IG_TOKEN)
-        wa_phone   = _get(session, _WA_PHONE_ID)
-        wa_token   = _get(session, _WA_TOKEN)
+        ig_token = _get(session, _IG_TOKEN)
+        wa_phone = _get(session, _WA_PHONE_ID)
+        wa_token = _get(session, _WA_TOKEN)
         wa_default = _get(session, _WA_DEFAULT_TO)
     return SocialConfigResponse(
         instagram_configured=bool(ig_user_id and ig_token),
@@ -111,8 +114,11 @@ def delete_social_config(_: User = Depends(require_manager)):
 
 # ── Publish endpoints ─────────────────────────────────────────────────────────
 
+
 @router.post("/instagram/post")
-async def instagram_post(body: InstagramPostRequest, _: User = Depends(get_current_user)):
+async def instagram_post(
+    body: InstagramPostRequest, _: User = Depends(get_current_user)
+):
     """Publish a photo post to the configured Instagram Business account."""
     with get_session() as session:
         ig_user_id = _get(session, _IG_USER_ID)
@@ -122,6 +128,7 @@ async def instagram_post(body: InstagramPostRequest, _: User = Depends(get_curre
         raise HTTPException(status_code=422, detail="Instagram yapılandırılmamış.")
 
     from services.social_media import instagram_post_photo
+
     try:
         result = await instagram_post_photo(
             ig_user_id=ig_user_id,
@@ -129,7 +136,9 @@ async def instagram_post(body: InstagramPostRequest, _: User = Depends(get_curre
             image_url=body.image_url,
             caption=body.caption,
         )
-        logger.info("Instagram post published", extra={"extra": {"media_id": result.get("id")}})
+        logger.info(
+            "Instagram post published", extra={"extra": {"media_id": result.get("id")}}
+        )
         return result
     except Exception as e:
         logger.error("Instagram post failed", extra={"extra": {"error": str(e)}})
@@ -137,7 +146,9 @@ async def instagram_post(body: InstagramPostRequest, _: User = Depends(get_curre
 
 
 @router.post("/whatsapp/send")
-async def whatsapp_send(body: WhatsAppMessageRequest, _: User = Depends(get_current_user)):
+async def whatsapp_send(
+    body: WhatsAppMessageRequest, _: User = Depends(get_current_user)
+):
     """Send a WhatsApp message via Meta Cloud API."""
     with get_session() as session:
         wa_phone = _get(session, _WA_PHONE_ID)
@@ -152,6 +163,7 @@ async def whatsapp_send(body: WhatsAppMessageRequest, _: User = Depends(get_curr
         raise HTTPException(status_code=422, detail="Alıcı numarası belirtilmemiş.")
 
     from services.social_media import whatsapp_send_message
+
     try:
         result = await whatsapp_send_message(
             phone_number_id=wa_phone,

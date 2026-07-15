@@ -1,6 +1,7 @@
 """
 Task request routing, creation, run (mocked LLM), and rejection tests.
 """
+
 from unittest.mock import patch
 
 import models
@@ -14,6 +15,7 @@ from tests.conftest import (
 
 # ── Setup helper ──────────────────────────────────────────────────────────────
 
+
 def _full_agent_setup(auth_client, db_session):
     """
     Creates a responsible human personnel linked to auth_client._test_user,
@@ -24,15 +26,19 @@ def _full_agent_setup(auth_client, db_session):
     user = auth_client._test_user
 
     # Responsible person (linked to the test user)
-    responsible = make_personnel(db_session, co.id, name="Responsible Human",
-                                 slug="responsible-h", type="human")
+    responsible = make_personnel(
+        db_session, co.id, name="Responsible Human", slug="responsible-h", type="human"
+    )
     responsible.user_id = user.id
     db_session.add(responsible)
 
     # Agent
-    agent = make_personnel(db_session, co.id, name="TaskBot", slug="taskbot", type="agent")
-    cfg = make_agent_config(db_session, agent.id, model="gpt-4o-mini",
-                            responsible_id=responsible.id)
+    agent = make_personnel(
+        db_session, co.id, name="TaskBot", slug="taskbot", type="agent"
+    )
+    cfg = make_agent_config(
+        db_session, agent.id, model="gpt-4o-mini", responsible_id=responsible.id
+    )
     make_provider_key(db_session, provider="openai")
     db_session.commit()
     return co.id, agent.id, responsible.id, cfg.id
@@ -49,6 +55,7 @@ def _post_task(client, company_id, **overrides):
 
 
 # ── Create ────────────────────────────────────────────────────────────────────
+
 
 def test_create_task_no_agent(auth_client):
     co = auth_client._test_company
@@ -70,9 +77,9 @@ def test_create_task_with_agent_assigned(auth_client, db_session):
 
 
 def test_create_task_requires_auth(client):
-    r = client.post("/task-requests", json={
-        "company_id": "x", "title": "T", "body": "B"
-    })
+    r = client.post(
+        "/task-requests", json={"company_id": "x", "title": "T", "body": "B"}
+    )
     assert r.status_code == 401
 
 
@@ -80,8 +87,10 @@ def test_create_task_with_skill_filter(auth_client, db_session):
     company_id, _, _, cfg_id = _full_agent_setup(auth_client, db_session)
     # Add a skill to the agent
     skill = models.CompanySkill(
-        company_id=company_id, name="data_analysis",
-        slug="data-analysis", skill_type="builtin",
+        company_id=company_id,
+        name="data_analysis",
+        slug="data-analysis",
+        skill_type="builtin",
     )
     db_session.add(skill)
     db_session.flush()
@@ -105,6 +114,7 @@ def test_create_task_skill_filter_no_match(auth_client, db_session):
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
+
 def test_list_task_requests(auth_client, db_session):
     company_id, _, _, _ = _full_agent_setup(auth_client, db_session)
     _post_task(auth_client, company_id, title="Task 1")
@@ -125,6 +135,7 @@ def test_list_task_requests_by_status(auth_client, db_session):
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
+
 
 def test_run_task_completes(auth_client, db_session):
     company_id, _, _, _ = _full_agent_setup(auth_client, db_session)
@@ -154,7 +165,9 @@ def test_run_task_delivers_inbox_message(auth_client, db_session):
 def test_run_task_not_responsible(auth_client, db_session):
     co = auth_client._test_company
     # Agent with no responsible user → responsible_user_id=None on the task
-    agent = make_personnel(db_session, co.id, name="NoResp", slug="no-resp", type="agent")
+    agent = make_personnel(
+        db_session, co.id, name="NoResp", slug="no-resp", type="agent"
+    )
     make_agent_config(db_session, agent.id, model="gpt-4o-mini")
     db_session.commit()
 
@@ -198,12 +211,15 @@ def test_run_task_llm_error_reverts_to_assigned(auth_client, db_session):
 
 # ── Reject ────────────────────────────────────────────────────────────────────
 
+
 def test_reject_task(auth_client, db_session):
     company_id, _, _, _ = _full_agent_setup(auth_client, db_session)
     task = _post_task(auth_client, company_id).json()
 
-    r = auth_client.post(f"/task-requests/{task['id']}/reject",
-                         json={"human_note": "Not enough context."})
+    r = auth_client.post(
+        f"/task-requests/{task['id']}/reject",
+        json={"human_note": "Not enough context."},
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "rejected"
@@ -215,7 +231,9 @@ def test_reject_task_not_responsible(auth_client, db_session):
     # Make a task where responsible is another user
     other_user = make_user(db_session, email="resp_owner@t.com")
     make_member(db_session, other_user.id, co.id)
-    responsible = make_personnel(db_session, co.id, name="Owner", slug="owner-p", type="human")
+    responsible = make_personnel(
+        db_session, co.id, name="Owner", slug="owner-p", type="human"
+    )
     responsible.user_id = other_user.id
     db_session.add(responsible)
     agent = make_personnel(db_session, co.id, name="Bot", slug="bot-t", type="agent")

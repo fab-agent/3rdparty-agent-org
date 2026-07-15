@@ -22,7 +22,9 @@ from models import (
 )
 
 
-def _generate_image_sync(model: str, prompt: str, api_key: str, base_url: str | None = None) -> str:
+def _generate_image_sync(
+    model: str, prompt: str, api_key: str, base_url: str | None = None
+) -> str:
     """Synchronous image generation via DashScope task API or OpenAI images endpoint."""
     import time
 
@@ -37,10 +39,22 @@ def _generate_image_sync(model: str, prompt: str, api_key: str, base_url: str | 
             if root.endswith(sfx):
                 root = root[: -len(sfx)]
                 break
-        headers = {"Authorization": f"Bearer {api_key}", "X-DashScope-Async": "enable", "Content-Type": "application/json"}
-        payload = {"model": model, "input": {"prompt": prompt}, "parameters": {"size": "1024*1024", "n": 1}}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "X-DashScope-Async": "enable",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": model,
+            "input": {"prompt": prompt},
+            "parameters": {"size": "1024*1024", "n": 1},
+        }
         with httpx.Client(timeout=30) as client:
-            r = client.post(f"{root}/api/v1/services/aigc/text2image/image-synthesis", headers=headers, json=payload)
+            r = client.post(
+                f"{root}/api/v1/services/aigc/text2image/image-synthesis",
+                headers=headers,
+                json=payload,
+            )
             r.raise_for_status()
             task_id = r.json().get("output", {}).get("task_id")
         if not task_id:
@@ -65,17 +79,25 @@ def _generate_image_sync(model: str, prompt: str, api_key: str, base_url: str | 
 
     # OpenAI images endpoint (dall-e-*)
     import openai
+
     img_base = base_url or "https://api.openai.com/v1"
     client = openai.OpenAI(api_key=api_key, base_url=img_base)
     resp = client.images.generate(model=model, prompt=prompt, n=1, size="1024x1024")
     urls = [d.url for d in resp.data if d.url]
-    return "\n".join(f"![Üretilen görsel]({u})" for u in urls) if urls else "Görsel URL alınamadı."
+    return (
+        "\n".join(f"![Üretilen görsel]({u})" for u in urls)
+        if urls
+        else "Görsel URL alınamadı."
+    )
 
 
-def _call_llm(provider: str, model: str, system_prompt: str, user_prompt: str, api_key: str) -> str:
+def _call_llm(
+    provider: str, model: str, system_prompt: str, user_prompt: str, api_key: str
+) -> str:
     """Single-turn LLM call. Returns response text."""
     if provider == "anthropic":
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model=model,
@@ -87,6 +109,7 @@ def _call_llm(provider: str, model: str, system_prompt: str, user_prompt: str, a
 
     elif provider == "openai":
         import openai
+
         client = openai.OpenAI(api_key=api_key)
         resp = client.chat.completions.create(
             model=model,
@@ -100,6 +123,7 @@ def _call_llm(provider: str, model: str, system_prompt: str, user_prompt: str, a
 
     elif provider == "google":
         from google import genai
+
         client = genai.Client(api_key=api_key)
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
         resp = client.models.generate_content(model=model, contents=full_prompt)
@@ -111,13 +135,24 @@ def _call_llm(provider: str, model: str, system_prompt: str, user_prompt: str, a
 
         from database import get_session as _get_session
         from models import ProviderKey as _PK
+
         base_url = None
         with _get_session() as _sess:
-            pk = _sess.exec(_select(_PK).where(_PK.provider == provider).where(_PK.status == "active")).first()
+            pk = _sess.exec(
+                _select(_PK)
+                .where(_PK.provider == provider)
+                .where(_PK.status == "active")
+            ).first()
             if pk and pk.base_url:
-                base_url = f"{pk.base_url}/v1" if not pk.base_url.endswith("/v1") else pk.base_url
+                base_url = (
+                    f"{pk.base_url}/v1"
+                    if not pk.base_url.endswith("/v1")
+                    else pk.base_url
+                )
         if provider == "qwen":
-            base_url = base_url or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+            base_url = (
+                base_url or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+            )
         elif provider == "mistral":
             base_url = "https://api.mistral.ai/v1"
         client = openai.OpenAI(api_key=api_key, base_url=base_url)
@@ -149,7 +184,9 @@ def _get_anthropic_tool_definitions(skills: list) -> list[dict]:
             "description": "Search the web for information",
             "input_schema": {
                 "type": "object",
-                "properties": {"query": {"type": "string", "description": "Search query"}},
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"}
+                },
                 "required": ["query"],
             },
         },
@@ -173,6 +210,7 @@ def _get_anthropic_tool_definitions(skills: list) -> list[dict]:
         cfg = {}
         if s.config_json:
             import json as _json
+
             try:
                 cfg = _json.loads(s.config_json)
             except Exception:
@@ -182,21 +220,34 @@ def _get_anthropic_tool_definitions(skills: list) -> list[dict]:
             if fn_name in _BUILTIN_TOOLS:
                 tools.append({"name": fn_name, **_BUILTIN_TOOLS[fn_name]})
             else:
-                tools.append({
-                    "name": fn_name,
-                    "description": s.description or s.name,
-                    "input_schema": {"type": "object", "properties": {}, "required": []},
-                })
+                tools.append(
+                    {
+                        "name": fn_name,
+                        "description": s.description or s.name,
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {},
+                            "required": [],
+                        },
+                    }
+                )
         elif s.skill_type == "http" and cfg.get("url"):
-            tools.append({
-                "name": s.name.lower().replace(" ", "_"),
-                "description": s.description or s.name,
-                "input_schema": {
-                    "type": "object",
-                    "properties": {"input": {"type": "string", "description": "Input to the tool"}},
-                    "required": ["input"],
-                },
-            })
+            tools.append(
+                {
+                    "name": s.name.lower().replace(" ", "_"),
+                    "description": s.description or s.name,
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "input": {
+                                "type": "string",
+                                "description": "Input to the tool",
+                            }
+                        },
+                        "required": ["input"],
+                    },
+                }
+            )
     return tools
 
 
@@ -207,6 +258,7 @@ def _execute_flow_tool(tool_name: str, tool_input: dict) -> str:
             import asyncio
 
             from services.mcp_client import execute_builtin
+
             result = asyncio.run(execute_builtin("web_search", tool_input))
             return str(result)
         except Exception as e:
@@ -227,6 +279,7 @@ def _call_llm_with_tools(
         return _call_llm(provider, model, system_prompt, user_prompt, api_key)
 
     import anthropic
+
     client = anthropic.Anthropic(api_key=api_key)
     messages = [{"role": "user", "content": user_prompt}]
 
@@ -250,15 +303,20 @@ def _call_llm_with_tools(
         for block in resp.content:
             if block.type == "tool_use":
                 result_text = _execute_flow_tool(block.name, block.input)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result_text,
-                })
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result_text,
+                    }
+                )
         messages.append({"role": "user", "content": tool_results})
 
     # Fallback: extract any text from last response
-    return "".join(block.text for block in resp.content if hasattr(block, "text")) or "[max tool iterations reached]"
+    return (
+        "".join(block.text for block in resp.content if hasattr(block, "text"))
+        or "[max tool iterations reached]"
+    )
 
 
 def _find_responsible_user_id(session: Session, agent_cfg: AgentConfig) -> str | None:
@@ -284,11 +342,14 @@ def _find_admin_user_id(session: Session, company_id: str) -> str | None:
     return None
 
 
-def _notify_flow_telegram(company_id: str, flow_name: str, agent_name: str, output: str) -> None:
+def _notify_flow_telegram(
+    company_id: str, flow_name: str, agent_name: str, output: str
+) -> None:
     """Send flow result to Telegram admin chat."""
     try:
         from core.security import decrypt as _decrypt
         from models import TelegramConfig
+
         with get_session() as s:
             cfg = s.exec(
                 select(TelegramConfig)
@@ -303,10 +364,10 @@ def _notify_flow_telegram(company_id: str, flow_name: str, agent_name: str, outp
         text = (
             f"📊 <b>[Akış Tamamlandı]</b> {flow_name}\n"
             f"🤖 Ajan: <b>{agent_name}</b>\n\n"
-            f"{preview}"
-            + (" <i>…(devamı var)</i>" if len(output) > 600 else "")
+            f"{preview}" + (" <i>…(devamı var)</i>" if len(output) > 600 else "")
         )
         import httpx as _httpx
+
         with _httpx.Client(timeout=10) as c:
             c.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
@@ -337,19 +398,33 @@ def run_flow(flow_id: str) -> None:
             # Get provider key — prefer agent's model provider
             def _infer_prov(model: str) -> str:
                 m = (model or "").lower()
-                if m.startswith("claude"): return "anthropic"
-                if m.startswith(("gpt-", "o1", "o3", "dall-e")): return "openai"
-                if m.startswith("gemini"): return "google"
-                if m.startswith(("mistral", "codestral")): return "mistral"
-                if m.startswith(("qwen", "wanx", "flux")): return "qwen"
+                if m.startswith("claude"):
+                    return "anthropic"
+                if m.startswith(("gpt-", "o1", "o3", "dall-e")):
+                    return "openai"
+                if m.startswith("gemini"):
+                    return "google"
+                if m.startswith(("mistral", "codestral")):
+                    return "mistral"
+                if m.startswith(("qwen", "wanx", "flux")):
+                    return "qwen"
                 return ""
+
             agent_prov = _infer_prov(agent_cfg.model or "")
             provider_key = None
-            for prov in ([agent_prov] if agent_prov else []) + ["anthropic", "openai", "google", "mistral", "qwen"]:
+            for prov in ([agent_prov] if agent_prov else []) + [
+                "anthropic",
+                "openai",
+                "google",
+                "mistral",
+                "qwen",
+            ]:
                 if not prov:
                     continue
                 pk = session.exec(
-                    select(ProviderKey).where(ProviderKey.provider == prov).where(ProviderKey.status == "active")
+                    select(ProviderKey)
+                    .where(ProviderKey.provider == prov)
+                    .where(ProviderKey.status == "active")
                 ).first()
                 if pk:
                     provider_key = pk
@@ -363,11 +438,15 @@ def run_flow(flow_id: str) -> None:
 
             # Load agent skills for tool use
             from sqlmodel import select as sql_select
+
             skills = session.exec(
-                sql_select(Skill).where(Skill.agent_id == agent_cfg.id).where(Skill.is_active == True)
+                sql_select(Skill)
+                .where(Skill.agent_id == agent_cfg.id)
+                .where(Skill.is_active == True)
             ).all()
 
             from services.agent_runtime import is_image_gen_model as _is_img
+
             if _is_img(agent_cfg.model or ""):
                 output = _generate_image_sync(
                     model=agent_cfg.model,
@@ -376,7 +455,11 @@ def run_flow(flow_id: str) -> None:
                     base_url=provider_key.base_url,
                 )
             else:
-                tools = _get_anthropic_tool_definitions(list(skills)) if provider_key.provider == "anthropic" else []
+                tools = (
+                    _get_anthropic_tool_definitions(list(skills))
+                    if provider_key.provider == "anthropic"
+                    else []
+                )
                 output = _call_llm_with_tools(
                     provider=provider_key.provider,
                     model=agent_cfg.model,

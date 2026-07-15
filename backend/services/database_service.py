@@ -7,6 +7,7 @@ Provides:
   - Semantic annotation storage/retrieval
   - Safe SELECT-only query execution
 """
+
 import json
 import re
 from typing import Any
@@ -86,7 +87,10 @@ def discover_schema(dsn: str, db_type: str) -> dict:
         row_count = 0
         try:
             with engine.connect() as conn:
-                row_count = conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"')).scalar() or 0
+                row_count = (
+                    conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"')).scalar()
+                    or 0
+                )
         except Exception:
             pass
 
@@ -136,7 +140,11 @@ def build_schema_context(schema_json: str, examples_json: str | None = None) -> 
     for tname, tdata in schema.get("tables", {}).items():
         tdesc = tdata.get("description", "")
         row_count = tdata.get("row_count", 0)
-        lines.append(f"### `{tname}`" + (f" — {tdesc}" if tdesc else "") + f" ({row_count:,} rows)")
+        lines.append(
+            f"### `{tname}`"
+            + (f" — {tdesc}" if tdesc else "")
+            + f" ({row_count:,} rows)"
+        )
 
         for cname, cdata in tdata.get("columns", {}).items():
             flags = []
@@ -148,7 +156,10 @@ def build_schema_context(schema_json: str, examples_json: str | None = None) -> 
                 flags.append("NOT NULL")
             flag_str = f" [{', '.join(flags)}]" if flags else ""
             cdesc = cdata.get("description", "")
-            lines.append(f"  - `{cname}` {cdata.get('type', '')} {flag_str}" + (f" — {cdesc}" if cdesc else ""))
+            lines.append(
+                f"  - `{cname}` {cdata.get('type', '')} {flag_str}"
+                + (f" — {cdesc}" if cdesc else "")
+            )
 
         lines.append("")
 
@@ -174,9 +185,12 @@ _FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 
+
 def _assert_select_only(sql: str) -> None:
     stripped = sql.strip()
-    if not stripped.upper().startswith("SELECT") and not stripped.upper().startswith("WITH"):
+    if not stripped.upper().startswith("SELECT") and not stripped.upper().startswith(
+        "WITH"
+    ):
         raise ValueError("Only SELECT (and CTE WITH ... SELECT) queries are allowed.")
     if _FORBIDDEN.search(stripped):
         raise ValueError("Query contains forbidden keyword.")

@@ -28,27 +28,37 @@ def _to_dict(m: InboxMessage) -> dict:
 def list_inbox(
     company_id: str | None = None,
     unread_only: bool = False,
-    period: str | None = None,   # "week" | "month"
+    period: str | None = None,  # "week" | "month"
     current_user: User = Depends(get_current_user),
 ):
     with get_session() as session:
-        q = select(InboxMessage).where(InboxMessage.recipient_user_id == current_user.id)
+        q = select(InboxMessage).where(
+            InboxMessage.recipient_user_id == current_user.id
+        )
         if company_id:
             q = q.where(InboxMessage.company_id == company_id)
         if unread_only:
             q = q.where(InboxMessage.read == False)
         if period == "week":
             from datetime import timedelta
-            q = q.where(InboxMessage.created_at >= datetime.utcnow() - timedelta(days=7))
+
+            q = q.where(
+                InboxMessage.created_at >= datetime.utcnow() - timedelta(days=7)
+            )
         elif period == "month":
             from datetime import timedelta
-            q = q.where(InboxMessage.created_at >= datetime.utcnow() - timedelta(days=30))
+
+            q = q.where(
+                InboxMessage.created_at >= datetime.utcnow() - timedelta(days=30)
+            )
         q = q.order_by(InboxMessage.created_at.desc())
         return [_to_dict(m) for m in session.exec(q).all()]
 
 
 @router.get("/unread-count")
-def unread_count(company_id: str | None = None, current_user: User = Depends(get_current_user)):
+def unread_count(
+    company_id: str | None = None, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         q = select(func.count()).where(
             InboxMessage.recipient_user_id == current_user.id,
@@ -74,7 +84,9 @@ def mark_read(msg_id: str, current_user: User = Depends(get_current_user)):
 
 
 @router.post("/read-all")
-def mark_all_read(company_id: str | None = None, current_user: User = Depends(get_current_user)):
+def mark_all_read(
+    company_id: str | None = None, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         q = select(InboxMessage).where(
             InboxMessage.recipient_user_id == current_user.id,

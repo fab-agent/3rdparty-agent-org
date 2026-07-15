@@ -16,7 +16,7 @@ class FlowCreate(BaseModel):
     personnel_id: str
     name: str
     description: str | None = None
-    schedule: str       # cron: "0 9 * * 1-5"
+    schedule: str  # cron: "0 9 * * 1-5"
     prompt: str
     enabled: bool = True
 
@@ -48,12 +48,16 @@ def _to_dict(f: Flow) -> dict:
 
 
 @router.get("")
-def list_flows(company_id: str | None = None, current_user: User = Depends(get_current_user)):
+def list_flows(
+    company_id: str | None = None, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         q = select(Flow)
         if company_id:
             q = q.where(Flow.company_id == company_id)
-        return [_to_dict(f) for f in session.exec(q.order_by(Flow.created_at.desc())).all()]
+        return [
+            _to_dict(f) for f in session.exec(q.order_by(Flow.created_at.desc())).all()
+        ]
 
 
 @router.get("/{flow_id}")
@@ -66,7 +70,9 @@ def get_flow(flow_id: str, current_user: User = Depends(get_current_user)):
 
 
 @router.post("", status_code=201)
-def create_flow(body: FlowCreate, company_id: str, current_user: User = Depends(get_current_user)):
+def create_flow(
+    body: FlowCreate, company_id: str, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         flow = Flow(
             company_id=company_id,
@@ -80,12 +86,21 @@ def create_flow(body: FlowCreate, company_id: str, current_user: User = Depends(
             updated_at=datetime.utcnow(),
         )
         session.add(flow)
-        log_action(session, "create", "flow", entity_id=flow.id, entity_name=flow.name, company_id=flow.company_id, user_id=current_user.id)
+        log_action(
+            session,
+            "create",
+            "flow",
+            entity_id=flow.id,
+            entity_name=flow.name,
+            company_id=flow.company_id,
+            user_id=current_user.id,
+        )
         session.commit()
         session.refresh(flow)
         # Reload scheduler
         try:
             from main import _reload_flow_schedules
+
             _reload_flow_schedules()
         except Exception:
             pass
@@ -93,23 +108,39 @@ def create_flow(body: FlowCreate, company_id: str, current_user: User = Depends(
 
 
 @router.patch("/{flow_id}")
-def update_flow(flow_id: str, body: FlowUpdate, current_user: User = Depends(get_current_user)):
+def update_flow(
+    flow_id: str, body: FlowUpdate, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         flow = session.get(Flow, flow_id)
         if not flow:
             raise HTTPException(status_code=404, detail="Flow not found")
-        if body.name is not None:        flow.name = body.name
-        if body.description is not None: flow.description = body.description
-        if body.schedule is not None:    flow.schedule = body.schedule
-        if body.prompt is not None:      flow.prompt = body.prompt
-        if body.enabled is not None:     flow.enabled = body.enabled
+        if body.name is not None:
+            flow.name = body.name
+        if body.description is not None:
+            flow.description = body.description
+        if body.schedule is not None:
+            flow.schedule = body.schedule
+        if body.prompt is not None:
+            flow.prompt = body.prompt
+        if body.enabled is not None:
+            flow.enabled = body.enabled
         flow.updated_at = datetime.utcnow()
         session.add(flow)
-        log_action(session, "update", "flow", entity_id=flow.id, entity_name=flow.name, company_id=flow.company_id, user_id=current_user.id)
+        log_action(
+            session,
+            "update",
+            "flow",
+            entity_id=flow.id,
+            entity_name=flow.name,
+            company_id=flow.company_id,
+            user_id=current_user.id,
+        )
         session.commit()
         session.refresh(flow)
         try:
             from main import _reload_flow_schedules
+
             _reload_flow_schedules()
         except Exception:
             pass
@@ -122,11 +153,20 @@ def delete_flow(flow_id: str, current_user: User = Depends(get_current_user)):
         flow = session.get(Flow, flow_id)
         if not flow:
             raise HTTPException(status_code=404, detail="Flow not found")
-        log_action(session, "delete", "flow", entity_id=flow.id, entity_name=flow.name, company_id=flow.company_id, user_id=current_user.id)
+        log_action(
+            session,
+            "delete",
+            "flow",
+            entity_id=flow.id,
+            entity_name=flow.name,
+            company_id=flow.company_id,
+            user_id=current_user.id,
+        )
         session.delete(flow)
         session.commit()
         try:
             from main import _reload_flow_schedules
+
             _reload_flow_schedules()
         except Exception:
             pass
@@ -136,6 +176,7 @@ def delete_flow(flow_id: str, current_user: User = Depends(get_current_user)):
 def run_flow_now(flow_id: str, current_user: User = Depends(get_current_user)):
     """Manually trigger a flow immediately."""
     from services.flow_runner import run_flow
+
     with get_session() as session:
         flow = session.get(Flow, flow_id)
         if not flow:
@@ -143,6 +184,15 @@ def run_flow_now(flow_id: str, current_user: User = Depends(get_current_user)):
     run_flow(flow_id)
     with get_session() as session:
         flow = session.get(Flow, flow_id)
-        log_action(session, "run", "flow", entity_id=flow.id, entity_name=flow.name, company_id=flow.company_id, user_id=current_user.id, details={"status": flow.last_run_status})
+        log_action(
+            session,
+            "run",
+            "flow",
+            entity_id=flow.id,
+            entity_name=flow.name,
+            company_id=flow.company_id,
+            user_id=current_user.id,
+            details={"status": flow.last_run_status},
+        )
         session.commit()
         return _to_dict(flow)

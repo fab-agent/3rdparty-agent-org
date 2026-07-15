@@ -2,6 +2,7 @@
 Agent runtime unit tests.
 AI calls are always mocked — no real API keys needed.
 """
+
 import asyncio
 from unittest.mock import MagicMock, patch
 
@@ -17,14 +18,27 @@ from tests.conftest import (
 
 # ── build_system_prompt ───────────────────────────────────────────────────────
 
+
 def test_build_system_prompt_contains_name():
     from services.agent_runtime import build_system_prompt
-    p = models.Personnel(name="CodeGuard", slug="codeguard", title="Code Review Agent",
-                          role="Reviewer", type="agent",
-                          id="test-id", company_id="c1")
-    skill = models.Skill(name="Code Review", version="1.0",
-                          description="PR review", agent_id="cfg1",
-                          skill_type="builtin", id="s1")
+
+    p = models.Personnel(
+        name="CodeGuard",
+        slug="codeguard",
+        title="Code Review Agent",
+        role="Reviewer",
+        type="agent",
+        id="test-id",
+        company_id="c1",
+    )
+    skill = models.Skill(
+        name="Code Review",
+        version="1.0",
+        description="PR review",
+        agent_id="cfg1",
+        skill_type="builtin",
+        id="s1",
+    )
     prompt = build_system_prompt(p, None, [skill])
     assert "CodeGuard" in prompt
     assert "Code Review Agent" in prompt
@@ -34,18 +48,23 @@ def test_build_system_prompt_contains_name():
 def test_build_system_prompt_with_department():
     import models as m
     from services.agent_runtime import build_system_prompt
-    p = m.Personnel(name="TestBot", slug="testbot", type="agent",
-                     id="pid", company_id="cid")
-    dept = m.Department(name="Engineering", slug="engineering",
-                         company_id="cid", id="did")
+
+    p = m.Personnel(
+        name="TestBot", slug="testbot", type="agent", id="pid", company_id="cid"
+    )
+    dept = m.Department(
+        name="Engineering", slug="engineering", company_id="cid", id="did"
+    )
     prompt = build_system_prompt(p, dept, [])
     assert "Engineering" in prompt
 
 
 def test_build_system_prompt_no_skills():
     from services.agent_runtime import build_system_prompt
-    p = models.Personnel(name="SimpleBot", slug="simplebot", type="agent",
-                          id="p1", company_id="c1")
+
+    p = models.Personnel(
+        name="SimpleBot", slug="simplebot", type="agent", id="p1", company_id="c1"
+    )
     prompt = build_system_prompt(p, None, [])
     assert "SimpleBot" in prompt
     assert isinstance(prompt, str)
@@ -54,58 +73,78 @@ def test_build_system_prompt_no_skills():
 
 # ── build_tool_definitions ────────────────────────────────────────────────────
 
+
 def test_build_tool_definitions_structure():
     from services.agent_runtime import build_tool_definitions
-    skill = models.Skill(name="Code Review", version="1.0",
-                          description="Reviews code", agent_id="cfg1",
-                          skill_type="builtin", id="s1")
+
+    skill = models.Skill(
+        name="Code Review",
+        version="1.0",
+        description="Reviews code",
+        agent_id="cfg1",
+        skill_type="builtin",
+        id="s1",
+    )
     tools = build_tool_definitions([skill])
     assert len(tools) >= 1
     # Find our skill in tool defs (builtin skills may be expanded or included)
     tool_names = [t["name"] for t in tools]
-    assert any("code" in n.lower() or "review" in n.lower() for n in tool_names) or len(tools) > 0
+    assert (
+        any("code" in n.lower() or "review" in n.lower() for n in tool_names)
+        or len(tools) > 0
+    )
 
 
 def test_build_tool_definitions_empty():
     from services.agent_runtime import build_tool_definitions
+
     tools = build_tool_definitions([])
     assert isinstance(tools, list)
 
 
 # ── detect_provider (also tested in test_provider.py) ────────────────────────
 
-@pytest.mark.parametrize("model,expected", [
-    ("gemini-2.5-pro", "google"),
-    ("gemini-2.0-flash", "google"),
-    ("claude-sonnet-4-6", "anthropic"),
-    ("claude-opus-4-7", "anthropic"),
-    ("gpt-4o", "openai"),
-    ("gpt-4o-mini", "openai"),
-    ("o1-mini", "openai"),
-    ("qwen-max", "qwen"),
-    ("qwen-turbo", "qwen"),
-    ("qwen-plus", "qwen"),
-    ("qwen-long", "qwen"),
-])
+
+@pytest.mark.parametrize(
+    "model,expected",
+    [
+        ("gemini-2.5-pro", "google"),
+        ("gemini-2.0-flash", "google"),
+        ("claude-sonnet-4-6", "anthropic"),
+        ("claude-opus-4-7", "anthropic"),
+        ("gpt-4o", "openai"),
+        ("gpt-4o-mini", "openai"),
+        ("o1-mini", "openai"),
+        ("qwen-max", "qwen"),
+        ("qwen-turbo", "qwen"),
+        ("qwen-plus", "qwen"),
+        ("qwen-long", "qwen"),
+    ],
+)
 def test_detect_provider_parametrized(model, expected):
     from services.agent_runtime import detect_provider
+
     assert detect_provider(model) == expected
 
 
 # ── run_session error cases (no AI call) ─────────────────────────────────────
 
+
 def _collect_events(gen):
     """Collect all events from an async generator."""
     events = []
+
     async def _collect():
         async for e in gen:
             events.append(e)
+
     asyncio.run(_collect())
     return events
 
 
 def test_run_session_not_found(db_session):
     from services.agent_runtime import run_session
+
     events = _collect_events(run_session("nonexistent-session-id", "hello"))
     assert any(e["type"] == "error" for e in events)
     err = next(e for e in events if e["type"] == "error")
@@ -180,7 +219,9 @@ def test_run_session_with_mock_anthropic(db_session, test_engine):
 
     with Session(test_engine) as s:
         co = make_company(s)
-        agent = make_personnel(s, co.id, name="ClaudeBot", slug="claudebot", type="agent")
+        agent = make_personnel(
+            s, co.id, name="ClaudeBot", slug="claudebot", type="agent"
+        )
         make_agent_config(s, agent.id, model="claude-haiku-4-5-20251001")
         make_provider_key(s, provider="anthropic", plain_key="sk-ant-test")
         sess = models.AgentSession(personnel_id=agent.id)

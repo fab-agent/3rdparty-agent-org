@@ -8,6 +8,7 @@ Flow:
   4. POST /a2a/requests/{id}/approve-result — responsible human approves the result
   5. Result returned to the originating session
 """
+
 import asyncio
 from datetime import datetime
 
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/a2a", tags=["a2a"])
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _req_to_dict(req: A2ARequest, session) -> dict:
     from_agent = session.get(Personnel, req.from_agent_id)
     to_agent = session.get(Personnel, req.to_agent_id)
@@ -49,7 +51,9 @@ def _req_to_dict(req: A2ARequest, session) -> dict:
         "approver_id": req.approver_id,
         "approver_name": approver.name if approver else None,
         "approved_at": req.approved_at.isoformat() if req.approved_at else None,
-        "result_approved_at": req.result_approved_at.isoformat() if req.result_approved_at else None,
+        "result_approved_at": req.result_approved_at.isoformat()
+        if req.result_approved_at
+        else None,
         "rejection_reason": req.rejection_reason,
         "created_at": req.created_at.isoformat(),
         "updated_at": req.updated_at.isoformat(),
@@ -67,6 +71,7 @@ def _auto_set_approver(req: A2ARequest, session) -> None:
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
+
 @router.get("/requests")
 def list_requests(
     company_id: str | None = None,
@@ -77,12 +82,15 @@ def list_requests(
     _: User = Depends(get_current_user),
 ):
     from sqlalchemy import or_
+
     with get_session() as session:
         q = select(A2ARequest).order_by(A2ARequest.created_at.desc())
         if company_id:
-            agent_ids = list(session.exec(
-                select(Personnel.id).where(Personnel.company_id == company_id)
-            ).all())
+            agent_ids = list(
+                session.exec(
+                    select(Personnel.id).where(Personnel.company_id == company_id)
+                ).all()
+            )
             q = q.where(
                 or_(
                     A2ARequest.from_agent_id.in_(agent_ids),
@@ -105,14 +113,17 @@ def list_requests(
 def pending_count(company_id: str | None = None, _: User = Depends(get_current_user)):
     """Returns count of requests awaiting approval (for notification badge)."""
     from sqlalchemy import or_
+
     with get_session() as session:
         q = select(A2ARequest).where(
             A2ARequest.status.in_(["pending_approval", "pending_result_approval"])
         )
         if company_id:
-            agent_ids = list(session.exec(
-                select(Personnel.id).where(Personnel.company_id == company_id)
-            ).all())
+            agent_ids = list(
+                session.exec(
+                    select(Personnel.id).where(Personnel.company_id == company_id)
+                ).all()
+            )
             q = q.where(
                 or_(
                     A2ARequest.from_agent_id.in_(agent_ids),
@@ -128,7 +139,9 @@ def create_request(body: A2ARequestCreate, _: User = Depends(get_current_user)):
         # Validate agents exist
         for pid in [body.from_agent_id, body.to_agent_id]:
             if not session.get(Personnel, pid):
-                raise HTTPException(status_code=404, detail=f"Personnel {pid} not found")
+                raise HTTPException(
+                    status_code=404, detail=f"Personnel {pid} not found"
+                )
 
         req = A2ARequest(
             from_session_id=body.from_session_id,
@@ -155,18 +168,28 @@ def get_request(req_id: str, _: User = Depends(get_current_user)):
 
 
 @router.post("/requests/{req_id}/approve")
-def approve_request(req_id: str, body: A2AApprove, background_tasks: BackgroundTasks,
-                    caller: User = Depends(get_current_user)):
+def approve_request(
+    req_id: str,
+    body: A2AApprove,
+    background_tasks: BackgroundTasks,
+    caller: User = Depends(get_current_user),
+):
     """Approve the task. Triggers execution in background."""
     with get_session() as session:
         req = session.get(A2ARequest, req_id)
         if not req:
             raise HTTPException(status_code=404, detail="Request not found")
         if req.status != "pending_approval":
-            raise HTTPException(status_code=409, detail=f"Request is not pending approval (status: {req.status})")
+            raise HTTPException(
+                status_code=409,
+                detail=f"Request is not pending approval (status: {req.status})",
+            )
         # Verify the approver matches the designated responsible person
         if req.approver_id and req.approver_id != body.approver_id:
-            raise HTTPException(status_code=403, detail="Yetkisiz: bu talebi onaylayacak kişi siz değilsiniz")
+            raise HTTPException(
+                status_code=403,
+                detail="Yetkisiz: bu talebi onaylayacak kişi siz değilsiniz",
+            )
         req.status = "running"
         req.approver_id = body.approver_id
         req.approved_at = datetime.utcnow()
@@ -180,14 +203,19 @@ def approve_request(req_id: str, body: A2AApprove, background_tasks: BackgroundT
 
 
 @router.post("/requests/{req_id}/approve-result")
-def approve_result(req_id: str, body: A2AResultApprove, _: User = Depends(get_current_user)):
+def approve_result(
+    req_id: str, body: A2AResultApprove, _: User = Depends(get_current_user)
+):
     """Approve the result and mark the request as completed."""
     with get_session() as session:
         req = session.get(A2ARequest, req_id)
         if not req:
             raise HTTPException(status_code=404, detail="Request not found")
         if req.status != "pending_result_approval":
-            raise HTTPException(status_code=409, detail=f"Request is not pending result approval (status: {req.status})")
+            raise HTTPException(
+                status_code=409,
+                detail=f"Request is not pending result approval (status: {req.status})",
+            )
         req.status = "completed"
         req.result_approved_at = datetime.utcnow()
         req.updated_at = datetime.utcnow()
@@ -204,7 +232,9 @@ def reject_request(req_id: str, body: A2AReject, _: User = Depends(get_current_u
         if not req:
             raise HTTPException(status_code=404, detail="Request not found")
         if req.status not in ("pending_approval", "pending_result_approval"):
-            raise HTTPException(status_code=409, detail="Request cannot be rejected at this stage")
+            raise HTTPException(
+                status_code=409, detail="Request cannot be rejected at this stage"
+            )
         req.status = "rejected"
         req.rejection_reason = body.reason
         req.approver_id = body.approver_id
@@ -217,9 +247,11 @@ def reject_request(req_id: str, body: A2AReject, _: User = Depends(get_current_u
 
 # ── Background execution ──────────────────────────────────────────────────────
 
+
 async def _run_agent_task(session_id: str, task: str) -> str:
     """Run the agent and collect the full text response."""
     from services.agent_runtime import run_session
+
     text_parts = []
     async for event in run_session(session_id, task):
         if event["type"] == "text":

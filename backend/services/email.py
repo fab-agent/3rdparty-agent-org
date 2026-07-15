@@ -1,4 +1,5 @@
 """Email service via Resend."""
+
 import os
 
 import resend
@@ -13,7 +14,9 @@ def _send(to: str, subject: str, html: str) -> None:
     if not resend.api_key:
         print(f"[email] RESEND_API_KEY not set — would send to {to}: {subject}")
         return
-    resend.Emails.send({"from": FROM_ADDRESS, "to": to, "subject": subject, "html": html})
+    resend.Emails.send(
+        {"from": FROM_ADDRESS, "to": to, "subject": subject, "html": html}
+    )
 
 
 def send_invite(to: str, name: str, company_name: str, temp_password: str) -> None:

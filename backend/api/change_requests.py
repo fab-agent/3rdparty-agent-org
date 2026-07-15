@@ -33,12 +33,20 @@ def _cr_to_dict(cr: ChangeRequest) -> dict:
         "original": json.loads(cr.original_json) if cr.original_json else None,
         "status": cr.status,
         "dept_head_id": cr.dept_head_id,
-        "dept_head_approved_at": cr.dept_head_approved_at.isoformat() if cr.dept_head_approved_at else None,
-        "dept_head_rejected_at": cr.dept_head_rejected_at.isoformat() if cr.dept_head_rejected_at else None,
+        "dept_head_approved_at": cr.dept_head_approved_at.isoformat()
+        if cr.dept_head_approved_at
+        else None,
+        "dept_head_rejected_at": cr.dept_head_rejected_at.isoformat()
+        if cr.dept_head_rejected_at
+        else None,
         "dept_head_note": cr.dept_head_note,
         "admin_id": cr.admin_id,
-        "admin_approved_at": cr.admin_approved_at.isoformat() if cr.admin_approved_at else None,
-        "admin_rejected_at": cr.admin_rejected_at.isoformat() if cr.admin_rejected_at else None,
+        "admin_approved_at": cr.admin_approved_at.isoformat()
+        if cr.admin_approved_at
+        else None,
+        "admin_rejected_at": cr.admin_rejected_at.isoformat()
+        if cr.admin_rejected_at
+        else None,
         "admin_note": cr.admin_note,
         "commit_sha": cr.commit_sha,
         "commit_url": cr.commit_url,
@@ -49,6 +57,7 @@ def _cr_to_dict(cr: ChangeRequest) -> dict:
 
 
 # ── List & Get ────────────────────────────────────────────────────────────────
+
 
 @router.get("")
 def list_change_requests(
@@ -80,6 +89,7 @@ def get_change_request(cr_id: str, current_user: User = Depends(get_current_user
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
+
 @router.post("", status_code=201)
 def create_change_request(
     body: ChangeRequestCreate,
@@ -104,13 +114,22 @@ def create_change_request(
             updated_at=datetime.utcnow(),
         )
         session.add(cr)
-        log_action(session, "create", "change_request", entity_id=cr.id, entity_name=cr.title, company_id=cr.company_id, user_id=current_user.id)
+        log_action(
+            session,
+            "create",
+            "change_request",
+            entity_id=cr.id,
+            entity_name=cr.title,
+            company_id=cr.company_id,
+            user_id=current_user.id,
+        )
         session.commit()
         session.refresh(cr)
         return _cr_to_dict(cr)
 
 
 # ── Stage 1: Dept Head Approval ───────────────────────────────────────────────
+
 
 @router.post("/{cr_id}/dept-approve")
 def dept_head_approve(
@@ -123,7 +142,10 @@ def dept_head_approve(
         if not cr:
             raise HTTPException(status_code=404, detail="Not found")
         if cr.status != "submitted":
-            raise HTTPException(status_code=400, detail=f"CR is in '{cr.status}' status, expected 'submitted'")
+            raise HTTPException(
+                status_code=400,
+                detail=f"CR is in '{cr.status}' status, expected 'submitted'",
+            )
 
         cr.status = "dept_head_approved"
         cr.dept_head_id = current_user.id
@@ -131,7 +153,16 @@ def dept_head_approve(
         cr.dept_head_note = body.note
         cr.updated_at = datetime.utcnow()
         session.add(cr)
-        log_action(session, "approve", "change_request", entity_id=cr.id, entity_name=cr.title, company_id=cr.company_id, user_id=current_user.id, details={"stage": "dept_head"})
+        log_action(
+            session,
+            "approve",
+            "change_request",
+            entity_id=cr.id,
+            entity_name=cr.title,
+            company_id=cr.company_id,
+            user_id=current_user.id,
+            details={"stage": "dept_head"},
+        )
         session.commit()
         session.refresh(cr)
         return _cr_to_dict(cr)
@@ -148,7 +179,9 @@ def dept_head_reject(
         if not cr:
             raise HTTPException(status_code=404, detail="Not found")
         if cr.status != "submitted":
-            raise HTTPException(status_code=400, detail=f"CR is in '{cr.status}' status")
+            raise HTTPException(
+                status_code=400, detail=f"CR is in '{cr.status}' status"
+            )
 
         cr.status = "rejected"
         cr.dept_head_id = current_user.id
@@ -156,13 +189,23 @@ def dept_head_reject(
         cr.dept_head_note = body.note
         cr.updated_at = datetime.utcnow()
         session.add(cr)
-        log_action(session, "reject", "change_request", entity_id=cr.id, entity_name=cr.title, company_id=cr.company_id, user_id=current_user.id, details={"stage": "dept_head"})
+        log_action(
+            session,
+            "reject",
+            "change_request",
+            entity_id=cr.id,
+            entity_name=cr.title,
+            company_id=cr.company_id,
+            user_id=current_user.id,
+            details={"stage": "dept_head"},
+        )
         session.commit()
         session.refresh(cr)
         return _cr_to_dict(cr)
 
 
 # ── Stage 2: Admin Approval → GitHub Commit ───────────────────────────────────
+
 
 @router.post("/{cr_id}/admin-approve")
 def admin_approve(
@@ -176,7 +219,10 @@ def admin_approve(
         if not cr:
             raise HTTPException(status_code=404, detail="Not found")
         if cr.status != "dept_head_approved":
-            raise HTTPException(status_code=400, detail=f"CR is in '{cr.status}' status, expected 'dept_head_approved'")
+            raise HTTPException(
+                status_code=400,
+                detail=f"CR is in '{cr.status}' status, expected 'dept_head_approved'",
+            )
 
         # Mark admin approval
         cr.status = "admin_approved"
@@ -196,7 +242,13 @@ def admin_approve(
 
         if git_cfg:
             try:
-                sha, url = commit_change_request(session, cr, git_cfg, committer_name=current_user.name, committer_email=current_user.email)
+                sha, url = commit_change_request(
+                    session,
+                    cr,
+                    git_cfg,
+                    committer_name=current_user.name,
+                    committer_email=current_user.email,
+                )
                 cr.commit_sha = sha
                 cr.commit_url = url
                 cr.status = "committed"
@@ -209,7 +261,16 @@ def admin_approve(
 
         cr.updated_at = datetime.utcnow()
         session.add(cr)
-        log_action(session, "approve", "change_request", entity_id=cr.id, entity_name=cr.title, company_id=cr.company_id, user_id=current_user.id, details={"stage": "admin", "commit_sha": cr.commit_sha})
+        log_action(
+            session,
+            "approve",
+            "change_request",
+            entity_id=cr.id,
+            entity_name=cr.title,
+            company_id=cr.company_id,
+            user_id=current_user.id,
+            details={"stage": "admin", "commit_sha": cr.commit_sha},
+        )
         session.commit()
         session.refresh(cr)
         return _cr_to_dict(cr)
@@ -226,7 +287,9 @@ def admin_reject(
         if not cr:
             raise HTTPException(status_code=404, detail="Not found")
         if cr.status != "dept_head_approved":
-            raise HTTPException(status_code=400, detail=f"CR is in '{cr.status}' status")
+            raise HTTPException(
+                status_code=400, detail=f"CR is in '{cr.status}' status"
+            )
 
         cr.status = "rejected"
         cr.admin_id = current_user.id
@@ -234,7 +297,16 @@ def admin_reject(
         cr.admin_note = body.note
         cr.updated_at = datetime.utcnow()
         session.add(cr)
-        log_action(session, "reject", "change_request", entity_id=cr.id, entity_name=cr.title, company_id=cr.company_id, user_id=current_user.id, details={"stage": "admin"})
+        log_action(
+            session,
+            "reject",
+            "change_request",
+            entity_id=cr.id,
+            entity_name=cr.title,
+            company_id=cr.company_id,
+            user_id=current_user.id,
+            details={"stage": "admin"},
+        )
         session.commit()
         session.refresh(cr)
         return _cr_to_dict(cr)

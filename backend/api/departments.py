@@ -12,7 +12,9 @@ from schemas import DepartmentCreate, DepartmentUpdate, PolicyLinkSet
 router = APIRouter(prefix="/departments", tags=["departments"])
 
 
-def dept_to_dict(d: Department, linked_policies: list = None, parent_name: str | None = None) -> dict:
+def dept_to_dict(
+    d: Department, linked_policies: list = None, parent_name: str | None = None
+) -> dict:
     policies = linked_policies or []
     return {
         "id": d.id,
@@ -47,8 +49,9 @@ def _load_dept_policies_map(session, dept_ids: list[str]) -> dict[str, list]:
 
 
 @router.get("")
-def list_departments(company_id: str | None = None,
-                     current_user: User = Depends(get_current_user)):
+def list_departments(
+    company_id: str | None = None, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         if company_id:
             check_company_membership(current_user.id, company_id, session)
@@ -63,14 +66,21 @@ def list_departments(company_id: str | None = None,
         name_map = {d.id: d.name for d in depts}
         policies_map = _load_dept_policies_map(session, [d.id for d in depts])
         return [
-            dept_to_dict(d, policies_map.get(d.id, []), name_map.get(d.parent_id) if d.parent_id else None)
+            dept_to_dict(
+                d,
+                policies_map.get(d.id, []),
+                name_map.get(d.parent_id) if d.parent_id else None,
+            )
             for d in depts
         ]
 
 
 @router.post("", status_code=201)
-def create_department(body: DepartmentCreate, company_id: str | None = None,
-                      current_user: User = Depends(get_current_user)):
+def create_department(
+    body: DepartmentCreate,
+    company_id: str | None = None,
+    current_user: User = Depends(get_current_user),
+):
     with get_session() as session:
         if company_id:
             check_company_membership(current_user.id, company_id, session)
@@ -78,7 +88,9 @@ def create_department(body: DepartmentCreate, company_id: str | None = None,
         if body.parent_id:
             parent = session.get(Department, body.parent_id)
             if not parent:
-                raise HTTPException(status_code=404, detail="Parent department not found")
+                raise HTTPException(
+                    status_code=404, detail="Parent department not found"
+                )
             parent_name = parent.name
         dept = Department(
             company_id=company_id,
@@ -90,8 +102,14 @@ def create_department(body: DepartmentCreate, company_id: str | None = None,
             status=body.status,
         )
         session.add(dept)
-        log_action(session, "create", "department", entity_id=dept.id, entity_name=dept.name,
-                   company_id=dept.company_id or company_id)
+        log_action(
+            session,
+            "create",
+            "department",
+            entity_id=dept.id,
+            entity_name=dept.name,
+            company_id=dept.company_id or company_id,
+        )
         session.commit()
         session.refresh(dept)
         return dept_to_dict(dept, [], parent_name)
@@ -114,26 +132,40 @@ def get_department(dept_id: str, current_user: User = Depends(get_current_user))
 
 
 @router.patch("/{dept_id}")
-def update_department(dept_id: str, body: DepartmentUpdate,
-                      current_user: User = Depends(get_current_user)):
+def update_department(
+    dept_id: str, body: DepartmentUpdate, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         dept = session.get(Department, dept_id)
         if not dept:
             raise HTTPException(status_code=404, detail="Department not found")
         if dept.company_id:
             check_company_membership(current_user.id, dept.company_id, session)
-        if body.name is not None:        dept.name = body.name
-        if body.slug is not None:        dept.slug = body.slug
-        if body.description is not None: dept.description = body.description
-        if body.goals is not None:       dept.goals = body.goals
-        if body.status is not None:      dept.status = body.status
+        if body.name is not None:
+            dept.name = body.name
+        if body.slug is not None:
+            dept.slug = body.slug
+        if body.description is not None:
+            dept.description = body.description
+        if body.goals is not None:
+            dept.goals = body.goals
+        if body.status is not None:
+            dept.status = body.status
         if "parent_id" in body.model_fields_set:
             if body.parent_id and body.parent_id == dept_id:
-                raise HTTPException(status_code=400, detail="Department cannot be its own parent")
+                raise HTTPException(
+                    status_code=400, detail="Department cannot be its own parent"
+                )
             dept.parent_id = body.parent_id
         session.add(dept)
-        log_action(session, "update", "department", entity_id=dept.id, entity_name=dept.name,
-                   company_id=dept.company_id)
+        log_action(
+            session,
+            "update",
+            "department",
+            entity_id=dept.id,
+            entity_name=dept.name,
+            company_id=dept.company_id,
+        )
         session.commit()
         session.refresh(dept)
         parent_name = None
@@ -145,8 +177,9 @@ def update_department(dept_id: str, body: DepartmentUpdate,
 
 
 @router.put("/{dept_id}/policies")
-def set_department_policies(dept_id: str, body: PolicyLinkSet,
-                            current_user: User = Depends(get_current_user)):
+def set_department_policies(
+    dept_id: str, body: PolicyLinkSet, current_user: User = Depends(get_current_user)
+):
     """Replace the full set of linked policies for a department."""
     with get_session() as session:
         dept = session.get(Department, dept_id)
@@ -156,24 +189,37 @@ def set_department_policies(dept_id: str, body: PolicyLinkSet,
             check_company_membership(current_user.id, dept.company_id, session)
         # Remove existing links
         existing = session.exec(
-            select(DepartmentPolicyLink).where(DepartmentPolicyLink.department_id == dept_id)
+            select(DepartmentPolicyLink).where(
+                DepartmentPolicyLink.department_id == dept_id
+            )
         ).all()
         for link in existing:
             session.delete(link)
         # Create new links
         for policy_id in body.policy_ids:
-            session.add(DepartmentPolicyLink(department_id=dept_id, policy_id=policy_id))
+            session.add(
+                DepartmentPolicyLink(department_id=dept_id, policy_id=policy_id)
+            )
         # Keep policies_json in sync for any legacy readers
         if body.policy_ids:
-            names = [p.name for p in session.exec(
-                select(Policy).where(Policy.id.in_(body.policy_ids))
-            ).all()]
+            names = [
+                p.name
+                for p in session.exec(
+                    select(Policy).where(Policy.id.in_(body.policy_ids))
+                ).all()
+            ]
         else:
             names = []
         dept.policies_json = json.dumps(names, ensure_ascii=False)
         session.add(dept)
-        log_action(session, "update", "department", entity_id=dept.id, entity_name=dept.name,
-                   company_id=dept.company_id)
+        log_action(
+            session,
+            "update",
+            "department",
+            entity_id=dept.id,
+            entity_name=dept.name,
+            company_id=dept.company_id,
+        )
         session.commit()
         policies_map = _load_dept_policies_map(session, [dept_id])
         parent_name = None
@@ -191,25 +237,36 @@ def delete_department(dept_id: str, current_user: User = Depends(get_current_use
             raise HTTPException(status_code=404, detail="Department not found")
         if dept.company_id:
             check_company_membership(current_user.id, dept.company_id, session)
-        children = session.exec(select(Department).where(Department.parent_id == dept_id)).all()
+        children = session.exec(
+            select(Department).where(Department.parent_id == dept_id)
+        ).all()
         for child in children:
             child.parent_id = None
             session.add(child)
         # Clean up policy links before delete
         existing = session.exec(
-            select(DepartmentPolicyLink).where(DepartmentPolicyLink.department_id == dept_id)
+            select(DepartmentPolicyLink).where(
+                DepartmentPolicyLink.department_id == dept_id
+            )
         ).all()
         for link in existing:
             session.delete(link)
-        log_action(session, "delete", "department", entity_id=dept.id, entity_name=dept.name,
-                   company_id=dept.company_id)
+        log_action(
+            session,
+            "delete",
+            "department",
+            entity_id=dept.id,
+            entity_name=dept.name,
+            company_id=dept.company_id,
+        )
         session.delete(dept)
         session.commit()
 
 
 @router.get("/tree/root")
-def get_department_tree(company_id: str | None = None,
-                        current_user: User = Depends(get_current_user)):
+def get_department_tree(
+    company_id: str | None = None, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
         if company_id:
             check_company_membership(current_user.id, company_id, session)

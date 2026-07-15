@@ -1,4 +1,5 @@
 """Work journal — agent-authored and human-authored log entries per personnel."""
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,7 +18,7 @@ class JournalEntryCreate(BaseModel):
     personnel_id: str
     title: str | None = None
     content: str
-    author: str = "human"          # "agent" | "human"
+    author: str = "human"  # "agent" | "human"
     session_id: str | None = None
 
 
@@ -79,9 +80,10 @@ def create_entry(
         session.add(entry)
         session.commit()
         session.refresh(entry)
-        logger.info("Journal entry created", extra={"extra": {
-            "personnel_id": body.personnel_id, "author": body.author
-        }})
+        logger.info(
+            "Journal entry created",
+            extra={"extra": {"personnel_id": body.personnel_id, "author": body.author}},
+        )
         return _to_resp(entry)
 
 

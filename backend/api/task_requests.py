@@ -79,7 +79,9 @@ def _to_dict(t: TaskRequest) -> dict:
     }
 
 
-def _route_agent(session, company_id: str, department_id: str | None, skill_filter: str | None) -> AgentConfig | None:
+def _route_agent(
+    session, company_id: str, department_id: str | None, skill_filter: str | None
+) -> AgentConfig | None:
     """Find best matching agent. Dept first → parent dept → company-wide."""
     dept_ids_to_try: list[str | None] = []
     if department_id:
@@ -111,16 +113,23 @@ def _route_agent(session, company_id: str, department_id: str | None, skill_filt
             for cfg in candidates:
                 # Check legacy Skill table
                 skills = session.exec(
-                    select(Skill).where(Skill.agent_id == cfg.id).where(Skill.is_active == True)
+                    select(Skill)
+                    .where(Skill.agent_id == cfg.id)
+                    .where(Skill.is_active == True)
                 ).all()
                 # Also check CompanySkill assignments via AgentSkillLink
                 company_skills = session.exec(
                     select(CompanySkill)
-                    .join(AgentSkillLink, AgentSkillLink.company_skill_id == CompanySkill.id)
+                    .join(
+                        AgentSkillLink,
+                        AgentSkillLink.company_skill_id == CompanySkill.id,
+                    )
                     .where(AgentSkillLink.agent_config_id == cfg.id)
                     .where(CompanySkill.is_active == True)
                 ).all()
-                all_skill_names = [s.name for s in skills] + [s.name for s in company_skills]
+                all_skill_names = [s.name for s in skills] + [
+                    s.name for s in company_skills
+                ]
                 if any(skill_filter.lower() in n.lower() for n in all_skill_names):
                     matched.append(cfg)
             candidates = matched
@@ -141,8 +150,8 @@ def list_task_requests(
         q = select(TaskRequest)
         # Show tasks the user submitted OR tasks assigned to them as responsible
         q = q.where(
-            (TaskRequest.requester_user_id == current_user.id) |
-            (TaskRequest.responsible_user_id == current_user.id)
+            (TaskRequest.requester_user_id == current_user.id)
+            | (TaskRequest.responsible_user_id == current_user.id)
         )
         if company_id:
             q = q.where(TaskRequest.company_id == company_id)
@@ -153,9 +162,13 @@ def list_task_requests(
 
 
 @router.post("", status_code=201)
-def create_task_request(body: TaskRequestCreate, current_user: User = Depends(get_current_user)):
+def create_task_request(
+    body: TaskRequestCreate, current_user: User = Depends(get_current_user)
+):
     with get_session() as session:
-        agent_cfg = _route_agent(session, body.company_id, body.department_id, body.skill_filter)
+        agent_cfg = _route_agent(
+            session, body.company_id, body.department_id, body.skill_filter
+        )
 
         responsible_user_id: str | None = None
         if agent_cfg:
@@ -200,16 +213,25 @@ def create_task_request(body: TaskRequestCreate, current_user: User = Depends(ge
 
 
 @router.post("/{task_id}/run")
-def run_task(task_id: str, body: TaskRequestAction, current_user: User = Depends(get_current_user)):
+def run_task(
+    task_id: str,
+    body: TaskRequestAction,
+    current_user: User = Depends(get_current_user),
+):
     """Responsible human reviews, optionally adds a note, and triggers agent execution."""
     with get_session() as session:
         task = session.get(TaskRequest, task_id)
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         if task.responsible_user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Only the responsible user can trigger this task")
+            raise HTTPException(
+                status_code=403,
+                detail="Only the responsible user can trigger this task",
+            )
         if task.status not in ("assigned", "pending"):
-            raise HTTPException(status_code=400, detail=f"Task is in '{task.status}' status")
+            raise HTTPException(
+                status_code=400, detail=f"Task is in '{task.status}' status"
+            )
 
         if body.human_note:
             task.human_note = body.human_note
@@ -222,7 +244,9 @@ def run_task(task_id: str, body: TaskRequestAction, current_user: User = Depends
         try:
             agent = session.get(Personnel, task.assigned_agent_id)
             agent_cfg = session.exec(
-                select(AgentConfig).where(AgentConfig.personnel_id == task.assigned_agent_id)
+                select(AgentConfig).where(
+                    AgentConfig.personnel_id == task.assigned_agent_id
+                )
             ).first()
             if not agent or not agent_cfg:
                 raise ValueError("Agent or config not found")
@@ -230,11 +254,19 @@ def run_task(task_id: str, body: TaskRequestAction, current_user: User = Depends
             # Find active provider key — prefer agent's own provider, then fallback list
             provider_key = None
             agent_provider = _model_to_provider(agent_cfg.model or "")
-            for prov in ([agent_provider] if agent_provider else []) + ["anthropic", "openai", "google", "mistral", "qwen"]:
+            for prov in ([agent_provider] if agent_provider else []) + [
+                "anthropic",
+                "openai",
+                "google",
+                "mistral",
+                "qwen",
+            ]:
                 if not prov:
                     continue
                 pk = session.exec(
-                    select(ProviderKey).where(ProviderKey.provider == prov).where(ProviderKey.status == "active")
+                    select(ProviderKey)
+                    .where(ProviderKey.provider == prov)
+                    .where(ProviderKey.status == "active")
                 ).first()
                 if pk:
                     provider_key = pk
@@ -277,7 +309,7 @@ def run_task(task_id: str, body: TaskRequestAction, current_user: User = Depends
             session.refresh(task)
 
         except Exception as e:
-            task.status = "assigned"   # revert to allow retry
+            task.status = "assigned"  # revert to allow retry
             task.result = f"Hata: {str(e)}"
             task.updated_at = datetime.utcnow()
             session.add(task)
@@ -288,13 +320,19 @@ def run_task(task_id: str, body: TaskRequestAction, current_user: User = Depends
 
 
 @router.post("/{task_id}/reject")
-def reject_task(task_id: str, body: TaskRequestAction, current_user: User = Depends(get_current_user)):
+def reject_task(
+    task_id: str,
+    body: TaskRequestAction,
+    current_user: User = Depends(get_current_user),
+):
     with get_session() as session:
         task = session.get(TaskRequest, task_id)
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         if task.responsible_user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Only the responsible user can reject this task")
+            raise HTTPException(
+                status_code=403, detail="Only the responsible user can reject this task"
+            )
         task.status = "rejected"
         task.human_note = body.human_note
         task.updated_at = datetime.utcnow()

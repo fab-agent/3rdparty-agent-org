@@ -23,6 +23,8 @@ ddgs>=6.0
 pypdf>=4.0
 python-multipart>=0.0.9
 
+resend>=2.0
+
 # dev / test
 pytest>=8.0
 pytest-anyio>=0.0.0

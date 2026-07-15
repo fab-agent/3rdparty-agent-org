@@ -17,7 +17,7 @@ class PolicyCreate(BaseModel):
     name: str
     slug: str
     content: str = ""
-    scope: str = "company"        # company | department | agent
+    scope: str = "company"  # company | department | agent
     department_id: str | None = None
     agent_config_id: str | None = None
 

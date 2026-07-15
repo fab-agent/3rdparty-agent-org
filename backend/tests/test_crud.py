@@ -1,7 +1,9 @@
 """CRUD endpoint tests: companies, departments, personnel, sessions."""
+
 from tests.conftest import make_agent_config, make_company_for_user, make_personnel
 
 # ── Companies ─────────────────────────────────────────────────────────────────
+
 
 def test_list_companies_empty(auth_client, db_session):
     r = auth_client.get("/companies")
@@ -10,7 +12,9 @@ def test_list_companies_empty(auth_client, db_session):
 
 
 def test_create_company(auth_client):
-    r = auth_client.post("/companies", json={"name": "Yeni Şirket", "slug": "yeni-sirket"})
+    r = auth_client.post(
+        "/companies", json={"name": "Yeni Şirket", "slug": "yeni-sirket"}
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Yeni Şirket"
@@ -19,7 +23,9 @@ def test_create_company(auth_client):
 
 
 def test_get_company(auth_client, db_session):
-    co = make_company_for_user(db_session, auth_client._test_user, name="Fabrika", slug="fabrika")
+    co = make_company_for_user(
+        db_session, auth_client._test_user, name="Fabrika", slug="fabrika"
+    )
     db_session.commit()
     r = auth_client.get(f"/companies/{co.id}")
     assert r.status_code == 200
@@ -32,7 +38,9 @@ def test_get_company_not_found(auth_client):
 
 
 def test_update_company(auth_client, db_session):
-    co = make_company_for_user(db_session, auth_client._test_user, name="Eski Ad", slug="eski-ad")
+    co = make_company_for_user(
+        db_session, auth_client._test_user, name="Eski Ad", slug="eski-ad"
+    )
     db_session.commit()
     r = auth_client.patch(f"/companies/{co.id}", json={"name": "Yeni Ad"})
     assert r.status_code == 200
@@ -40,7 +48,9 @@ def test_update_company(auth_client, db_session):
 
 
 def test_delete_company(auth_client, db_session):
-    co = make_company_for_user(db_session, auth_client._test_user, name="Silinecek", slug="silinecek")
+    co = make_company_for_user(
+        db_session, auth_client._test_user, name="Silinecek", slug="silinecek"
+    )
     db_session.commit()
     r = auth_client.delete(f"/companies/{co.id}")
     assert r.status_code in (200, 204)
@@ -50,22 +60,34 @@ def test_delete_company(auth_client, db_session):
 
 # ── Departments ───────────────────────────────────────────────────────────────
 
+
 def test_create_department(auth_client, db_session):
-    co = make_company_for_user(db_session, auth_client._test_user, name="Dept Corp", slug="dept-corp")
+    co = make_company_for_user(
+        db_session, auth_client._test_user, name="Dept Corp", slug="dept-corp"
+    )
     db_session.commit()
-    r = auth_client.post(f"/departments?company_id={co.id}", json={
-        "name": "Yazılım",
-        "slug": "yazilim",
-    })
+    r = auth_client.post(
+        f"/departments?company_id={co.id}",
+        json={
+            "name": "Yazılım",
+            "slug": "yazilim",
+        },
+    )
     assert r.status_code == 201
     assert r.json()["name"] == "Yazılım"
 
 
 def test_list_departments_by_company(auth_client, db_session):
-    co = make_company_for_user(db_session, auth_client._test_user, name="Filter Corp", slug="filter-corp")
+    co = make_company_for_user(
+        db_session, auth_client._test_user, name="Filter Corp", slug="filter-corp"
+    )
     db_session.commit()
-    auth_client.post(f"/departments?company_id={co.id}", json={"name": "QA", "slug": "qa"})
-    auth_client.post(f"/departments?company_id={co.id}", json={"name": "Dev", "slug": "dev"})
+    auth_client.post(
+        f"/departments?company_id={co.id}", json={"name": "QA", "slug": "qa"}
+    )
+    auth_client.post(
+        f"/departments?company_id={co.id}", json={"name": "Dev", "slug": "dev"}
+    )
     r = auth_client.get(f"/departments?company_id={co.id}")
     assert r.status_code == 200
     assert len(r.json()) == 2
@@ -73,16 +95,20 @@ def test_list_departments_by_company(auth_client, db_session):
 
 # ── Personnel ─────────────────────────────────────────────────────────────────
 
+
 def test_create_personnel(auth_client, db_session):
     co = make_company_for_user(db_session, auth_client._test_user)
     db_session.commit()
-    r = auth_client.post("/personnel", json={
-        "company_id": co.id,
-        "name": "Ahmet Yılmaz",
-        "slug": "ahmet-yilmaz",
-        "type": "human",
-        "title": "Developer",
-    })
+    r = auth_client.post(
+        "/personnel",
+        json={
+            "company_id": co.id,
+            "name": "Ahmet Yılmaz",
+            "slug": "ahmet-yilmaz",
+            "type": "human",
+            "title": "Developer",
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Ahmet Yılmaz"
@@ -124,7 +150,9 @@ def test_update_personnel(auth_client, db_session):
     co = make_company_for_user(db_session, auth_client._test_user)
     p = make_personnel(db_session, co.id, name="Eski", slug="eski")
     db_session.commit()
-    r = auth_client.patch(f"/personnel/{p.id}", json={"name": "Yeni", "title": "Senior Dev"})
+    r = auth_client.patch(
+        f"/personnel/{p.id}", json={"name": "Yeni", "title": "Senior Dev"}
+    )
     assert r.status_code == 200
     assert r.json()["name"] == "Yeni"
 
@@ -141,15 +169,19 @@ def test_delete_personnel(auth_client, db_session):
 
 # ── Agent sessions ────────────────────────────────────────────────────────────
 
+
 def test_create_session(auth_client, db_session):
     co = make_company_for_user(db_session, auth_client._test_user)
     agent = make_personnel(db_session, co.id, name="Bot", slug="bot", type="agent")
     make_agent_config(db_session, agent.id)
     db_session.commit()
-    r = auth_client.post("/sessions", json={
-        "personnel_id": agent.id,
-        "company_id": co.id,
-    })
+    r = auth_client.post(
+        "/sessions",
+        json={
+            "personnel_id": agent.id,
+            "company_id": co.id,
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["personnel_id"] == agent.id
@@ -173,6 +205,8 @@ def test_delete_session(auth_client, db_session):
     agent = make_personnel(db_session, co.id, name="Bot3", slug="bot3", type="agent")
     make_agent_config(db_session, agent.id)
     db_session.commit()
-    sess = auth_client.post("/sessions", json={"personnel_id": agent.id, "company_id": co.id}).json()
+    sess = auth_client.post(
+        "/sessions", json={"personnel_id": agent.id, "company_id": co.id}
+    ).json()
     r = auth_client.delete(f"/sessions/{sess['id']}")
     assert r.status_code in (200, 204)

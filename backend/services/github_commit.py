@@ -92,7 +92,9 @@ def commit_change_request(
     branch = git_config.branch or "main"
 
     proposed = json.loads(cr.proposed_json)
-    file_path, content = _build_agent_yaml_content(session, cr.personnel_id, proposed, cr.change_type)
+    file_path, content = _build_agent_yaml_content(
+        session, cr.personnel_id, proposed, cr.change_type
+    )
 
     commit_message = (
         f"[Change Request] {cr.title}\n\n"

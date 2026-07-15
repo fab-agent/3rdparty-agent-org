@@ -26,7 +26,9 @@ def _today_start() -> datetime:
 
 
 @router.get("/dashboard/stats")
-def company_stats(company_id: str | None = None, user: User = Depends(get_current_user)):
+def company_stats(
+    company_id: str | None = None, user: User = Depends(get_current_user)
+):
     with get_session() as session:
         # Resolve company_id
         if not company_id:
@@ -46,12 +48,15 @@ def company_stats(company_id: str | None = None, user: User = Depends(get_curren
         personnel_ids = [p.id for p in people]
 
         # Active agents (agent_config.status == "active")
-        active_agents = session.exec(
-            select(func.count(AgentConfig.id))
-            .join(Personnel, AgentConfig.personnel_id == Personnel.id)
-            .where(Personnel.company_id == company_id)
-            .where(AgentConfig.status == "active")
-        ).one() or 0
+        active_agents = (
+            session.exec(
+                select(func.count(AgentConfig.id))
+                .join(Personnel, AgentConfig.personnel_id == Personnel.id)
+                .where(Personnel.company_id == company_id)
+                .where(AgentConfig.status == "active")
+            ).one()
+            or 0
+        )
 
         # Sessions today and totals
         today = _today_start()
@@ -64,7 +69,8 @@ def company_stats(company_id: str | None = None, user: User = Depends(get_curren
 
         total_sessions = len(all_sessions)
         today_sessions = sum(
-            1 for s in all_sessions
+            1
+            for s in all_sessions
             if s.created_at.replace(tzinfo=timezone.utc) >= today
         )
         active_sessions = sum(1 for s in all_sessions if s.status == "active")
@@ -86,10 +92,14 @@ def company_stats(company_id: str | None = None, user: User = Depends(get_curren
         # Long-term memories count
         memory_count = 0
         if personnel_ids:
-            memory_count = session.exec(
-                select(func.count(AgentMemory.id))
-                .where(AgentMemory.personnel_id.in_(personnel_ids))
-            ).one() or 0
+            memory_count = (
+                session.exec(
+                    select(func.count(AgentMemory.id)).where(
+                        AgentMemory.personnel_id.in_(personnel_ids)
+                    )
+                ).one()
+                or 0
+            )
 
         return {
             "company_id": company_id,
@@ -172,7 +182,11 @@ def my_dashboard(company_id: str | None = None, user: User = Depends(get_current
         # Memories for those agents
         memories = session.exec(
             select(AgentMemory)
-            .where(AgentMemory.personnel_id.in_(agent_personnel_ids) if agent_personnel_ids else AgentMemory.personnel_id == "")
+            .where(
+                AgentMemory.personnel_id.in_(agent_personnel_ids)
+                if agent_personnel_ids
+                else AgentMemory.personnel_id == ""
+            )
             .order_by(AgentMemory.created_at.desc())
         ).all()
 
@@ -183,7 +197,8 @@ def my_dashboard(company_id: str | None = None, user: User = Depends(get_current
             "personnel_title": person.title,
             "total_sessions": len(sessions_q),
             "today_sessions": sum(
-                1 for s in sessions_q
+                1
+                for s in sessions_q
                 if s.created_at.replace(tzinfo=timezone.utc) >= today
             ),
             "active_sessions": sum(1 for s in sessions_q if s.status == "active"),
@@ -243,7 +258,9 @@ def agent_sla(company_id: str | None = None, user: User = Depends(get_current_us
             total_tokens = 0
             if session_ids:
                 msgs = session.exec(
-                    select(SessionMessage).where(SessionMessage.session_id.in_(session_ids))
+                    select(SessionMessage).where(
+                        SessionMessage.session_id.in_(session_ids)
+                    )
                 ).all()
                 total_tokens = sum(m.tokens_used or 0 for m in msgs)
 
@@ -261,22 +278,28 @@ def agent_sla(company_id: str | None = None, user: User = Depends(get_current_us
 
             total_ops = flow_success + flow_error + task_total
             completed_ops = flow_success + task_completed
-            success_rate = round(completed_ops / total_ops * 100, 1) if total_ops > 0 else None
+            success_rate = (
+                round(completed_ops / total_ops * 100, 1) if total_ops > 0 else None
+            )
 
-            results.append({
-                "id": agent.id,
-                "name": agent.name,
-                "title": agent.title,
-                "status": cfg.status if cfg else "draft",
-                "total_sessions": len(agent_sessions),
-                "active_sessions": sum(1 for s in agent_sessions if s.status == "active"),
-                "total_tokens": total_tokens,
-                "flow_count": len(flows),
-                "flow_success": flow_success,
-                "flow_error": flow_error,
-                "task_total": task_total,
-                "task_completed": task_completed,
-                "success_rate": success_rate,
-            })
+            results.append(
+                {
+                    "id": agent.id,
+                    "name": agent.name,
+                    "title": agent.title,
+                    "status": cfg.status if cfg else "draft",
+                    "total_sessions": len(agent_sessions),
+                    "active_sessions": sum(
+                        1 for s in agent_sessions if s.status == "active"
+                    ),
+                    "total_tokens": total_tokens,
+                    "flow_count": len(flows),
+                    "flow_success": flow_success,
+                    "flow_error": flow_error,
+                    "task_total": task_total,
+                    "task_completed": task_completed,
+                    "success_rate": success_rate,
+                }
+            )
 
         return {"agents": results}

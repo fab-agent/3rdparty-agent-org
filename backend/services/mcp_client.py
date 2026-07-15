@@ -2,6 +2,7 @@
 MCP (Model Context Protocol) client — supports SSE and HTTP transports.
 stdio transport is deferred to a future phase.
 """
+
 import json
 from typing import Any
 
@@ -22,7 +23,9 @@ async def call_http_tool(url: str, method: str, headers: dict, args: dict) -> An
             return resp.text
 
 
-async def call_mcp_sse_tool(url: str, auth_type: str, auth_value: str | None, tool_name: str, args: dict) -> Any:
+async def call_mcp_sse_tool(
+    url: str, auth_type: str, auth_value: str | None, tool_name: str, args: dict
+) -> Any:
     """
     Call a tool on an MCP server using HTTP transport (JSON-RPC over POST).
     The MCP server must expose a /call endpoint accepting JSON-RPC 2.0.
@@ -61,7 +64,12 @@ async def call_mcp_sse_tool(url: str, auth_type: str, auth_value: str | None, to
 BUILTIN_WEB_SEARCH_URL = "https://api.duckduckgo.com/?format=json&no_html=1&q={query}"
 
 
-async def execute_builtin(function_name: str, args: dict, session_id: str | None = None, agent_id: str | None = None) -> Any:
+async def execute_builtin(
+    function_name: str,
+    args: dict,
+    session_id: str | None = None,
+    agent_id: str | None = None,
+) -> Any:
     """Execute a built-in capability by name."""
     if function_name == "web_search":
         query = args.get("query", "")
@@ -70,7 +78,9 @@ async def execute_builtin(function_name: str, args: dict, session_id: str | None
             resp = await client.get(url)
             data = resp.json()
         topics = data.get("RelatedTopics", [])[:5]
-        results = [t.get("Text", "") for t in topics if isinstance(t, dict) and t.get("Text")]
+        results = [
+            t.get("Text", "") for t in topics if isinstance(t, dict) and t.get("Text")
+        ]
         return "\n".join(results) if results else "No results found."
 
     if function_name == "text_to_chart":
@@ -100,7 +110,9 @@ async def execute_builtin(function_name: str, args: dict, session_id: str | None
     return f"[Built-in '{function_name}' not implemented]"
 
 
-async def _delegate_to_agent(args: dict, session_id: str | None, from_agent_id: str | None) -> str:
+async def _delegate_to_agent(
+    args: dict, session_id: str | None, from_agent_id: str | None
+) -> str:
     """Create an A2A delegation request and return status."""
     if not session_id or not from_agent_id:
         return "[A2A delegation error: missing session_id or agent_id]"
@@ -123,7 +135,9 @@ async def _delegate_to_agent(args: dict, session_id: str | None, from_agent_id: 
             return f"[A2A delegation error: agent with slug '{to_slug}' not found]"
 
         # Verify target is an agent
-        cfg = db.exec(select(AgentConfig).where(AgentConfig.personnel_id == target.id)).first()
+        cfg = db.exec(
+            select(AgentConfig).where(AgentConfig.personnel_id == target.id)
+        ).first()
         if not cfg:
             return f"[A2A delegation error: '{to_slug}' has no agent config]"
 
@@ -202,8 +216,8 @@ async def _whatsapp_send(args: dict) -> str:
         return "[whatsapp_send] message gerekli"
 
     with _gs() as db:
-        phone_row   = db.get(AppConfig, "sm_wa_phone_number_id")
-        token_row   = db.get(AppConfig, "sm_wa_access_token_enc")
+        phone_row = db.get(AppConfig, "sm_wa_phone_number_id")
+        token_row = db.get(AppConfig, "sm_wa_access_token_enc")
         default_row = db.get(AppConfig, "sm_wa_default_to")
 
     if not phone_row or not token_row:
@@ -226,7 +240,9 @@ async def _whatsapp_send(args: dict) -> str:
         return f"[whatsapp_send] Hata: {e}"
 
 
-async def _journal_write(args: dict, session_id: str | None, agent_id: str | None) -> str:
+async def _journal_write(
+    args: dict, session_id: str | None, agent_id: str | None
+) -> str:
     """Builtin: agent writes a work log entry to its own journal."""
     content = args.get("content", "").strip()
     title = args.get("title", "").strip() or None
@@ -264,7 +280,6 @@ async def _db_query(args: dict) -> str:
     if not sql:
         return "[db_query] sql gerekli"
 
-
     from core.security import decrypt
     from database import get_session as _gs
     from models import DatabaseConnection
@@ -288,7 +303,9 @@ async def _db_query(args: dict) -> str:
         sep = " | ".join(["---"] * len(cols))
         body_lines = [" | ".join(str(v) for v in row) for row in rows[:50]]
         table = "\n".join([header, sep] + body_lines)
-        note = f"\n\n_{len(rows)} satır döndü" + ("_" if len(rows) < 100 else " (ilk 100 gösteriliyor)_")
+        note = f"\n\n_{len(rows)} satır döndü" + (
+            "_" if len(rows) < 100 else " (ilk 100 gösteriliyor)_"
+        )
         return table + note
     except ValueError as e:
         return f"[db_query] Güvenlik hatası: {e}"
@@ -302,21 +319,41 @@ def _run_function(args: dict) -> str:
     The code must define a function named `run(args: dict) -> str`.
     Runs in a restricted namespace with a 5-second wall-clock timeout.
     """
-    code = args.get("__code__", "")   # injected from skill config at call time
+    code = args.get("__code__", "")  # injected from skill config at call time
     if not code:
         return "[function] Çalıştırılacak kod bulunamadı (skill config'inde 'code' alanı gerekli)"
 
     import threading
+
     result_holder: list = []
     error_holder: list = []
 
     _SAFE_BUILTINS = {
-        "print": print, "len": len, "str": str, "int": int, "float": float,
-        "bool": bool, "list": list, "dict": dict, "tuple": tuple, "set": set,
-        "range": range, "enumerate": enumerate, "zip": zip, "map": map,
-        "filter": filter, "sorted": sorted, "sum": sum, "min": min, "max": max,
-        "abs": abs, "round": round, "isinstance": isinstance, "type": type,
-        "repr": repr, "json": __import__("json"),
+        "print": print,
+        "len": len,
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": bool,
+        "list": list,
+        "dict": dict,
+        "tuple": tuple,
+        "set": set,
+        "range": range,
+        "enumerate": enumerate,
+        "zip": zip,
+        "map": map,
+        "filter": filter,
+        "sorted": sorted,
+        "sum": sum,
+        "min": min,
+        "max": max,
+        "abs": abs,
+        "round": round,
+        "isinstance": isinstance,
+        "type": type,
+        "repr": repr,
+        "json": __import__("json"),
     }
 
     def _exec():

@@ -1,4 +1,5 @@
 """On-demand database backup to S3-compatible storage."""
+
 import io
 import json
 import logging
@@ -18,13 +19,13 @@ logger = logging.getLogger("app")
 router = APIRouter(prefix="/backup", tags=["backup"])
 
 # AppConfig keys used for backup settings
-_KEY_ENDPOINT   = "backup_endpoint_url"
-_KEY_BUCKET     = "backup_bucket"
-_KEY_PREFIX     = "backup_prefix"
-_KEY_REGION     = "backup_region"
+_KEY_ENDPOINT = "backup_endpoint_url"
+_KEY_BUCKET = "backup_bucket"
+_KEY_PREFIX = "backup_prefix"
+_KEY_REGION = "backup_region"
 _KEY_ACCESS_KEY = "backup_access_key"
 _KEY_SECRET_ENC = "backup_secret_key_encrypted"
-_KEY_HISTORY    = "backup_history_json"
+_KEY_HISTORY = "backup_history_json"
 
 
 def _get_cfg(session, key: str) -> str | None:
@@ -43,13 +44,14 @@ def _set_cfg(session, key: str, value: str) -> None:
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+
 class BackupConfig(BaseModel):
-    endpoint_url: str | None = None   # None = AWS S3; provide URL for R2/MinIO
+    endpoint_url: str | None = None  # None = AWS S3; provide URL for R2/MinIO
     bucket: str
     prefix: str = "backups/"
     region: str = "us-east-1"
     access_key: str
-    secret_key: str                      # plain on write, redacted on read
+    secret_key: str  # plain on write, redacted on read
 
 
 class BackupConfigResponse(BaseModel):
@@ -70,6 +72,7 @@ class BackupEntry(BaseModel):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _load_history(session) -> list[dict]:
     raw = _get_cfg(session, _KEY_HISTORY)
@@ -119,10 +122,13 @@ def _upload_to_s3(data: bytes, filename: str, cfg: dict) -> None:
 
     s3 = boto3.client("s3", **kwargs)
     key = f"{cfg.get('prefix', 'backups/')}{filename}".lstrip("/")
-    s3.put_object(Bucket=cfg["bucket"], Key=key, Body=data, ContentType="application/octet-stream")
+    s3.put_object(
+        Bucket=cfg["bucket"], Key=key, Body=data, ContentType="application/octet-stream"
+    )
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/config", response_model=BackupConfigResponse)
 def get_backup_config(_: User = Depends(get_current_user)):
@@ -145,10 +151,10 @@ def get_backup_config(_: User = Depends(get_current_user)):
 @router.put("/config")
 def save_backup_config(body: BackupConfig, _: User = Depends(require_manager)):
     with get_session() as session:
-        _set_cfg(session, _KEY_ENDPOINT,   body.endpoint_url or "")
-        _set_cfg(session, _KEY_BUCKET,     body.bucket)
-        _set_cfg(session, _KEY_PREFIX,     body.prefix)
-        _set_cfg(session, _KEY_REGION,     body.region)
+        _set_cfg(session, _KEY_ENDPOINT, body.endpoint_url or "")
+        _set_cfg(session, _KEY_BUCKET, body.bucket)
+        _set_cfg(session, _KEY_PREFIX, body.prefix)
+        _set_cfg(session, _KEY_REGION, body.region)
         _set_cfg(session, _KEY_ACCESS_KEY, body.access_key)
         _set_cfg(session, _KEY_SECRET_ENC, encrypt(body.secret_key))
         session.commit()
@@ -157,8 +163,14 @@ def save_backup_config(body: BackupConfig, _: User = Depends(require_manager)):
 
 @router.delete("/config", status_code=204)
 def delete_backup_config(_: User = Depends(require_manager)):
-    keys = [_KEY_ENDPOINT, _KEY_BUCKET, _KEY_PREFIX, _KEY_REGION,
-            _KEY_ACCESS_KEY, _KEY_SECRET_ENC]
+    keys = [
+        _KEY_ENDPOINT,
+        _KEY_BUCKET,
+        _KEY_PREFIX,
+        _KEY_REGION,
+        _KEY_ACCESS_KEY,
+        _KEY_SECRET_ENC,
+    ]
     with get_session() as session:
         for k in keys:
             row = session.get(AppConfig, k)
@@ -173,7 +185,10 @@ def backup_now(_: User = Depends(require_manager)):
     with get_session() as session:
         bucket = _get_cfg(session, _KEY_BUCKET)
         if not bucket:
-            raise HTTPException(status_code=422, detail="Yedekleme yapılandırılmamış. Önce depolama ayarlarını yapın.")
+            raise HTTPException(
+                status_code=422,
+                detail="Yedekleme yapılandırılmamış. Önce depolama ayarlarını yapın.",
+            )
 
         secret_enc = _get_cfg(session, _KEY_SECRET_ENC)
         cfg = {
@@ -192,20 +207,31 @@ def backup_now(_: User = Depends(require_manager)):
 
     try:
         import os
-        db_path = os.getenv("DATABASE_URL", "sqlite:///./data/app.db").replace("sqlite:///", "")
+
+        db_path = os.getenv("DATABASE_URL", "sqlite:///./data/app.db").replace(
+            "sqlite:///", ""
+        )
         data = _make_backup_stream(db_path)
         _upload_to_s3(data, filename, cfg)
         status = "success"
         message = None
         size = len(data)
-        logger.info("Backup completed", extra={"extra": {"filename": filename, "size": size}})
+        logger.info(
+            "Backup completed", extra={"extra": {"filename": filename, "size": size}}
+        )
     except Exception as e:
         status = "error"
         message = str(e)
         size = 0
         logger.error("Backup failed", extra={"extra": {"error": message}})
 
-    entry = {"ts": ts.isoformat(), "filename": filename, "size_bytes": size, "status": status, "message": message}
+    entry = {
+        "ts": ts.isoformat(),
+        "filename": filename,
+        "size_bytes": size,
+        "status": status,
+        "message": message,
+    }
     history.append(entry)
 
     with get_session() as session:

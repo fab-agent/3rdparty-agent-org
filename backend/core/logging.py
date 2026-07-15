@@ -1,4 +1,5 @@
 """Structured JSON logging — writes to logs/app.log and stdout."""
+
 import json
 import logging
 import os
@@ -37,6 +38,7 @@ def setup_logging() -> None:
 
     # File handler — rotates daily, keeps 30 days
     from logging.handlers import TimedRotatingFileHandler
+
     fh = TimedRotatingFileHandler(
         "logs/app.log", when="midnight", backupCount=30, encoding="utf-8"
     )
@@ -47,4 +49,6 @@ def setup_logging() -> None:
     for noisy in ("uvicorn.access", "sqlalchemy.engine", "httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    logging.getLogger("app").info("Logging initialised", extra={"extra": {"log_dir": "logs/"}})
+    logging.getLogger("app").info(
+        "Logging initialised", extra={"extra": {"log_dir": "logs/"}}
+    )

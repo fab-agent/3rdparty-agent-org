@@ -1,10 +1,12 @@
 """
 Policy CRUD, scope-filtering, and change-request proposal tests.
 """
+
 import models
 from tests.conftest import make_personnel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _create_policy(client, company_id, **overrides):
     payload = {
@@ -20,6 +22,7 @@ def _create_policy(client, company_id, **overrides):
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
+
 def test_create_policy_201(auth_client):
     co = auth_client._test_company
     r = _create_policy(auth_client, co.id)
@@ -32,9 +35,10 @@ def test_create_policy_201(auth_client):
 
 
 def test_create_policy_requires_auth(client):
-    r = client.post("/policies", json={
-        "company_id": "x", "name": "X", "slug": "x", "scope": "company"
-    })
+    r = client.post(
+        "/policies",
+        json={"company_id": "x", "name": "X", "slug": "x", "scope": "company"},
+    )
     assert r.status_code == 401
 
 
@@ -43,8 +47,14 @@ def test_create_department_scoped_policy(auth_client, db_session):
     dept = models.Department(name="Engineering", slug="engineering", company_id=co.id)
     db_session.add(dept)
     db_session.commit()
-    r = _create_policy(auth_client, co.id, name="Eng Policy", slug="eng-policy",
-                       scope="department", department_id=dept.id)
+    r = _create_policy(
+        auth_client,
+        co.id,
+        name="Eng Policy",
+        slug="eng-policy",
+        scope="department",
+        department_id=dept.id,
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["scope"] == "department"
@@ -52,6 +62,7 @@ def test_create_department_scoped_policy(auth_client, db_session):
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 
 def test_list_policies_empty(auth_client):
     co = auth_client._test_company
@@ -82,6 +93,7 @@ def test_list_policies_by_scope(auth_client):
 
 # ── Get ───────────────────────────────────────────────────────────────────────
 
+
 def test_get_policy(auth_client):
     co = auth_client._test_company
     pid = _create_policy(auth_client, co.id).json()["id"]
@@ -96,6 +108,7 @@ def test_get_policy_not_found(auth_client):
 
 
 # ── Update ────────────────────────────────────────────────────────────────────
+
 
 def test_update_policy_content(auth_client):
     co = auth_client._test_company
@@ -135,6 +148,7 @@ def test_update_policy_propose_cr(auth_client, db_session):
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
+
 
 def test_delete_policy(auth_client):
     co = auth_client._test_company

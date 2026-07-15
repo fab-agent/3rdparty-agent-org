@@ -9,6 +9,7 @@ WhatsApp: uses Meta Cloud API to send messages to a specific recipient.
   Note: WhatsApp Status Stories are NOT available via the official Cloud API.
   This implementation sends a text message instead.
 """
+
 import httpx
 
 GRAPH_BASE = "https://graph.facebook.com/v21.0"
@@ -59,7 +60,7 @@ async def instagram_post_text(
     # Return a helpful message instead of failing silently.
     return {
         "error": "Instagram feed posts require an image URL. "
-                 "Provide image_url to publish a photo post.",
+        "Provide image_url to publish a photo post.",
     }
 
 
