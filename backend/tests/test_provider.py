@@ -24,9 +24,13 @@ def test_each_provider_has_required_keys():
 
 
 def test_each_provider_has_models():
-    from services.provider_service import PROVIDER_CONFIGS
+    from services.provider_service import LOCAL_PROVIDERS, PROVIDER_CONFIGS
 
     for name, cfg in PROVIDER_CONFIGS.items():
+        if name in LOCAL_PROVIDERS:
+            # Local providers (ollama, lmstudio) return dynamic models from a
+            # running service — skip static model count check in CI.
+            continue
         assert len(cfg["models"]) >= 1, f"{name} has no models"
         for m in cfg["models"]:
             assert "id" in m and "name" in m
@@ -144,7 +148,7 @@ def test_get_provider_status(auth_client, db_session):
     assert r.status_code == 200
     data = r.json()
     providers = {p["provider"] for p in data}
-    assert {"anthropic", "openai", "google", "mistral", "qwen"} == providers
+    assert {"anthropic", "openai", "google", "mistral", "qwen"}.issubset(providers)
 
 
 def test_add_provider_key(auth_client, db_session):
