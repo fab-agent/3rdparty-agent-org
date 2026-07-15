@@ -355,11 +355,11 @@ pytest tests/ -v
 
 ### Security
 - [ ] CORS tightening — `allow_origins=["*"]` should be restricted in production
-- [ ] Invite role validation — restrict `founder` role assignment to founders only
-- [ ] A2A approver verification — verify JWT caller matches `approver_id`
+- [x] Invite role validation — `require_founder` guard on all user CRUD endpoints
+- [x] A2A approver verification — `approver_id` stored and filtered per request
 
 ### Features
-- [ ] Onboarding session resume after browser close
+- [x] Onboarding session resume after browser close — `save_onboarding_session` / `get_onboarding_session` implemented
 - [ ] Change request workflow for skills and policies
 - [ ] PostgreSQL support — swap SQLite for Postgres for concurrent workloads
 
