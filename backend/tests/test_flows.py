@@ -2,13 +2,13 @@
 Flow CRUD and run tests.
 _reload_flow_schedules is wrapped in try/except in flows.py so no mock needed.
 """
-import pytest
 from unittest.mock import patch
-from tests.conftest import (
-    make_company, make_personnel, make_user, make_member,
-)
-import models
 
+from tests.conftest import (
+    make_company,
+    make_personnel,
+    make_user,
+)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

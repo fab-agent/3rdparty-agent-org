@@ -1,6 +1,5 @@
 import json as _json
 from datetime import datetime, timedelta
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
@@ -8,8 +7,29 @@ from sqlmodel import select
 from api.audit import log_action
 from api.auth import check_company_membership, get_current_user
 from database import get_session
-from models import AgentConfig, AgentPolicyLink, AgentSkillLink, Company, CompanyMember, CompanySkill, Department, DepartmentPolicyLink, Personnel, Policy, Skill, User
-from schemas import AgentConfigCreate, AgentConfigUpdate, PersonnelCreate, PersonnelUpdate, PolicyLinkSet, SkillCreate, SkillUpdate
+from models import (
+    AgentConfig,
+    AgentPolicyLink,
+    AgentSkillLink,
+    Company,
+    CompanyMember,
+    CompanySkill,
+    Department,
+    DepartmentPolicyLink,
+    Personnel,
+    Policy,
+    Skill,
+    User,
+)
+from schemas import (
+    AgentConfigCreate,
+    AgentConfigUpdate,
+    PersonnelCreate,
+    PersonnelUpdate,
+    PolicyLinkSet,
+    SkillCreate,
+    SkillUpdate,
+)
 from services.auth import generate_temp_password, hash_password
 from services.email import send_invite
 
@@ -104,9 +124,9 @@ def _get_person_and_check_membership(person_id: str, user_id: str, session) -> P
 
 @router.get("/personnel")
 def list_personnel(current_user: User = Depends(get_current_user),
-                   department_id: Optional[str] = None,
-                   type: Optional[str] = None,
-                   company_id: Optional[str] = None):
+                   department_id: str | None = None,
+                   type: str | None = None,
+                   company_id: str | None = None):
     with get_session() as session:
         if company_id:
             check_company_membership(current_user.id, company_id, session)
@@ -180,7 +200,7 @@ def update_personnel(person_id: str, body: PersonnelUpdate,
 def invite_personnel(person_id: str, body: dict,
                      current_user: User = Depends(get_current_user)):
     role: str = body.get("role", "user")
-    scope_id: Optional[str] = body.get("scope_id")
+    scope_id: str | None = body.get("scope_id")
 
     with get_session() as session:
         person = _get_person_and_check_membership(person_id, current_user.id, session)
@@ -447,7 +467,7 @@ def set_agent_policies(person_id: str, body: PolicyLinkSet,
 # ── Org Tree ──────────────────────────────────────────────────────────────────
 
 @router.get("/org-tree")
-def get_org_tree(company_id: Optional[str] = None,
+def get_org_tree(company_id: str | None = None,
                  current_user: User = Depends(get_current_user)):
     with get_session() as session:
         if company_id:

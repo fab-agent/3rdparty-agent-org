@@ -8,7 +8,6 @@ Lifecycle:
 
 import json
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
@@ -17,7 +16,7 @@ from api.audit import log_action
 from api.auth import get_current_user
 from database import get_session
 from models import ChangeRequest, GitConfig, Personnel, User
-from schemas import ChangeRequestCreate, ChangeRequestApprove, ChangeRequestReject
+from schemas import ChangeRequestApprove, ChangeRequestCreate, ChangeRequestReject
 from services.github_commit import commit_change_request
 
 router = APIRouter(prefix="/change-requests", tags=["change-requests"])
@@ -53,9 +52,9 @@ def _cr_to_dict(cr: ChangeRequest) -> dict:
 
 @router.get("")
 def list_change_requests(
-    company_id: Optional[str] = None,
-    status: Optional[str] = None,
-    personnel_id: Optional[str] = None,
+    company_id: str | None = None,
+    status: str | None = None,
+    personnel_id: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     with get_session() as session:
@@ -192,7 +191,7 @@ def admin_approve(
         ).first()
         if not git_cfg:
             git_cfg = session.exec(
-                select(GitConfig).where(GitConfig.company_id == None)
+                select(GitConfig).where(GitConfig.company_id.is_(None))
             ).first()
 
         if git_cfg:

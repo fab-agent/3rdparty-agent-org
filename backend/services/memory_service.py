@@ -1,13 +1,11 @@
 """Agent memory: generate and load session summaries."""
-import json
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import select
 
-from database import get_session
-from models import AgentMemory, AgentSession, SessionMessage, AgentConfig, ProviderKey
 from core.security import decrypt
+from database import get_session
+from models import AgentConfig, AgentMemory, AgentSession, ProviderKey, SessionMessage
 
 
 async def generate_session_summary(session_id: str) -> None:
@@ -97,7 +95,6 @@ async def generate_session_summary(session_id: str) -> None:
 
 
 def _call_summary_llm(provider: str, model: str, api_key: str, prompt: str) -> str:
-    import asyncio
 
     if provider == "anthropic":
         import anthropic
@@ -127,9 +124,10 @@ def _call_summary_llm(provider: str, model: str, api_key: str, prompt: str) -> s
 
     elif provider in ("qwen", "mistral"):
         import openai
+        from sqlmodel import select as _sel
+
         from database import get_session as _gs
         from models import ProviderKey as _PK
-        from sqlmodel import select as _sel
         base_url = None
         with _gs() as _db:
             pk = _db.exec(_sel(_PK).where(_PK.provider == provider)).first()

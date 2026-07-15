@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends
 from sqlmodel import func, select
@@ -7,8 +6,15 @@ from sqlmodel import func, select
 from api.auth import get_current_user
 from database import get_session
 from models import (
-    AgentConfig, AgentMemory, AgentSession, Company, CompanyMember,
-    Flow, Personnel, SessionMessage, TaskRequest, User,
+    AgentConfig,
+    AgentMemory,
+    AgentSession,
+    CompanyMember,
+    Flow,
+    Personnel,
+    SessionMessage,
+    TaskRequest,
+    User,
 )
 
 router = APIRouter(tags=["dashboard"])
@@ -20,7 +26,7 @@ def _today_start() -> datetime:
 
 
 @router.get("/dashboard/stats")
-def company_stats(company_id: Optional[str] = None, user: User = Depends(get_current_user)):
+def company_stats(company_id: str | None = None, user: User = Depends(get_current_user)):
     with get_session() as session:
         # Resolve company_id
         if not company_id:
@@ -101,7 +107,7 @@ def company_stats(company_id: Optional[str] = None, user: User = Depends(get_cur
 
 
 @router.get("/dashboard/me")
-def my_dashboard(company_id: Optional[str] = None, user: User = Depends(get_current_user)):
+def my_dashboard(company_id: str | None = None, user: User = Depends(get_current_user)):
     """Returns the current user's personal telemetry (linked personnel record)."""
     with get_session() as session:
         # Resolve company_id
@@ -206,7 +212,7 @@ def my_dashboard(company_id: Optional[str] = None, user: User = Depends(get_curr
 
 
 @router.get("/dashboard/agent-sla")
-def agent_sla(company_id: Optional[str] = None, user: User = Depends(get_current_user)):
+def agent_sla(company_id: str | None = None, user: User = Depends(get_current_user)):
     """Per-agent SLA metrics: sessions, tokens, flow success rate, task completion."""
     with get_session() as session:
         if not company_id:

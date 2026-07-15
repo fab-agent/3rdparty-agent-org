@@ -1,6 +1,5 @@
-from datetime import datetime
-from typing import Optional
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -19,18 +18,18 @@ class PolicyCreate(BaseModel):
     slug: str
     content: str = ""
     scope: str = "company"        # company | department | agent
-    department_id: Optional[str] = None
-    agent_config_id: Optional[str] = None
+    department_id: str | None = None
+    agent_config_id: str | None = None
 
 
 class PolicyUpdate(BaseModel):
-    name: Optional[str] = None
-    slug: Optional[str] = None
-    content: Optional[str] = None
-    scope: Optional[str] = None
-    department_id: Optional[str] = None
-    agent_config_id: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    slug: str | None = None
+    content: str | None = None
+    scope: str | None = None
+    department_id: str | None = None
+    agent_config_id: str | None = None
+    is_active: bool | None = None
 
 
 def _policy_dict(p: Policy) -> dict:
@@ -51,10 +50,10 @@ def _policy_dict(p: Policy) -> dict:
 
 @router.get("/policies")
 def list_policies(
-    company_id: Optional[str] = None,
-    department_id: Optional[str] = None,
-    agent_config_id: Optional[str] = None,
-    scope: Optional[str] = None,
+    company_id: str | None = None,
+    department_id: str | None = None,
+    agent_config_id: str | None = None,
+    scope: str | None = None,
     _: User = Depends(get_current_user),
 ):
     with get_session() as session:
@@ -103,7 +102,7 @@ def update_policy(
     policy_id: str,
     body: PolicyUpdate,
     propose: bool = False,
-    personnel_id: Optional[str] = None,
+    personnel_id: str | None = None,
     user: User = Depends(require_manager),
 ):
     """

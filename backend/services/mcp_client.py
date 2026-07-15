@@ -3,9 +3,9 @@ MCP (Model Context Protocol) client — supports SSE and HTTP transports.
 stdio transport is deferred to a future phase.
 """
 import json
-import asyncio
-import httpx
 from typing import Any
+
+import httpx
 
 
 async def call_http_tool(url: str, method: str, headers: dict, args: dict) -> Any:
@@ -112,9 +112,10 @@ async def _delegate_to_agent(args: dict, session_id: str | None, from_agent_id: 
     if not to_slug or not task:
         return "[A2A delegation error: to_agent_slug and task are required]"
 
-    from database import get_session as _get_session
-    from models import Personnel, AgentConfig, A2ARequest
     from sqlmodel import select
+
+    from database import get_session as _get_session
+    from models import A2ARequest, AgentConfig, Personnel
 
     with _get_session() as db:
         target = db.exec(select(Personnel).where(Personnel.slug == to_slug)).first()
@@ -156,9 +157,9 @@ async def _delegate_to_agent(args: dict, session_id: str | None, from_agent_id: 
 
 async def _instagram_post(args: dict) -> str:
     """Builtin: publish a photo post to the platform's configured Instagram account."""
+    from core.security import decrypt
     from database import get_session as _gs
     from models import AppConfig
-    from core.security import decrypt
     from services.social_media import instagram_post_photo
 
     image_url = args.get("image_url", "")
@@ -190,9 +191,9 @@ async def _instagram_post(args: dict) -> str:
 
 async def _whatsapp_send(args: dict) -> str:
     """Builtin: send a WhatsApp text message via the platform's configured account."""
+    from core.security import decrypt
     from database import get_session as _gs
     from models import AppConfig
-    from core.security import decrypt
     from services.social_media import whatsapp_send_message
 
     message = args.get("message", "")
@@ -263,11 +264,11 @@ async def _db_query(args: dict) -> str:
     if not sql:
         return "[db_query] sql gerekli"
 
+
+    from core.security import decrypt
     from database import get_session as _gs
     from models import DatabaseConnection
-    from core.security import decrypt
     from services.database_service import execute_query
-    import json
 
     with _gs() as db:
         row = db.get(DatabaseConnection, db_id)

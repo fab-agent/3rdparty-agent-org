@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (Ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Ruff
+        run: pip install ruff>=0.4
+
+      - name: Lint
+        run: ruff check backend/
+
+      - name: Format check
+        run: ruff format --check backend/
+
+  typecheck:
+    name: TypeCheck (svelte-check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: TypeCheck
+        run: npm run check
+        working-directory: frontend
+
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: backend
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+        working-directory: backend
+        env:
+          JWT_SECRET: ci-test-secret-not-for-production
+          ENCRYPTION_KEY: ""
+
+  gate:
+    name: CI Gate
+    needs: [lint, typecheck, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    if: always()
+    steps:
+      - name: All required jobs passed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more required jobs failed."
+          echo "  lint:      ${{ needs.lint.result }}"
+          echo "  typecheck: ${{ needs.typecheck.result }}"
+          echo "  test:      ${{ needs.test.result }}"
+          exit 1
+      - name: Gate passed
+        if: "!(contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))"
+        run: echo "All gates passed."

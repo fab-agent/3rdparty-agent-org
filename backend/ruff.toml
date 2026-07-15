@@ -1,0 +1,37 @@
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (unused imports, undefined names)
+    "I",   # isort (import ordering)
+    "UP",  # pyupgrade (modern Python syntax)
+    "B",   # bugbear (common bugs)
+    "S",   # bandit (security)
+]
+ignore = [
+    "S101",  # assert statements allowed in tests
+    "S105",  # hardcoded passwords — false positives on field names
+    "S106",
+    "S110",  # try-except-pass — intentional in service layer
+    "S104",  # hardcoded bind-all — intentional in dev server
+    "B008",  # FastAPI Depends() calls in function defaults
+    "E501",  # line length — not enforced
+    "E402",  # module-import-not-at-top — intentional in main.py (.env load first)
+    "E701",  # multiple-statements-on-one-line — style preference
+    "E712",  # == True/False — SQLModel filter pattern
+    "E741",  # ambiguous variable names — short names acceptable in small scopes
+    "B904",  # raise-without-from — exception chaining not required in API handlers
+    "B023",  # function-uses-loop-variable — intentional mutable-container capture pattern
+    "B007",  # unused-loop-control-variable
+    "B017",  # assert-raises-exception — used in tests
+    "B905",  # zip-without-explicit-strict
+    "F841",  # unused-variable — occasionally left in for debugging
+    "S102",  # exec-builtin
+    "S608",  # hardcoded-sql-expression
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S", "F811"]  # security + redefinition noise in test files
+
+[format]
+quote-style = "double"
+indent-style = "space"

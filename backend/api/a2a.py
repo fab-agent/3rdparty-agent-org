@@ -9,16 +9,20 @@ Flow:
   5. Result returned to the originating session
 """
 import asyncio
-import json
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import select
 
 from api.auth import get_current_user
 from database import get_session
-from models import A2ARequest, AgentConfig, AgentSession, Personnel, SessionMessage, User
+from models import (
+    A2ARequest,
+    AgentConfig,
+    AgentSession,
+    Personnel,
+    User,
+)
 from schemas import A2AApprove, A2AReject, A2ARequestCreate, A2AResultApprove
 
 router = APIRouter(prefix="/a2a", tags=["a2a"])
@@ -65,11 +69,11 @@ def _auto_set_approver(req: A2ARequest, session) -> None:
 
 @router.get("/requests")
 def list_requests(
-    company_id: Optional[str] = None,
-    approver_id: Optional[str] = None,
-    status: Optional[str] = None,
-    from_agent_id: Optional[str] = None,
-    to_agent_id: Optional[str] = None,
+    company_id: str | None = None,
+    approver_id: str | None = None,
+    status: str | None = None,
+    from_agent_id: str | None = None,
+    to_agent_id: str | None = None,
     _: User = Depends(get_current_user),
 ):
     from sqlalchemy import or_
@@ -98,7 +102,7 @@ def list_requests(
 
 
 @router.get("/requests/pending-count")
-def pending_count(company_id: Optional[str] = None, _: User = Depends(get_current_user)):
+def pending_count(company_id: str | None = None, _: User = Depends(get_current_user)):
     """Returns count of requests awaiting approval (for notification badge)."""
     from sqlalchemy import or_
     with get_session() as session:

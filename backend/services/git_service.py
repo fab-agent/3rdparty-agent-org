@@ -10,16 +10,20 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import httpx
 import yaml
-from git import Repo, InvalidGitRepositoryError, NoSuchPathError
+from git import InvalidGitRepositoryError, NoSuchPathError, Repo
 from sqlmodel import Session, select
 
 from core.security import decrypt
 from models import (
-    AgentConfig, Department, GitConfig, Personnel, Skill, SyncLog,
+    AgentConfig,
+    Department,
+    GitConfig,
+    Personnel,
+    Skill,
+    SyncLog,
 )
 
 REPO_DIR = Path("data/git-repo")
@@ -31,8 +35,8 @@ def _agent_to_dict(
     agent: Personnel,
     cfg: AgentConfig,
     skills: list[Skill],
-    dept: Optional[Department],
-    responsible: Optional[Personnel],
+    dept: Department | None,
+    responsible: Personnel | None,
 ) -> dict:
     return {
         "id":            agent.slug,
@@ -104,7 +108,7 @@ class GitSyncService:
 
     # ── Export (DB → YAML files) ──────────────────────────────────────────────
 
-    def export_to_files(self, session: Session, company_id: Optional[str] = None) -> list[Path]:
+    def export_to_files(self, session: Session, company_id: str | None = None) -> list[Path]:
         written: list[Path] = []
 
         dept_q = select(Department)
@@ -145,7 +149,7 @@ class GitSyncService:
 
     # ── Import (YAML files → DB) ──────────────────────────────────────────────
 
-    def import_from_files(self, session: Session, company_id: Optional[str] = None) -> int:
+    def import_from_files(self, session: Session, company_id: str | None = None) -> int:
         changed = 0
 
         dept_dir = REPO_DIR / "departments"
@@ -275,7 +279,7 @@ class GitSyncService:
             repo.remotes.origin.push(config.branch)
 
             sha    = commit.hexsha
-            pr_url: Optional[str] = None
+            pr_url: str | None = None
             if config.auto_pr:
                 try:
                     pr_url = self._create_pr(config, msg)
@@ -350,7 +354,7 @@ class GitSyncService:
 
     # ── PR creation (GitHub / GitLab) ─────────────────────────────────────────
 
-    def _create_pr(self, config: GitConfig, title: str) -> Optional[str]:
+    def _create_pr(self, config: GitConfig, title: str) -> str | None:
         token = decrypt(config.encrypted_token)
         owner, repo = self._parse_repo_url(config)
 

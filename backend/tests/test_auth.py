@@ -1,7 +1,7 @@
 """Auth endpoints + service unit tests."""
 import pytest
-from tests.conftest import make_company, make_user, make_member
 
+from tests.conftest import make_user
 
 # ── Service unit tests ────────────────────────────────────────────────────────
 

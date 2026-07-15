@@ -5,7 +5,7 @@ from sqlmodel import select
 
 from api.audit import log_action
 from api.auth import get_current_user, require_manager
-from core.security import encrypt, decrypt
+from core.security import decrypt, encrypt
 from database import get_session
 from models import AppConfig, ProviderKey, User
 from schemas import ConfigPatch, SetProviderKey

@@ -1,5 +1,4 @@
 """Audit log API — read-only, admin/executive only in production."""
-from typing import Optional
 import json
 from datetime import datetime
 
@@ -16,11 +15,11 @@ def log_action(
     session,
     action: str,
     entity_type: str,
-    entity_id: Optional[str] = None,
-    entity_name: Optional[str] = None,
-    company_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    details: Optional[dict] = None,
+    entity_id: str | None = None,
+    entity_name: str | None = None,
+    company_id: str | None = None,
+    user_id: str | None = None,
+    details: dict | None = None,
 ) -> None:
     """Helper called from other routers to record an audit event."""
     entry = AuditLog(
@@ -38,10 +37,10 @@ def log_action(
 
 @router.get("")
 def list_audit_logs(
-    company_id: Optional[str] = None,
-    entity_type: Optional[str] = None,
-    action: Optional[str] = None,
-    user_id: Optional[str] = None,
+    company_id: str | None = None,
+    entity_type: str | None = None,
+    action: str | None = None,
+    user_id: str | None = None,
     limit: int = 100,
 ):
     with get_session() as session:

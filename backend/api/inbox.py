@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select, func
+from sqlmodel import func, select
 
 from api.auth import get_current_user
 from database import get_session
@@ -26,9 +26,9 @@ def _to_dict(m: InboxMessage) -> dict:
 
 @router.get("")
 def list_inbox(
-    company_id: Optional[str] = None,
+    company_id: str | None = None,
     unread_only: bool = False,
-    period: Optional[str] = None,   # "week" | "month"
+    period: str | None = None,   # "week" | "month"
     current_user: User = Depends(get_current_user),
 ):
     with get_session() as session:
@@ -48,7 +48,7 @@ def list_inbox(
 
 
 @router.get("/unread-count")
-def unread_count(company_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+def unread_count(company_id: str | None = None, current_user: User = Depends(get_current_user)):
     with get_session() as session:
         q = select(func.count()).where(
             InboxMessage.recipient_user_id == current_user.id,
@@ -74,7 +74,7 @@ def mark_read(msg_id: str, current_user: User = Depends(get_current_user)):
 
 
 @router.post("/read-all")
-def mark_all_read(company_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+def mark_all_read(company_id: str | None = None, current_user: User = Depends(get_current_user)):
     with get_session() as session:
         q = select(InboxMessage).where(
             InboxMessage.recipient_user_id == current_user.id,

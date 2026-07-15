@@ -1,6 +1,5 @@
 """Social media credential management + publish endpoints."""
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -21,7 +20,7 @@ _WA_TOKEN    = "sm_wa_access_token_enc"
 _WA_DEFAULT_TO = "sm_wa_default_to"
 
 
-def _get(session, key: str) -> Optional[str]:
+def _get(session, key: str) -> str | None:
     row = session.get(AppConfig, key)
     return row.value if row else None
 
@@ -38,19 +37,19 @@ def _set(session, key: str, value: str) -> None:
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
 class SocialConfig(BaseModel):
-    ig_user_id: Optional[str] = None
-    ig_access_token: Optional[str] = None       # plain on write
-    wa_phone_number_id: Optional[str] = None
-    wa_access_token: Optional[str] = None        # plain on write
-    wa_default_to: Optional[str] = None          # default WhatsApp recipient
+    ig_user_id: str | None = None
+    ig_access_token: str | None = None       # plain on write
+    wa_phone_number_id: str | None = None
+    wa_access_token: str | None = None        # plain on write
+    wa_default_to: str | None = None          # default WhatsApp recipient
 
 
 class SocialConfigResponse(BaseModel):
     instagram_configured: bool
-    ig_user_id: Optional[str] = None
+    ig_user_id: str | None = None
     whatsapp_configured: bool
-    wa_phone_number_id: Optional[str] = None
-    wa_default_to: Optional[str] = None
+    wa_phone_number_id: str | None = None
+    wa_default_to: str | None = None
 
 
 class InstagramPostRequest(BaseModel):
@@ -60,7 +59,7 @@ class InstagramPostRequest(BaseModel):
 
 class WhatsAppMessageRequest(BaseModel):
     message: str
-    to: Optional[str] = None   # overrides default_to if provided
+    to: str | None = None   # overrides default_to if provided
 
 
 # ── Config endpoints ───────────────────────────────────────────────────────────

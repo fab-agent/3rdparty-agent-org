@@ -1,9 +1,9 @@
-from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
 
 from api.audit import log_action
-from core.security import encrypt, decrypt
+from core.security import encrypt
 from database import get_session
 from models import GitConfig, SyncLog
 from schemas import GitConfigCreate, GitConfigUpdate, PushRequest
@@ -41,7 +41,7 @@ def _log_to_dict(log: SyncLog) -> dict:
     }
 
 
-def _get_config_or_404(session, company_id: Optional[str] = None) -> GitConfig:
+def _get_config_or_404(session, company_id: str | None = None) -> GitConfig:
     q = select(GitConfig)
     if company_id:
         q = q.where(GitConfig.company_id == company_id)
@@ -54,7 +54,7 @@ def _get_config_or_404(session, company_id: Optional[str] = None) -> GitConfig:
 # ── Config CRUD ───────────────────────────────────────────────────────────────
 
 @router.get("/config")
-def get_git_config(company_id: Optional[str] = None):
+def get_git_config(company_id: str | None = None):
     with get_session() as session:
         q = select(GitConfig)
         if company_id:
@@ -66,7 +66,7 @@ def get_git_config(company_id: Optional[str] = None):
 
 
 @router.post("/config", status_code=201)
-def create_git_config(body: GitConfigCreate, company_id: Optional[str] = None):
+def create_git_config(body: GitConfigCreate, company_id: str | None = None):
     with get_session() as session:
         q = select(GitConfig)
         if company_id:
@@ -92,7 +92,7 @@ def create_git_config(body: GitConfigCreate, company_id: Optional[str] = None):
 
 
 @router.patch("/config")
-def update_git_config(body: GitConfigUpdate, company_id: Optional[str] = None):
+def update_git_config(body: GitConfigUpdate, company_id: str | None = None):
     with get_session() as session:
         cfg = _get_config_or_404(session, company_id)
         if body.branch is not None:        cfg.branch          = body.branch
@@ -107,7 +107,7 @@ def update_git_config(body: GitConfigUpdate, company_id: Optional[str] = None):
 
 
 @router.delete("/config", status_code=204)
-def delete_git_config(company_id: Optional[str] = None):
+def delete_git_config(company_id: str | None = None):
     with get_session() as session:
         cfg = _get_config_or_404(session, company_id)
         log_action(session, "delete", "git_config", entity_id=cfg.id, entity_name=cfg.repo_url, company_id=cfg.company_id)
@@ -118,7 +118,7 @@ def delete_git_config(company_id: Optional[str] = None):
 # ── Sync operations ───────────────────────────────────────────────────────────
 
 @router.post("/pull")
-def git_pull(company_id: Optional[str] = None):
+def git_pull(company_id: str | None = None):
     with get_session() as session:
         cfg = _get_config_or_404(session, company_id)
         log = git_service.pull(session, cfg)
@@ -128,7 +128,7 @@ def git_pull(company_id: Optional[str] = None):
 
 
 @router.post("/push")
-def git_push(body: PushRequest, company_id: Optional[str] = None):
+def git_push(body: PushRequest, company_id: str | None = None):
     with get_session() as session:
         cfg = _get_config_or_404(session, company_id)
         log = git_service.push(session, cfg, body.message)
@@ -138,7 +138,7 @@ def git_push(body: PushRequest, company_id: Optional[str] = None):
 
 
 @router.get("/diff")
-def git_diff(company_id: Optional[str] = None):
+def git_diff(company_id: str | None = None):
     with get_session() as session:
         cfg = _get_config_or_404(session, company_id)
         return git_service.diff(session, cfg)

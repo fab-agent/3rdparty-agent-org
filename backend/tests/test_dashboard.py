@@ -1,9 +1,8 @@
 """
 Dashboard stats and personal telemetry tests.
 """
-from tests.conftest import make_personnel, make_agent_config
 import models
-
+from tests.conftest import make_agent_config, make_personnel
 
 # ── /dashboard/stats ──────────────────────────────────────────────────────────
 

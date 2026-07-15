@@ -11,16 +11,16 @@ Strategy:
 - init_db / run_seed / env-key sync are mocked (no alembic, no demo noise).
 - A logged-in `auth_client` fixture provides an authenticated TestClient.
 """
-import pytest
 from unittest.mock import patch
-from sqlalchemy import create_engine
-from sqlmodel import SQLModel, Session
+
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlmodel import Session, SQLModel
 
 import database
 import models
-from services.auth import hash_password, create_access_token
-
+from services.auth import create_access_token, hash_password
 
 # ── DB fixture ────────────────────────────────────────────────────────────────
 

@@ -6,18 +6,28 @@ Supported providers (routed by model name prefix):
   claude-*   → Anthropic Claude
   gpt-*      → OpenAI GPT
 """
-import json
 import asyncio
-from typing import AsyncGenerator, Any
+import json
+from collections.abc import AsyncGenerator
 
 from sqlmodel import select
 
-from database import get_session
-from models import AgentPolicyLink, DepartmentPolicyLink, Personnel, Department, AgentConfig, Policy, Skill, ProviderKey, AgentSession, SessionMessage
 from core.security import decrypt
-from services.mcp_client import call_mcp_sse_tool, call_http_tool, execute_builtin
+from database import get_session
+from models import (
+    AgentConfig,
+    AgentPolicyLink,
+    AgentSession,
+    Department,
+    DepartmentPolicyLink,
+    Personnel,
+    Policy,
+    ProviderKey,
+    SessionMessage,
+    Skill,
+)
+from services.mcp_client import call_http_tool, call_mcp_sse_tool, execute_builtin
 from services.memory_service import load_agent_memories
-
 
 # ── Attachment helpers ────────────────────────────────────────────────────────
 
@@ -312,7 +322,7 @@ def detect_provider(model: str) -> str:
 
 def is_image_gen_model(model: str) -> bool:
     """Check model type from the capabilities cache; fall back to prefix detection."""
-    from services.provider_service import load_model_capabilities, _infer_model_type
+    from services.provider_service import _infer_model_type, load_model_capabilities
     caps = load_model_capabilities()
     if model in caps:
         return caps[model] == "image"
@@ -594,8 +604,9 @@ async def _generate_image_qwen(
     stored_base_url: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """DashScope async task API for qwen-image-* and wanx-* models."""
-    import httpx
     import time
+
+    import httpx
 
     task_root = _qwen_task_base(stored_base_url)
     submit_url = f"{task_root}/api/v1/services/aigc/text2image/image-synthesis"
@@ -713,9 +724,10 @@ async def _generate_image(
 ) -> AsyncGenerator[dict, None]:
     if provider == "qwen":
         stored_base_url = None
+        from sqlmodel import select as _sel
+
         from database import get_session as _gs
         from models import ProviderKey as _PK
-        from sqlmodel import select as _sel
         with _gs() as _db:
             _row = _db.exec(_sel(_PK).where(_PK.provider == "qwen")).first()
             if _row:
@@ -752,9 +764,10 @@ async def _stream_openai_compatible(
 
     base_url = _OPENAI_BASE_URLS.get(provider, "https://api.openai.com/v1")
     if provider == "qwen":
+        from sqlmodel import select as _sel
+
         from database import get_session as _gs
         from models import ProviderKey as _PK
-        from sqlmodel import select as _sel
         with _gs() as _db:
             _row = _db.exec(_sel(_PK).where(_PK.provider == "qwen")).first()
             if _row and _row.base_url:

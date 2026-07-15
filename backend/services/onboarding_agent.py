@@ -6,22 +6,28 @@ AI Onboarding Service
 3. Structured JSON org generation
 4. Bulk entity creation
 """
-import json
 import asyncio
+import json
 import re
+from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import AsyncGenerator
 
 from sqlmodel import select
 
+from core.security import decrypt
 from database import get_session
 from models import (
-    Company, Department, DepartmentPolicyLink, Personnel, AgentConfig, CompanySkill,
-    Policy, AgentSkillLink, ProviderKey, OnboardingSession,
+    AgentConfig,
+    AgentSkillLink,
+    Company,
+    CompanySkill,
+    Department,
+    DepartmentPolicyLink,
+    OnboardingSession,
+    Personnel,
+    Policy,
+    ProviderKey,
 )
-from core.security import decrypt
-from services.agent_runtime import detect_provider
-
 
 # ── Session persistence ───────────────────────────────────────────────────────
 

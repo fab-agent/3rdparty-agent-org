@@ -1,7 +1,5 @@
 """Work journal — agent-authored and human-authored log entries per personnel."""
 import logging
-from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -17,18 +15,18 @@ router = APIRouter(prefix="/journal", tags=["journal"])
 
 class JournalEntryCreate(BaseModel):
     personnel_id: str
-    title: Optional[str] = None
+    title: str | None = None
     content: str
     author: str = "human"          # "agent" | "human"
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 class JournalEntryResponse(BaseModel):
     id: str
     personnel_id: str
-    session_id: Optional[str]
+    session_id: str | None
     author: str
-    title: Optional[str]
+    title: str | None
     content: str
     created_at: str
 

@@ -5,7 +5,7 @@ import string
 from datetime import datetime, timedelta
 
 import bcrypt
-from jose import JWTError, jwt
+from jose import jwt
 
 SECRET_KEY = os.getenv("JWT_SECRET", "change-me-in-production-please")
 if SECRET_KEY == "change-me-in-production-please":

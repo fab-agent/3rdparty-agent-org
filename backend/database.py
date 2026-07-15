@@ -1,7 +1,8 @@
-from sqlmodel import create_engine, Session, SQLModel
-from contextlib import contextmanager
-from typing import Generator
 import os
+from collections.abc import Generator
+from contextlib import contextmanager
+
+from sqlmodel import Session, SQLModel, create_engine
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/app.db")
 
@@ -14,7 +15,7 @@ engine = create_engine(
 
 def _is_fresh_db() -> bool:
     """Return True if the database has no alembic_version table (brand-new install)."""
-    from sqlalchemy import inspect, text
+    from sqlalchemy import text
     with engine.connect() as conn:
         try:
             result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'"))
@@ -26,8 +27,8 @@ def _is_fresh_db() -> bool:
 def init_db() -> None:
     os.makedirs("data", exist_ok=True)
 
-    from alembic.config import Config
     from alembic import command
+    from alembic.config import Config
     ini_path = os.path.join(os.path.dirname(__file__), "alembic.ini")
     alembic_cfg = Config(ini_path)
 

@@ -1,7 +1,7 @@
 """Provider service unit tests + provider API endpoints."""
-from unittest.mock import patch, MagicMock
-from tests.conftest import make_provider_key
+from unittest.mock import MagicMock, patch
 
+from tests.conftest import make_provider_key
 
 # ── PROVIDER_CONFIGS completeness ─────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ def test_qwen_uses_dashscope_url():
 
 
 def test_qwen_models():
-    from services.provider_service import PROVIDER_CONFIGS, get_provider_models
+    from services.provider_service import get_provider_models
     models = get_provider_models("qwen")
     ids = [m["id"] for m in models]
     assert "qwen-turbo" in ids

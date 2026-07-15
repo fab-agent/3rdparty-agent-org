@@ -1,7 +1,5 @@
 """CRUD endpoint tests: companies, departments, personnel, sessions."""
-from tests.conftest import make_company_for_user, make_personnel, make_agent_config
-import models
-
+from tests.conftest import make_agent_config, make_company_for_user, make_personnel
 
 # ── Companies ─────────────────────────────────────────────────────────────────
 

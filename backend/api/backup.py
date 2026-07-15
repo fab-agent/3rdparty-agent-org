@@ -5,11 +5,9 @@ import logging
 import sqlite3
 import tempfile
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlmodel import select
 
 from api.auth import get_current_user, require_manager
 from core.security import decrypt, encrypt
@@ -29,7 +27,7 @@ _KEY_SECRET_ENC = "backup_secret_key_encrypted"
 _KEY_HISTORY    = "backup_history_json"
 
 
-def _get_cfg(session, key: str) -> Optional[str]:
+def _get_cfg(session, key: str) -> str | None:
     row = session.get(AppConfig, key)
     return row.value if row else None
 
@@ -46,7 +44,7 @@ def _set_cfg(session, key: str, value: str) -> None:
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
 class BackupConfig(BaseModel):
-    endpoint_url: Optional[str] = None   # None = AWS S3; provide URL for R2/MinIO
+    endpoint_url: str | None = None   # None = AWS S3; provide URL for R2/MinIO
     bucket: str
     prefix: str = "backups/"
     region: str = "us-east-1"
@@ -56,11 +54,11 @@ class BackupConfig(BaseModel):
 
 class BackupConfigResponse(BaseModel):
     configured: bool
-    endpoint_url: Optional[str] = None
-    bucket: Optional[str] = None
-    prefix: Optional[str] = None
-    region: Optional[str] = None
-    access_key_hint: Optional[str] = None  # first 4 + ***
+    endpoint_url: str | None = None
+    bucket: str | None = None
+    prefix: str | None = None
+    region: str | None = None
+    access_key_hint: str | None = None  # first 4 + ***
 
 
 class BackupEntry(BaseModel):
@@ -68,7 +66,7 @@ class BackupEntry(BaseModel):
     filename: str
     size_bytes: int
     status: str
-    message: Optional[str] = None
+    message: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

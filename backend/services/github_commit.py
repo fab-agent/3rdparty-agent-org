@@ -4,13 +4,12 @@ No local git clone needed — purely API-based.
 """
 
 import json
-from typing import Optional
 
 from github import Github, GithubException
+from sqlmodel import Session
 
 from core.security import decrypt
-from models import AgentConfig, ChangeRequest, GitConfig, Personnel, Skill
-from sqlmodel import Session, select
+from models import ChangeRequest, GitConfig, Personnel
 
 
 def _build_agent_yaml_content(

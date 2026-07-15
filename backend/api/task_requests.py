@@ -8,20 +8,27 @@ Routing logic:
 """
 
 from datetime import datetime
-from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import select
 
 from api.auth import get_current_user
+from core.security import decrypt
 from database import get_session
 from models import (
-    AgentConfig, AgentSkillLink, CompanyMember, CompanySkill,
-    Department, InboxMessage, Personnel, Skill, TaskRequest, User,
+    AgentConfig,
+    AgentSkillLink,
+    CompanySkill,
+    Department,
+    InboxMessage,
+    Personnel,
+    ProviderKey,
+    Skill,
+    TaskRequest,
+    User,
 )
-from services.flow_runner import _call_llm, _build_system_prompt
-from core.security import decrypt
-from models import ProviderKey
+from services.flow_runner import _build_system_prompt, _call_llm
 
 router = APIRouter(prefix="/task-requests", tags=["task-requests"])
 
@@ -43,14 +50,14 @@ def _model_to_provider(model: str) -> str:
 
 class TaskRequestCreate(BaseModel):
     company_id: str
-    department_id: Optional[str] = None
-    skill_filter: Optional[str] = None
+    department_id: str | None = None
+    skill_filter: str | None = None
     title: str
     body: str
 
 
 class TaskRequestAction(BaseModel):
-    human_note: Optional[str] = None
+    human_note: str | None = None
 
 
 def _to_dict(t: TaskRequest) -> dict:
@@ -72,9 +79,9 @@ def _to_dict(t: TaskRequest) -> dict:
     }
 
 
-def _route_agent(session, company_id: str, department_id: Optional[str], skill_filter: Optional[str]) -> Optional[AgentConfig]:
+def _route_agent(session, company_id: str, department_id: str | None, skill_filter: str | None) -> AgentConfig | None:
     """Find best matching agent. Dept first → parent dept → company-wide."""
-    dept_ids_to_try: list[Optional[str]] = []
+    dept_ids_to_try: list[str | None] = []
     if department_id:
         dept_ids_to_try.append(department_id)
         # Walk up parent chain
@@ -126,8 +133,8 @@ def _route_agent(session, company_id: str, department_id: Optional[str], skill_f
 
 @router.get("")
 def list_task_requests(
-    company_id: Optional[str] = None,
-    status: Optional[str] = None,
+    company_id: str | None = None,
+    status: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     with get_session() as session:
@@ -150,7 +157,7 @@ def create_task_request(body: TaskRequestCreate, current_user: User = Depends(ge
     with get_session() as session:
         agent_cfg = _route_agent(session, body.company_id, body.department_id, body.skill_filter)
 
-        responsible_user_id: Optional[str] = None
+        responsible_user_id: str | None = None
         if agent_cfg:
             if agent_cfg.responsible_id:
                 resp_personnel = session.get(Personnel, agent_cfg.responsible_id)

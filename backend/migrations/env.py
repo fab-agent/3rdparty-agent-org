@@ -2,13 +2,14 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # Make sure backend/ is on the path so we can import models
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from sqlmodel import SQLModel
+
 import models  # noqa: F401 — side-effect: registers all tables on SQLModel.metadata
 
 config = context.config

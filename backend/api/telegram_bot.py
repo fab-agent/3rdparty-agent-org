@@ -19,17 +19,22 @@ Inline buttons:
 import asyncio
 import json
 from datetime import datetime
-from typing import Optional
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter
 from sqlmodel import select
 
 from core.security import decrypt
 from database import get_session
 from models import (
-    A2ARequest, AgentConfig, AgentSession, CompanyMember,
-    Personnel, ProviderKey, TaskRequest, TelegramBotState, TelegramConfig,
+    A2ARequest,
+    AgentConfig,
+    AgentSession,
+    CompanyMember,
+    Personnel,
+    TaskRequest,
+    TelegramBotState,
+    TelegramConfig,
 )
 
 router = APIRouter(tags=["telegram-bot"])
@@ -43,7 +48,7 @@ def _tg_url(token: str, method: str) -> str:
     return _BOT_BASE.format(token=token, method=method)
 
 
-def _send(token: str, chat_id: str, text: str, reply_markup: Optional[dict] = None, parse_mode: str = "HTML") -> None:
+def _send(token: str, chat_id: str, text: str, reply_markup: dict | None = None, parse_mode: str = "HTML") -> None:
     payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
@@ -85,7 +90,7 @@ def _split_and_send(token: str, chat_id: str, text: str, parse_mode: str = "HTML
 
 # ── Bot config loader ──────────────────────────────────────────────────────────
 
-def _get_bot_token(company_id: Optional[str] = None) -> Optional[str]:
+def _get_bot_token(company_id: str | None = None) -> str | None:
     with get_session() as db:
         q = select(TelegramConfig).where(TelegramConfig.is_active == True)
         if company_id:
@@ -124,7 +129,7 @@ def _save_state(state: TelegramBotState) -> None:
 
 # ── Agent keyboard builder ─────────────────────────────────────────────────────
 
-def _agent_keyboard(company_id: Optional[str]) -> dict:
+def _agent_keyboard(company_id: str | None) -> dict:
     with get_session() as db:
         q = (
             select(Personnel, AgentConfig)
@@ -151,7 +156,7 @@ def _agent_keyboard(company_id: Optional[str]) -> dict:
 
 # ── Pending approvals ──────────────────────────────────────────────────────────
 
-def _pending_approvals_text_and_keyboard(company_id: Optional[str]) -> tuple[str, dict]:
+def _pending_approvals_text_and_keyboard(company_id: str | None) -> tuple[str, dict]:
     with get_session() as db:
         tasks = db.exec(
             select(TaskRequest)
@@ -271,7 +276,7 @@ async def _process_async(data: dict) -> None:
                     task.updated_at = datetime.utcnow()
                     db.add(task)
                     db.commit()
-            _send(token, chat_id, f"✅ Görev onaylandı ve çalıştırılıyor...")
+            _send(token, chat_id, "✅ Görev onaylandı ve çalıştırılıyor...")
             return
 
         if cb_data.startswith("reject_task:"):
@@ -283,7 +288,7 @@ async def _process_async(data: dict) -> None:
                     task.updated_at = datetime.utcnow()
                     db.add(task)
                     db.commit()
-            _send(token, chat_id, f"❌ Görev reddedildi.")
+            _send(token, chat_id, "❌ Görev reddedildi.")
             return
 
         if cb_data.startswith("approve_a2a:"):
@@ -295,7 +300,7 @@ async def _process_async(data: dict) -> None:
                     a2a.updated_at = datetime.utcnow()
                     db.add(a2a)
                     db.commit()
-            _send(token, chat_id, f"✅ A2A delegasyonu onaylandı.")
+            _send(token, chat_id, "✅ A2A delegasyonu onaylandı.")
             return
 
         if cb_data.startswith("reject_a2a:"):
@@ -307,7 +312,7 @@ async def _process_async(data: dict) -> None:
                     a2a.updated_at = datetime.utcnow()
                     db.add(a2a)
                     db.commit()
-            _send(token, chat_id, f"❌ A2A delegasyonu reddedildi.")
+            _send(token, chat_id, "❌ A2A delegasyonu reddedildi.")
             return
 
         return
@@ -383,7 +388,7 @@ async def _process_async(data: dict) -> None:
 import threading
 import time
 
-_polling_thread: Optional[threading.Thread] = None
+_polling_thread: threading.Thread | None = None
 _polling_active = False
 
 

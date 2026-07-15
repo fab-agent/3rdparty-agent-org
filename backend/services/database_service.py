@@ -11,7 +11,7 @@ import json
 import re
 from typing import Any
 
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import create_engine, inspect, text
 
 
 def _engine(dsn: str, db_type: str):

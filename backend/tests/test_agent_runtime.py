@@ -2,15 +2,18 @@
 Agent runtime unit tests.
 AI calls are always mocked — no real API keys needed.
 """
-import pytest
 import asyncio
-from unittest.mock import patch, AsyncMock, MagicMock
-from tests.conftest import (
-    make_company, make_personnel, make_agent_config,
-    make_provider_key, make_user, make_member,
-)
-import models
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+import models
+from tests.conftest import (
+    make_agent_config,
+    make_company,
+    make_personnel,
+    make_provider_key,
+)
 
 # ── build_system_prompt ───────────────────────────────────────────────────────
 
@@ -29,8 +32,8 @@ def test_build_system_prompt_contains_name():
 
 
 def test_build_system_prompt_with_department():
-    from services.agent_runtime import build_system_prompt
     import models as m
+    from services.agent_runtime import build_system_prompt
     p = m.Personnel(name="TestBot", slug="testbot", type="agent",
                      id="pid", company_id="cid")
     dept = m.Department(name="Engineering", slug="engineering",
@@ -110,8 +113,9 @@ def test_run_session_not_found(db_session):
 
 
 def test_run_session_no_api_key(db_session, test_engine):
-    from services.agent_runtime import run_session
     from sqlmodel import Session
+
+    from services.agent_runtime import run_session
 
     with Session(test_engine) as s:
         co = make_company(s)
@@ -130,8 +134,9 @@ def test_run_session_no_api_key(db_session, test_engine):
 
 def test_run_session_with_mock_openai(db_session, test_engine):
     """Full run_session with mocked OpenAI call — verifies streaming pipeline."""
-    from services.agent_runtime import run_session
     from sqlmodel import Session
+
+    from services.agent_runtime import run_session
 
     with Session(test_engine) as s:
         co = make_company(s)
@@ -169,8 +174,9 @@ def test_run_session_with_mock_openai(db_session, test_engine):
 
 def test_run_session_with_mock_anthropic(db_session, test_engine):
     """run_session with mocked Anthropic call."""
-    from services.agent_runtime import run_session
     from sqlmodel import Session
+
+    from services.agent_runtime import run_session
 
     with Session(test_engine) as s:
         co = make_company(s)

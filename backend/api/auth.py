@@ -1,13 +1,16 @@
 """Auth endpoints: login, invite, change-password, me."""
+import os as _os
 from datetime import datetime, timedelta
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlmodel import select
 
+from core.security import decrypt as _decrypt
 from database import get_session
 from models import Company, CompanyMember, Personnel, User
+from models import TelegramConfig as _TelegramConfig
 from schemas import ChangePasswordRequest, InviteRequest, LoginRequest, SetupRequest
+from services import telegram as _tg
 from services.auth import (
     create_access_token,
     decode_token,
@@ -15,11 +18,6 @@ from services.auth import (
     hash_password,
     verify_password,
 )
-import os as _os
-
-from services import telegram as _tg
-from core.security import decrypt as _decrypt
-from models import TelegramConfig as _TelegramConfig
 
 _APP_URL = _os.getenv("APP_URL", "http://localhost:5173")
 
@@ -47,7 +45,7 @@ TEMP_PASSWORD_TTL_MINUTES = 30
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 
-def get_current_user(authorization: Optional[str] = Header(None)) -> User:
+def get_current_user(authorization: str | None = Header(None)) -> User:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token gerekli")
     token = authorization.split(" ", 1)[1]
@@ -206,7 +204,7 @@ def invite_user(body: InviteRequest, caller: User = Depends(require_manager)):
     name: str = body.name.strip()
     company_id: str = body.company_id
     role: str = body.role
-    scope_id: Optional[str] = body.scope_id
+    scope_id: str | None = body.scope_id
 
     if not name:
         raise HTTPException(status_code=422, detail="name boş olamaz")

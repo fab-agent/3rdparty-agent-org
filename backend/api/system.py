@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Optional
 
 import httpx
 from fastapi import APIRouter
@@ -19,8 +18,8 @@ def check_version():
     now = datetime.utcnow()
 
     if _cache["data"] is None or now > _cache["expires"]:
-        latest_tag: Optional[str] = None
-        release_url: Optional[str] = None
+        latest_tag: str | None = None
+        release_url: str | None = None
         try:
             resp = httpx.get(
                 f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",

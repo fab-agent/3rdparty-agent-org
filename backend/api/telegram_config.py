@@ -1,6 +1,5 @@
 """Telegram bot configuration — CRUD + test."""
 import os
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
@@ -8,7 +7,7 @@ from sqlmodel import select
 from api.auth import get_current_user, require_founder
 from core.security import decrypt, encrypt
 from database import get_session
-from models import Company, CompanyMember, TelegramConfig, User
+from models import CompanyMember, TelegramConfig, User
 from services.telegram import send_message, test_bot
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
@@ -43,8 +42,8 @@ def get_config(user: User = Depends(get_current_user)):
 
 @router.put("/config")
 def save_config(body: dict, user: User = Depends(require_founder)):
-    bot_token: Optional[str] = body.get("bot_token")
-    admin_chat_id: Optional[str] = body.get("admin_chat_id")
+    bot_token: str | None = body.get("bot_token")
+    admin_chat_id: str | None = body.get("admin_chat_id")
     if not bot_token or not admin_chat_id:
         raise HTTPException(status_code=422, detail="bot_token ve admin_chat_id gerekli")
 

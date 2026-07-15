@@ -1,5 +1,4 @@
 """Telegram Bot API wrapper — notification delivery channel."""
-from typing import Optional
 
 import httpx
 
@@ -10,7 +9,7 @@ def _url(token: str, method: str) -> str:
     return _BASE.format(token=token, method=method)
 
 
-def test_bot(bot_token: str) -> Optional[dict]:
+def test_bot(bot_token: str) -> dict | None:
     """Call getMe; return bot info dict or None on failure."""
     try:
         r = httpx.get(_url(bot_token, "getMe"), timeout=10)

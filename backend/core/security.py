@@ -1,5 +1,6 @@
-from cryptography.fernet import Fernet
 import pathlib
+
+from cryptography.fernet import Fernet
 
 SECRET_FILE = pathlib.Path("data/.secret")
 

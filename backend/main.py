@@ -1,9 +1,12 @@
-import os
 import logging
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
+import os
 from datetime import datetime
 from pathlib import Path
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+from version import VERSION
 
 # Load .env if present (dev convenience)
 _env_file = Path(__file__).parent / ".env"
@@ -15,6 +18,7 @@ if _env_file.exists():
             os.environ.setdefault(_k.strip(), _v.strip())
 
 from core.logging import setup_logging
+
 setup_logging()
 logger = logging.getLogger("app")
 
@@ -22,33 +26,33 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import select
 
+from api.a2a import router as a2a_router
+from api.audit import router as audit_router
+from api.auth import router as auth_router
+from api.backup import router as backup_router
+from api.change_requests import router as cr_router
+from api.companies import router as companies_router
+from api.dashboard import router as dashboard_router
+from api.database import router as database_router
+from api.departments import router as dept_router
+from api.flows import router as flows_router
+from api.git_sync import router as git_router
+from api.inbox import router as inbox_router
+from api.journal import router as journal_router
+from api.onboarding import router as onboarding_router
+from api.personnel import router as personnel_router
+from api.policies import router as policies_router
+from api.providers import router as providers_router
+from api.sessions import router as sessions_router
+from api.skills import router as skills_router
+from api.social_media import router as social_media_router
+from api.system import router as system_router
+from api.task_requests import router as task_router
+from api.telegram_bot import router as telegram_bot_router
+from api.telegram_config import router as telegram_router
+from api.users import router as users_router
 from database import get_session, init_db
 from seed import run_seed, seed_company_skills
-from api.auth import router as auth_router
-from api.users import router as users_router
-from api.companies import router as companies_router
-from api.departments import router as dept_router
-from api.personnel import router as personnel_router
-from api.providers import router as providers_router
-from api.git_sync import router as git_router
-from api.sessions import router as sessions_router
-from api.a2a import router as a2a_router
-from api.change_requests import router as cr_router
-from api.flows import router as flows_router
-from api.inbox import router as inbox_router
-from api.task_requests import router as task_router
-from api.audit import router as audit_router
-from api.backup import router as backup_router
-from api.social_media import router as social_media_router
-from api.journal import router as journal_router
-from api.database import router as database_router
-from api.telegram_config import router as telegram_router
-from api.telegram_bot import router as telegram_bot_router
-from api.dashboard import router as dashboard_router
-from api.onboarding import router as onboarding_router
-from api.skills import router as skills_router
-from api.policies import router as policies_router
-from api.system import router as system_router
 
 app = FastAPI(
     title="3rdParty Agent Organization API",
@@ -184,8 +188,8 @@ def _sync_env_config():
 
 def _sync_env_provider_keys():
     """Encrypt and store provider keys from .env (first run only, won't overwrite)."""
-    from models import ProviderKey
     from core.security import encrypt
+    from models import ProviderKey
     from services.provider_service import SUPPORTED_PROVIDERS, test_provider_key
 
     env_map = {
@@ -225,7 +229,7 @@ def _sync_env_provider_keys():
 
 @app.get("/")
 def root():
-    return {"message": "3rdParty Agent Organization API", "version": "0.2.0", "status": "ok"}
+    return {"message": "Agentic Company API", "version": VERSION, "status": "ok"}
 
 
 @app.get("/health")

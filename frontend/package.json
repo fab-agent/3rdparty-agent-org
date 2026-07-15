@@ -1,6 +1,6 @@
 {
-  "name": "3rdparty-frontend",
-  "version": "0.1.0",
+  "name": "agentic-company-frontend",
+  "version": "1.1.2",
   "private": true,
   "scripts": {
     "dev": "vite dev",

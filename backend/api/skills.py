@@ -1,6 +1,5 @@
-from datetime import datetime
-from typing import Optional
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -8,7 +7,13 @@ from sqlmodel import select
 
 from api.auth import get_current_user, require_manager
 from database import get_session
-from models import AgentConfig, AgentSkillLink, ChangeRequest, CompanySkill, Personnel, User
+from models import (
+    AgentConfig,
+    AgentSkillLink,
+    ChangeRequest,
+    CompanySkill,
+    User,
+)
 
 router = APIRouter(tags=["skills"])
 
@@ -78,20 +83,20 @@ class SkillCreate(BaseModel):
     company_id: str
     name: str
     slug: str
-    description: Optional[str] = None
-    content: Optional[str] = None
+    description: str | None = None
+    content: str | None = None
     skill_type: str = "builtin"
-    config_json: Optional[str] = None
+    config_json: str | None = None
 
 
 class SkillUpdate(BaseModel):
-    name: Optional[str] = None
-    slug: Optional[str] = None
-    description: Optional[str] = None
-    content: Optional[str] = None
-    skill_type: Optional[str] = None
-    config_json: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    slug: str | None = None
+    description: str | None = None
+    content: str | None = None
+    skill_type: str | None = None
+    config_json: str | None = None
+    is_active: bool | None = None
 
 
 def _skill_dict(s: CompanySkill, assigned_agents: list[str] | None = None) -> dict:
@@ -112,7 +117,7 @@ def _skill_dict(s: CompanySkill, assigned_agents: list[str] | None = None) -> di
 
 
 @router.get("/company-skills")
-def list_skills(company_id: Optional[str] = None, _: User = Depends(get_current_user)):
+def list_skills(company_id: str | None = None, _: User = Depends(get_current_user)):
     with get_session() as session:
         q = select(CompanySkill)
         if company_id:
@@ -162,7 +167,7 @@ def update_skill(
     skill_id: str,
     body: SkillUpdate,
     propose: bool = False,
-    personnel_id: Optional[str] = None,
+    personnel_id: str | None = None,
     user: User = Depends(require_manager),
 ):
     """

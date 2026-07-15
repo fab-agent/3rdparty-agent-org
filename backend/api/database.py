@@ -2,7 +2,6 @@
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -29,13 +28,13 @@ class DBCreate(BaseModel):
     name: str
     db_type: str          # "sqlite" | "postgresql" | "mysql"
     dsn: str              # plain connection string
-    company_id: Optional[str] = None
+    company_id: str | None = None
 
 
 class DBAnnotate(BaseModel):
     """Partial update: set semantic descriptions on tables/columns + example queries."""
-    schema_json: Optional[str] = None    # full annotated schema JSON
-    examples_json: Optional[str] = None  # [{sql, description}]
+    schema_json: str | None = None    # full annotated schema JSON
+    examples_json: str | None = None  # [{sql, description}]
 
 
 class QueryRequest(BaseModel):
@@ -48,11 +47,11 @@ class DBResponse(BaseModel):
     id: str
     name: str
     db_type: str
-    company_id: Optional[str]
+    company_id: str | None
     status: str
-    last_checked: Optional[str]
-    schema: Optional[dict] = None
-    examples: Optional[list] = None
+    last_checked: str | None
+    schema: dict | None = None
+    examples: list | None = None
     created_at: str
 
 
@@ -86,7 +85,7 @@ def _to_resp(row: DatabaseConnection, include_schema: bool = False) -> DBRespons
 
 @router.get("/")
 def list_databases(
-    company_id: Optional[str] = None,
+    company_id: str | None = None,
     _: User = Depends(get_current_user),
 ) -> list[DBResponse]:
     with get_session() as session:

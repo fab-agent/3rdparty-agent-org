@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
-from api.auth import get_current_user, require_founder
+from api.auth import require_founder
 from database import get_session
 from models import Company, CompanyMember, Department, Personnel, User
 

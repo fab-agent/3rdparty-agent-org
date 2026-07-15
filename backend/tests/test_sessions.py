@@ -3,11 +3,10 @@ AgentSession CRUD, status polling, close, and SSE message tests.
 LLM calls are always mocked.
 """
 import json
-import pytest
 from unittest.mock import patch
-from tests.conftest import make_personnel, make_agent_config, make_provider_key
-import models
 
+import models
+from tests.conftest import make_agent_config, make_personnel, make_provider_key
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,30 +1,30 @@
-from sqlmodel import SQLModel, Field
-from datetime import datetime
-from typing import Optional
-import uuid
 import json
+import uuid
+from datetime import datetime
+
+from sqlmodel import Field, SQLModel
 
 
 class Company(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     name: str
     slug: str
-    sector: Optional[str] = None
-    website: Optional[str] = None
+    sector: str | None = None
+    website: str | None = None
     ai_onboarded: bool = Field(default=False)
-    metadata_json: Optional[str] = None  # JSON: {vision, mission, values, goals}
+    metadata_json: str | None = None  # JSON: {vision, mission, values, goals}
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Department(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    company_id: Optional[str] = Field(default=None, foreign_key="company.id")
-    parent_id: Optional[str] = Field(default=None, foreign_key="department.id")
+    company_id: str | None = Field(default=None, foreign_key="company.id")
+    parent_id: str | None = Field(default=None, foreign_key="department.id")
     name: str
     slug: str
-    description: Optional[str] = None
-    goals: Optional[str] = None        # newline-separated goal strings
-    policies_json: Optional[str] = None  # JSON array of policy name strings
+    description: str | None = None
+    goals: str | None = None        # newline-separated goal strings
+    policies_json: str | None = None  # JSON array of policy name strings
     status: str = Field(default="Active")  # "Active" | "Inactive"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -36,16 +36,16 @@ class Department(SQLModel, table=True):
 
 class Personnel(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    company_id: Optional[str] = Field(default=None, foreign_key="company.id")
-    department_id: Optional[str] = Field(default=None, foreign_key="department.id")
+    company_id: str | None = Field(default=None, foreign_key="company.id")
+    department_id: str | None = Field(default=None, foreign_key="department.id")
     name: str
     slug: str
-    title: Optional[str] = None
-    role: Optional[str] = None
+    title: str | None = None
+    role: str | None = None
     type: str = Field(default="human")   # "human" | "agent"
-    email: Optional[str] = None
-    user_id: Optional[str] = None        # linked User.id (no FK — soft link)
-    manager_id: Optional[str] = Field(default=None, foreign_key="personnel.id")
+    email: str | None = None
+    user_id: str | None = None        # linked User.id (no FK — soft link)
+    manager_id: str | None = Field(default=None, foreign_key="personnel.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -53,9 +53,9 @@ class AgentConfig(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     personnel_id: str = Field(foreign_key="personnel.id", unique=True)
     model: str
-    model_version: Optional[str] = None
+    model_version: str | None = None
     status: str = Field(default="draft")   # "active" | "draft" | "inactive"
-    responsible_id: Optional[str] = Field(default=None, foreign_key="personnel.id")
+    responsible_id: str | None = Field(default=None, foreign_key="personnel.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -65,10 +65,10 @@ class Skill(SQLModel, table=True):
     agent_id: str = Field(foreign_key="agentconfig.id")
     name: str
     version: str
-    description: Optional[str] = None
+    description: str | None = None
     # F6A: executable skill fields
     skill_type: str = Field(default="builtin")   # builtin | mcp | http | function
-    config_json: Optional[str] = None            # JSON — type-specific connection config
+    config_json: str | None = None            # JSON — type-specific connection config
     is_active: bool = Field(default=True)
 
 
@@ -84,23 +84,23 @@ class ProviderKey(SQLModel, table=True):
     provider: str = Field(unique=True)          # "anthropic" | "openai" | "google" | "mistral"
     encrypted_key: str
     status: str = Field(default="unconfigured") # "active" | "invalid" | "unconfigured"
-    base_url: Optional[str] = None              # override endpoint (e.g. dashscope-intl vs dashscope)
-    last_tested: Optional[datetime] = None
+    base_url: str | None = None              # override endpoint (e.g. dashscope-intl vs dashscope)
+    last_tested: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class GitConfig(SQLModel, table=True):
     """Per-company git repository connection settings."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    company_id: Optional[str] = Field(default=None, foreign_key="company.id", index=True)
+    company_id: str | None = Field(default=None, foreign_key="company.id", index=True)
     provider: str                        # "github" | "gitlab" | "gitea"
     repo_url: str                        # https://github.com/owner/repo
     branch: str = Field(default="main")
     encrypted_token: str
     sync_interval: int = Field(default=30)  # minutes — used by scheduler (F6)
     auto_pr: bool = Field(default=False)    # create PR instead of direct push
-    last_synced: Optional[datetime] = None
-    last_commit_sha: Optional[str] = None
+    last_synced: datetime | None = None
+    last_commit_sha: str | None = None
     status: str = Field(default="connected")  # "connected" | "error" | "disconnected"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -108,7 +108,7 @@ class GitConfig(SQLModel, table=True):
 class TelegramConfig(SQLModel, table=True):
     """Per-company Telegram bot configuration for notifications."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    company_id: Optional[str] = Field(default=None, foreign_key="company.id", index=True)
+    company_id: str | None = Field(default=None, foreign_key="company.id", index=True)
     encrypted_token: str               # Bot token from BotFather (AES encrypted)
     admin_chat_id: str                 # Chat/group ID where system alerts are sent
     is_active: bool = Field(default=True)
@@ -120,10 +120,10 @@ class SyncLog(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     direction: str                       # "pull" | "push"
     files_changed: int = Field(default=0)
-    commit_sha: Optional[str] = None
-    pr_url: Optional[str] = None
+    commit_sha: str | None = None
+    pr_url: str | None = None
     status: str                          # "success" | "error" | "no_changes"
-    message: Optional[str] = None
+    message: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -131,7 +131,7 @@ class AgentSession(SQLModel, table=True):
     """A chat session between a human user and an agent."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     personnel_id: str = Field(foreign_key="personnel.id")
-    title: Optional[str] = None
+    title: str | None = None
     status: str = Field(default="active")   # "active" | "closed"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -143,9 +143,9 @@ class SessionMessage(SQLModel, table=True):
     session_id: str = Field(foreign_key="agentsession.id")
     role: str                            # "user" | "assistant"
     content: str                         # text content
-    tool_calls_json: Optional[str] = None   # JSON array of tool calls made
-    tool_results_json: Optional[str] = None # JSON array of tool results received
-    tokens_used: Optional[int] = None
+    tool_calls_json: str | None = None   # JSON array of tool calls made
+    tool_results_json: str | None = None # JSON array of tool results received
+    tokens_used: int | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -156,17 +156,17 @@ class User(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     email: str = Field(unique=True, index=True)
     name: str
-    password_hash: Optional[str] = None       # null until invite accepted
+    password_hash: str | None = None       # null until invite accepted
     is_active: bool = Field(default=True)
     # Invite flow
-    invite_token: Optional[str] = None
-    invite_expires_at: Optional[datetime] = None
+    invite_token: str | None = None
+    invite_expires_at: datetime | None = None
     must_change_password: bool = Field(default=False)
     # Password reset
-    reset_token: Optional[str] = None
-    reset_expires_at: Optional[datetime] = None
+    reset_token: str | None = None
+    reset_expires_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_login_at: Optional[datetime] = None
+    last_login_at: datetime | None = None
 
 
 class CompanyMember(SQLModel, table=True):
@@ -178,7 +178,7 @@ class CompanyMember(SQLModel, table=True):
     role: str = Field(default="user")
     # For executive/dept_head: department_id they manage (null = entire company)
     # For agent_owner: personnel_id of the agent they own
-    scope_id: Optional[str] = None
+    scope_id: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -196,25 +196,25 @@ class ChangeRequest(SQLModel, table=True):
     # JSON snapshot of proposed values (what will be committed to GitHub)
     proposed_json: str
     # Original values before change (for diff display)
-    original_json: Optional[str] = None
+    original_json: str | None = None
     # Status lifecycle:
     # draft → submitted → dept_head_approved → admin_approved → committed → rejected
     status: str = Field(default="submitted")
     # Stage 1: dept_head approval
-    dept_head_id: Optional[str] = Field(default=None, foreign_key="personnel.id")
-    dept_head_approved_at: Optional[datetime] = None
-    dept_head_rejected_at: Optional[datetime] = None
-    dept_head_note: Optional[str] = None
+    dept_head_id: str | None = Field(default=None, foreign_key="personnel.id")
+    dept_head_approved_at: datetime | None = None
+    dept_head_rejected_at: datetime | None = None
+    dept_head_note: str | None = None
     # Stage 2: admin (founder/executive) approval
-    admin_id: Optional[str] = Field(default=None, foreign_key="user.id")
-    admin_approved_at: Optional[datetime] = None
-    admin_rejected_at: Optional[datetime] = None
-    admin_note: Optional[str] = None
+    admin_id: str | None = Field(default=None, foreign_key="user.id")
+    admin_approved_at: datetime | None = None
+    admin_rejected_at: datetime | None = None
+    admin_note: str | None = None
     # GitHub commit result
-    commit_sha: Optional[str] = None
-    commit_url: Optional[str] = None
+    commit_sha: str | None = None
+    commit_url: str | None = None
     # Who created the CR
-    created_by_user_id: Optional[str] = Field(default=None, foreign_key="user.id")
+    created_by_user_id: str | None = Field(default=None, foreign_key="user.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -224,19 +224,19 @@ class ChangeRequest(SQLModel, table=True):
 class A2ARequest(SQLModel, table=True):
     """Agent-to-Agent delegation request with two-stage human approval."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    from_session_id: Optional[str] = Field(default=None, foreign_key="agentsession.id")
+    from_session_id: str | None = Field(default=None, foreign_key="agentsession.id")
     from_agent_id: str = Field(foreign_key="personnel.id")   # requesting agent
     to_agent_id: str = Field(foreign_key="personnel.id")     # target agent
     task: str                            # task description for target agent
-    context: Optional[str] = None        # additional context / attached data
+    context: str | None = None        # additional context / attached data
     # Status lifecycle: pending_approval → approved → running → pending_result_approval → completed | rejected
     status: str = Field(default="pending_approval")
-    result: Optional[str] = None         # final result from target agent
+    result: str | None = None         # final result from target agent
     # Approver = responsible human of the TARGET agent
-    approver_id: Optional[str] = Field(default=None, foreign_key="personnel.id")
-    approved_at: Optional[datetime] = None
-    result_approved_at: Optional[datetime] = None
-    rejection_reason: Optional[str] = None
+    approver_id: str | None = Field(default=None, foreign_key="personnel.id")
+    approved_at: datetime | None = None
+    result_approved_at: datetime | None = None
+    rejection_reason: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -250,7 +250,7 @@ class InboxMessage(SQLModel, table=True):
     recipient_user_id: str = Field(foreign_key="user.id", index=True)
     # Source: "flow" | "task_request" | "task_result" | "system"
     source_type: str
-    source_id: Optional[str] = None          # flow_run_id or task_request_id
+    source_id: str | None = None          # flow_run_id or task_request_id
     title: str
     body: str                                 # markdown content
     read: bool = Field(default=False)
@@ -265,13 +265,13 @@ class Flow(SQLModel, table=True):
     company_id: str = Field(foreign_key="company.id", index=True)
     personnel_id: str = Field(foreign_key="personnel.id")   # the agent to run
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     schedule: str                             # cron expression e.g. "0 9 * * *"
     prompt: str                               # task prompt sent to the agent
     enabled: bool = Field(default=True)
-    last_run_at: Optional[datetime] = None
-    last_run_status: Optional[str] = None     # "success" | "error"
-    last_run_output: Optional[str] = None     # truncated output
+    last_run_at: datetime | None = None
+    last_run_status: str | None = None     # "success" | "error"
+    last_run_output: str | None = None     # truncated output
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -284,18 +284,18 @@ class TaskRequest(SQLModel, table=True):
     company_id: str = Field(foreign_key="company.id", index=True)
     requester_user_id: str = Field(foreign_key="user.id")
     # Routing
-    department_id: Optional[str] = Field(default=None, foreign_key="department.id")
-    skill_filter: Optional[str] = None        # skill name to match
+    department_id: str | None = Field(default=None, foreign_key="department.id")
+    skill_filter: str | None = None        # skill name to match
     # Assigned agent and their responsible human
-    assigned_agent_id: Optional[str] = Field(default=None, foreign_key="personnel.id")
-    responsible_user_id: Optional[str] = Field(default=None, foreign_key="user.id")
+    assigned_agent_id: str | None = Field(default=None, foreign_key="personnel.id")
+    responsible_user_id: str | None = Field(default=None, foreign_key="user.id")
     title: str
     body: str
     # Responsible human's comment before triggering
-    human_note: Optional[str] = None
+    human_note: str | None = None
     # Status: pending → assigned → running → completed | rejected
     status: str = Field(default="pending")
-    result: Optional[str] = None
+    result: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -305,13 +305,13 @@ class TaskRequest(SQLModel, table=True):
 class AuditLog(SQLModel, table=True):
     """Immutable record of every significant platform action."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    company_id: Optional[str] = Field(default=None, foreign_key="company.id", index=True)
-    user_id: Optional[str] = Field(default=None, foreign_key="user.id", index=True)
+    company_id: str | None = Field(default=None, foreign_key="company.id", index=True)
+    user_id: str | None = Field(default=None, foreign_key="user.id", index=True)
     action: str          # "create" | "update" | "delete" | "approve" | "reject" | "test" | "sync"
     entity_type: str     # "department" | "personnel" | "agent_config" | "skill" | "flow" | "change_request" | "provider_key" | "git_config"
-    entity_id: Optional[str] = None
-    entity_name: Optional[str] = None
-    details_json: Optional[str] = None  # JSON with relevant before/after or context
+    entity_id: str | None = None
+    entity_name: str | None = None
+    details_json: str | None = None  # JSON with relevant before/after or context
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -321,7 +321,7 @@ class AgentMemory(SQLModel, table=True):
     """LLM-generated summary of a closed session, used as long-term agent memory."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     personnel_id: str = Field(foreign_key="personnel.id", index=True)
-    session_id: Optional[str] = Field(default=None, foreign_key="agentsession.id")
+    session_id: str | None = Field(default=None, foreign_key="agentsession.id")
     summary: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -330,10 +330,10 @@ class WorkJournalEntry(SQLModel, table=True):
     """Agent-authored or human-authored work log entry."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     personnel_id: str = Field(foreign_key="personnel.id", index=True)
-    session_id: Optional[str] = Field(default=None, foreign_key="agentsession.id")
+    session_id: str | None = Field(default=None, foreign_key="agentsession.id")
     # author: "agent" | "human"
     author: str = Field(default="agent")
-    title: Optional[str] = None
+    title: str | None = None
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -344,10 +344,10 @@ class CompanySkill(SQLModel, table=True):
     company_id: str = Field(foreign_key="company.id", index=True)
     name: str
     slug: str
-    description: Optional[str] = None
-    content: Optional[str] = None          # markdown — what this skill does, how to use it
+    description: str | None = None
+    content: str | None = None          # markdown — what this skill does, how to use it
     skill_type: str = Field(default="builtin")  # builtin | mcp | http | function | database
-    config_json: Optional[str] = None
+    config_json: str | None = None
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -376,8 +376,8 @@ class Policy(SQLModel, table=True):
     """Markdown policy document — scoped to company, department, or agent."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     company_id: str = Field(foreign_key="company.id", index=True)
-    department_id: Optional[str] = Field(default=None, foreign_key="department.id")
-    agent_config_id: Optional[str] = Field(default=None, foreign_key="agentconfig.id")
+    department_id: str | None = Field(default=None, foreign_key="department.id")
+    agent_config_id: str | None = Field(default=None, foreign_key="agentconfig.id")
     name: str
     slug: str
     content: str = Field(default="")   # full markdown body
@@ -391,17 +391,17 @@ class Policy(SQLModel, table=True):
 class DatabaseConnection(SQLModel, table=True):
     """External database connection with semantic annotations."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    company_id: Optional[str] = Field(default=None, foreign_key="company.id", index=True)
+    company_id: str | None = Field(default=None, foreign_key="company.id", index=True)
     name: str                          # Human-friendly label
     db_type: str                       # "sqlite" | "postgresql" | "mysql"
     # Connection string encrypted (e.g. postgresql://user:pass@host/db)
     encrypted_dsn: str
     # JSON: {tables: {table_name: {description, columns: {col: description}, row_count}}}
-    schema_json: Optional[str] = None
+    schema_json: str | None = None
     # JSON: [{sql, description}] — user-provided example queries
-    examples_json: Optional[str] = None
+    examples_json: str | None = None
     status: str = Field(default="unchecked")  # "ok" | "error" | "unchecked"
-    last_checked: Optional[datetime] = None
+    last_checked: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -410,18 +410,18 @@ class OnboardingSession(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     company_id: str = Field(foreign_key="company.id", index=True, unique=True)
     phase: str = Field(default="search")   # search | chat | preview | done
-    search_context: Optional[str] = None   # raw DDG result text
-    messages_json: Optional[str] = None    # JSON list of {role, content}
-    structure_json: Optional[str] = None   # JSON org structure
+    search_context: str | None = None   # raw DDG result text
+    messages_json: str | None = None    # JSON list of {role, content}
+    structure_json: str | None = None   # JSON org structure
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class TelegramBotState(SQLModel, table=True):
     """Per-chat state for the Telegram bot: selected agent, active session."""
     chat_id: str = Field(primary_key=True)
-    user_id: Optional[str] = None               # Platform User.id if linked
-    company_id: Optional[str] = None            # Active company
-    selected_agent_id: Optional[str] = None     # Personnel.id of chosen agent
-    selected_agent_name: Optional[str] = None
-    active_session_id: Optional[str] = None     # AgentSession.id (persists history)
+    user_id: str | None = None               # Platform User.id if linked
+    company_id: str | None = None            # Active company
+    selected_agent_id: str | None = None     # Personnel.id of chosen agent
+    selected_agent_name: str | None = None
+    active_session_id: str | None = None     # AgentSession.id (persists history)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

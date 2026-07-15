@@ -1,9 +1,8 @@
 """
 Policy CRUD, scope-filtering, and change-request proposal tests.
 """
-from tests.conftest import make_personnel
 import models
-
+from tests.conftest import make_personnel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

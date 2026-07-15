@@ -4,14 +4,15 @@ A2A (Agent-to-Agent) delegation flow tests.
 Covers: create request → approve → (mocked execution) → approve-result
         and: create request → reject
 """
-import pytest
-from unittest.mock import patch, AsyncMock
-from tests.conftest import (
-    make_company, make_user, make_member,
-    make_personnel, make_agent_config, make_provider_key,
-)
-import models
+from unittest.mock import patch
 
+import pytest
+
+from tests.conftest import (
+    make_agent_config,
+    make_personnel,
+    make_provider_key,
+)
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

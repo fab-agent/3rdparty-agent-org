@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import select
@@ -15,18 +15,18 @@ router = APIRouter(prefix="/flows", tags=["flows"])
 class FlowCreate(BaseModel):
     personnel_id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     schedule: str       # cron: "0 9 * * 1-5"
     prompt: str
     enabled: bool = True
 
 
 class FlowUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    schedule: Optional[str] = None
-    prompt: Optional[str] = None
-    enabled: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    schedule: str | None = None
+    prompt: str | None = None
+    enabled: bool | None = None
 
 
 def _to_dict(f: Flow) -> dict:
@@ -48,7 +48,7 @@ def _to_dict(f: Flow) -> dict:
 
 
 @router.get("")
-def list_flows(company_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+def list_flows(company_id: str | None = None, current_user: User = Depends(get_current_user)):
     with get_session() as session:
         q = select(Flow)
         if company_id:

@@ -2,9 +2,11 @@
 Seed data — runs once on startup if DB is empty.
 """
 import json
+
 from sqlmodel import select
+
 from database import get_session
-from models import Company, Department, Personnel, AgentConfig, Skill, CompanySkill
+from models import AgentConfig, Company, CompanySkill, Department, Personnel, Skill
 
 
 def run_seed() -> None:

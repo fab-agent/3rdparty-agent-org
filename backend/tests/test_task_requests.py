@@ -1,14 +1,16 @@
 """
 Task request routing, creation, run (mocked LLM), and rejection tests.
 """
-import pytest
 from unittest.mock import patch
-from tests.conftest import (
-    make_personnel, make_agent_config, make_provider_key,
-    make_user, make_member,
-)
-import models
 
+import models
+from tests.conftest import (
+    make_agent_config,
+    make_member,
+    make_personnel,
+    make_provider_key,
+    make_user,
+)
 
 # ── Setup helper ──────────────────────────────────────────────────────────────
 

@@ -3,7 +3,6 @@ import base64
 import io
 import json
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -11,7 +10,7 @@ from sqlmodel import select
 
 from api.auth import get_current_user
 from database import get_session
-from models import AgentMemory, AgentSession, SessionMessage, Personnel, User
+from models import AgentMemory, AgentSession, Personnel, SessionMessage, User
 from schemas import Attachment, MessageCreate, SessionCreate
 from services.agent_runtime import run_session
 from services.memory_service import generate_session_summary
@@ -53,7 +52,7 @@ def _message_to_dict(m: SessionMessage) -> dict:
 # ── Session CRUD ──────────────────────────────────────────────────────────────
 
 @router.get("/sessions")
-def list_sessions(personnel_id: Optional[str] = None, status: Optional[str] = None,
+def list_sessions(personnel_id: str | None = None, status: str | None = None,
                   _: User = Depends(get_current_user)):
     with get_session() as session:
         q = select(AgentSession).order_by(AgentSession.updated_at.desc())
@@ -95,7 +94,7 @@ def create_session(body: SessionCreate, _: User = Depends(get_current_user)):
 # ── Memory ───────────────────────────────────────────────────────────────────
 
 @router.get("/sessions/memories")
-def list_memories(personnel_id: Optional[str] = None, _: User = Depends(get_current_user)):
+def list_memories(personnel_id: str | None = None, _: User = Depends(get_current_user)):
     with get_session() as session:
         q = select(AgentMemory).order_by(AgentMemory.created_at.desc())
         if personnel_id:

@@ -1,5 +1,6 @@
 """Email service via Resend."""
 import os
+
 import resend
 
 resend.api_key = os.getenv("RESEND_API_KEY", "")

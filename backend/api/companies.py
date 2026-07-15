@@ -1,7 +1,7 @@
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select, func
+from sqlmodel import func, select
 
 from api.audit import log_action
 from api.auth import check_company_membership, get_current_user

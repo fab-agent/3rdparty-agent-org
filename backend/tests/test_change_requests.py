@@ -5,10 +5,11 @@ Lifecycle:
   submitted → dept_head_approved → admin_approved → committed
            ↘ rejected (at any stage by the responsible stage)
 """
-import pytest
 from unittest.mock import patch
-from tests.conftest import make_personnel
 
+import pytest
+
+from tests.conftest import make_personnel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -260,8 +261,8 @@ def test_admin_reject_wrong_status_returns_400(auth_client, cr_setup):
 
 def test_admin_approve_with_git_config_commits(auth_client, cr_setup, db_session):
     """With a GitConfig present, admin approve should call commit_change_request."""
-    from models import GitConfig
     from core.security import encrypt
+    from models import GitConfig
 
     git_cfg = GitConfig(
         company_id=cr_setup["company_id"],
@@ -289,8 +290,8 @@ def test_admin_approve_with_git_config_commits(auth_client, cr_setup, db_session
 
 def test_admin_approve_commit_failure_saved_in_note(auth_client, cr_setup, db_session):
     """If commit_change_request raises, the error is appended to admin_note."""
-    from models import GitConfig
     from core.security import encrypt
+    from models import GitConfig
 
     git_cfg = GitConfig(
         company_id=cr_setup["company_id"],
@@ -344,8 +345,8 @@ def test_full_flow_no_git(auth_client, cr_setup):
 
 def test_full_flow_with_github_commit(auth_client, cr_setup, db_session):
     """Complete flow with mocked GitHub commit → commit_sha set."""
-    from models import GitConfig
     from core.security import encrypt
+    from models import GitConfig
 
     db_session.add(GitConfig(
         company_id=cr_setup["company_id"],

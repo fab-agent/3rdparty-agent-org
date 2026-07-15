@@ -1,7 +1,7 @@
-from typing import Optional
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
-import json
 
 from api.audit import log_action
 from api.auth import check_company_membership, get_current_user
@@ -12,7 +12,7 @@ from schemas import DepartmentCreate, DepartmentUpdate, PolicyLinkSet
 router = APIRouter(prefix="/departments", tags=["departments"])
 
 
-def dept_to_dict(d: Department, linked_policies: list = None, parent_name: Optional[str] = None) -> dict:
+def dept_to_dict(d: Department, linked_policies: list = None, parent_name: str | None = None) -> dict:
     policies = linked_policies or []
     return {
         "id": d.id,
@@ -47,7 +47,7 @@ def _load_dept_policies_map(session, dept_ids: list[str]) -> dict[str, list]:
 
 
 @router.get("")
-def list_departments(company_id: Optional[str] = None,
+def list_departments(company_id: str | None = None,
                      current_user: User = Depends(get_current_user)):
     with get_session() as session:
         if company_id:
@@ -69,7 +69,7 @@ def list_departments(company_id: Optional[str] = None,
 
 
 @router.post("", status_code=201)
-def create_department(body: DepartmentCreate, company_id: Optional[str] = None,
+def create_department(body: DepartmentCreate, company_id: str | None = None,
                       current_user: User = Depends(get_current_user)):
     with get_session() as session:
         if company_id:
@@ -208,7 +208,7 @@ def delete_department(dept_id: str, current_user: User = Depends(get_current_use
 
 
 @router.get("/tree/root")
-def get_department_tree(company_id: Optional[str] = None,
+def get_department_tree(company_id: str | None = None,
                         current_user: User = Depends(get_current_user)):
     with get_session() as session:
         if company_id:

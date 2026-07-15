@@ -6,18 +6,27 @@ deliver result to agent's responsible_user via InboxMessage.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Session, select
 
 from core.security import decrypt
 from database import get_session
-from models import AgentConfig, Flow, InboxMessage, Personnel, ProviderKey, User, CompanyMember, Skill
+from models import (
+    AgentConfig,
+    CompanyMember,
+    Flow,
+    InboxMessage,
+    Personnel,
+    ProviderKey,
+    Skill,
+)
 
 
 def _generate_image_sync(model: str, prompt: str, api_key: str, base_url: str | None = None) -> str:
     """Synchronous image generation via DashScope task API or OpenAI images endpoint."""
-    import httpx, time, json as _json
+    import time
+
+    import httpx
 
     # DashScope task-based (qwen-image-*, wanx-*, flux-*)
     m = model.lower()
@@ -99,6 +108,7 @@ def _call_llm(provider: str, model: str, system_prompt: str, user_prompt: str, a
     elif provider in ("qwen", "mistral"):
         import openai
         from sqlmodel import select as _select
+
         from database import get_session as _get_session
         from models import ProviderKey as _PK
         base_url = None
@@ -194,8 +204,9 @@ def _execute_flow_tool(tool_name: str, tool_input: dict) -> str:
     """Execute a tool call during flow execution. Returns string result."""
     if tool_name == "web_search":
         try:
-            from services.mcp_client import execute_builtin
             import asyncio
+
+            from services.mcp_client import execute_builtin
             result = asyncio.run(execute_builtin("web_search", tool_input))
             return str(result)
         except Exception as e:
@@ -250,7 +261,7 @@ def _call_llm_with_tools(
     return "".join(block.text for block in resp.content if hasattr(block, "text")) or "[max tool iterations reached]"
 
 
-def _find_responsible_user_id(session: Session, agent_cfg: AgentConfig) -> Optional[str]:
+def _find_responsible_user_id(session: Session, agent_cfg: AgentConfig) -> str | None:
     """Returns the User.id of the agent's responsible person, if linked."""
     if not agent_cfg.responsible_id:
         return None
@@ -260,7 +271,7 @@ def _find_responsible_user_id(session: Session, agent_cfg: AgentConfig) -> Optio
     return responsible_personnel.user_id
 
 
-def _find_admin_user_id(session: Session, company_id: str) -> Optional[str]:
+def _find_admin_user_id(session: Session, company_id: str) -> str | None:
     """Fallback: find a founder/executive in the company."""
     for role in ("founder", "executive"):
         member = session.exec(
@@ -276,8 +287,8 @@ def _find_admin_user_id(session: Session, company_id: str) -> Optional[str]:
 def _notify_flow_telegram(company_id: str, flow_name: str, agent_name: str, output: str) -> None:
     """Send flow result to Telegram admin chat."""
     try:
-        from models import TelegramConfig
         from core.security import decrypt as _decrypt
+        from models import TelegramConfig
         with get_session() as s:
             cfg = s.exec(
                 select(TelegramConfig)

@@ -1,9 +1,7 @@
 """
 Company skill CRUD and agent-assignment tests.
 """
-from tests.conftest import make_company, make_personnel, make_agent_config
-import models
-
+from tests.conftest import make_agent_config, make_personnel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

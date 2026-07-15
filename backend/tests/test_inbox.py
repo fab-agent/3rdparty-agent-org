@@ -3,9 +3,9 @@ Inbox endpoint tests.
 InboxMessages are created directly in the DB (no create endpoint).
 """
 from datetime import datetime
-from tests.conftest import make_company, make_user, make_member
-import models
 
+import models
+from tests.conftest import make_user
 
 # ── Fixture helper ────────────────────────────────────────────────────────────
 

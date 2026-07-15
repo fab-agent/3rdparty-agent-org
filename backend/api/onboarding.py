@@ -8,25 +8,23 @@ POST /onboarding/create     → Toplu entity oluştur
 GET  /onboarding/status/{company_id} → ai_onboarded durumu
 """
 import json
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlmodel import select
 
 from api.auth import get_current_user
 from database import get_session
 from models import Company, User
 from services.onboarding_agent import (
-    search_company,
-    stream_onboarding_chat,
-    generate_org_structure,
+    ONBOARDING_SYSTEM,
+    _get_best_key,
     create_org_from_structure,
+    generate_org_structure,
     get_onboarding_session,
     save_onboarding_session,
-    _get_best_key,
-    ONBOARDING_SYSTEM,
+    search_company,
+    stream_onboarding_chat,
 )
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
@@ -36,21 +34,21 @@ router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
 class SearchRequest(BaseModel):
     company_name: str
-    company_id: Optional[str] = None
+    company_id: str | None = None
 
 
 class ChatRequest(BaseModel):
     company_name: str
     search_context: str
     messages: list[dict]  # [{role: user|assistant, content: str}]
-    company_id: Optional[str] = None
+    company_id: str | None = None
 
 
 class GenerateRequest(BaseModel):
     company_name: str
     search_context: str
     messages: list[dict]
-    company_id: Optional[str] = None
+    company_id: str | None = None
 
 
 class CreateRequest(BaseModel):
