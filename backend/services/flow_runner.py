@@ -169,6 +169,68 @@ def _call_llm(
     raise ValueError(f"Unsupported provider: {provider}")
 
 
+def _call_llm_streaming(
+    provider: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    api_key: str,
+    on_chunk,
+    base_url: str | None = None,
+) -> str:
+    """
+    Single-turn LLM call with token streaming.
+    Calls on_chunk(text: str) for each received token chunk.
+    Returns the full response text.
+    Providers without streaming support fall back to _call_llm (no chunks emitted).
+    """
+    full = []
+
+    if provider == "anthropic":
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key)
+        with client.messages.stream(
+            model=model,
+            max_tokens=2048,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        ) as stream:
+            for text in stream.text_stream:
+                on_chunk(text)
+                full.append(text)
+        return "".join(full)
+
+    if provider in ("openai", "qwen", "mistral"):
+        import openai
+
+        if provider == "qwen":
+            base_url = base_url or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+        elif provider == "mistral":
+            base_url = "https://api.mistral.ai/v1"
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
+        stream = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=2048,
+            stream=True,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content or ""
+            if delta:
+                on_chunk(delta)
+                full.append(delta)
+        return "".join(full)
+
+    # Google and others: fall back to non-streaming
+    result = _call_llm(provider, model, system_prompt, user_prompt, api_key)
+    on_chunk(result)
+    return result
+
+
 def _build_system_prompt(agent: Personnel, agent_cfg: AgentConfig) -> str:
     return (
         f"Sen {agent.name} adlı bir AI ajansın.\n"

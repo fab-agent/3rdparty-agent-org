@@ -7,9 +7,12 @@ Routing logic:
   3. Assign to first match → notify responsible human via Inbox
 """
 
+import asyncio
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import select
 
@@ -28,9 +31,20 @@ from models import (
     TaskRequest,
     User,
 )
-from services.flow_runner import _build_system_prompt, _call_llm
+from services.flow_runner import _build_system_prompt, _call_llm, _call_llm_streaming
 
 router = APIRouter(prefix="/task-requests", tags=["task-requests"])
+
+# Per-task SSE queues: task_id → asyncio.Queue
+# Populated when a client opens /task-requests/{id}/stream before or during run.
+_task_queues: dict[str, asyncio.Queue] = {}
+
+
+async def _emit(task_id: str, event: dict) -> None:
+    """Push an event to the task's SSE queue if a client is listening."""
+    q = _task_queues.get(task_id)
+    if q:
+        await q.put(event)
 
 
 def _model_to_provider(model: str) -> str:
@@ -213,7 +227,7 @@ def create_task_request(
 
 
 @router.post("/{task_id}/run")
-def run_task(
+async def run_task(
     task_id: str,
     body: TaskRequestAction,
     current_user: User = Depends(get_current_user),
@@ -241,6 +255,8 @@ def run_task(
         session.add(task)
         session.commit()
 
+        await _emit(task_id, {"type": "step", "step": "starting", "label": "Ajan başlatılıyor..."})
+
         try:
             agent = session.get(Personnel, task.assigned_agent_id)
             agent_cfg = session.exec(
@@ -255,11 +271,7 @@ def run_task(
             provider_key = None
             agent_provider = _model_to_provider(agent_cfg.model or "")
             for prov in ([agent_provider] if agent_provider else []) + [
-                "anthropic",
-                "openai",
-                "google",
-                "mistral",
-                "qwen",
+                "anthropic", "openai", "google", "mistral", "qwen",
             ]:
                 if not prov:
                     continue
@@ -275,18 +287,38 @@ def run_task(
             if not provider_key:
                 raise ValueError("No active provider key")
 
+            await _emit(task_id, {
+                "type": "step",
+                "step": "model_ready",
+                "label": f"Model: {agent_cfg.model} · Provider: {provider_key.provider}",
+            })
+
             api_key = decrypt(provider_key.encrypted_key)
             system_prompt = _build_system_prompt(agent, agent_cfg)
             user_prompt = task.body
             if task.human_note:
                 user_prompt += f"\n\n**Sorumlu notu:** {task.human_note}"
 
-            result = _call_llm(
-                provider=provider_key.provider,
-                model=agent_cfg.model,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                api_key=api_key,
+            await _emit(task_id, {"type": "step", "step": "calling_llm", "label": "LLM çağrısı yapılıyor..."})
+
+            # Stream tokens to SSE queue while collecting full result
+            loop = asyncio.get_event_loop()
+            chunks: list[str] = []
+
+            def on_chunk(text: str) -> None:
+                chunks.append(text)
+                asyncio.run_coroutine_threadsafe(
+                    _emit(task_id, {"type": "chunk", "text": text}), loop
+                )
+
+            result = await asyncio.to_thread(
+                _call_llm_streaming,
+                provider_key.provider,
+                agent_cfg.model,
+                system_prompt,
+                user_prompt,
+                api_key,
+                on_chunk,
             )
 
             task.result = result
@@ -308,6 +340,8 @@ def run_task(
             session.commit()
             session.refresh(task)
 
+            await _emit(task_id, {"type": "done", "status": "completed"})
+
         except Exception as e:
             task.status = "assigned"  # revert to allow retry
             task.result = f"Hata: {str(e)}"
@@ -315,8 +349,32 @@ def run_task(
             session.add(task)
             session.commit()
             session.refresh(task)
+            await _emit(task_id, {"type": "error", "message": str(e)})
 
         return _to_dict(task)
+
+
+@router.get("/{task_id}/stream")
+async def stream_task(task_id: str, current_user: User = Depends(get_current_user)):
+    """SSE stream for task execution events. Open before or right after calling /run."""
+    q: asyncio.Queue = asyncio.Queue()
+    _task_queues[task_id] = q
+
+    async def event_gen():
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=180)
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'type': 'timeout'})}\n\n"
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
+                if event.get("type") in ("done", "error", "timeout"):
+                    break
+        finally:
+            _task_queues.pop(task_id, None)
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
 
 
 @router.post("/{task_id}/reject")

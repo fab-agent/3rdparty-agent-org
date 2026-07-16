@@ -169,6 +169,21 @@ def on_startup():
     _sync_env_config()
     _sync_env_provider_keys()
     _reload_flow_schedules()
+
+    # RAG: init DB and schedule incremental indexing every 15 minutes
+    try:
+        from services.rag_service import init_rag_db, index_new_records
+        init_rag_db()
+        _scheduler.add_job(
+            index_new_records,
+            "interval",
+            minutes=15,
+            id="rag_indexer",
+            replace_existing=True,
+        )
+    except Exception as e:
+        logger.warning("RAG init failed", extra={"extra": {"error": str(e)}})
+
     _scheduler.start()
     from api.telegram_bot import start_polling
 

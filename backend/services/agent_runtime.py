@@ -65,6 +65,8 @@ def build_system_prompt(
     dept: Department | None,
     skills: list[Skill],
     policy_names: list[str] | None = None,
+    rag_query: str | None = None,
+    company_id: str | None = None,
 ) -> str:
     lines = [
         f"You are {person.name}.",
@@ -98,6 +100,23 @@ def build_system_prompt(
                 lines.append(f"  - {mem}")
     except Exception:
         pass  # Never block session start due to memory failure
+
+    # Inject RAG context — semantically relevant past task results and session summaries
+    if rag_query:
+        try:
+            from services.rag_service import search as rag_search
+
+            hits = rag_search(rag_query, company_id=company_id, personnel_id=person.id, k=4)
+            if hits:
+                lines.append("\n--- Relevant knowledge from past work ---")
+                for hit in hits:
+                    date = hit["created_at"][:10]
+                    source = hit["source_type"].replace("_", " ")
+                    snippet = hit["chunk_text"][:300].replace("\n", " ")
+                    lines.append(f"[{date}] ({source}) {snippet}")
+                lines.append("--- End of relevant knowledge ---")
+        except Exception:
+            pass  # Never block session start due to RAG failure
 
     lines.append("\nRespond helpfully and concisely. Use tools when they would help.")
     return "\n".join(lines)
@@ -1060,7 +1079,9 @@ async def run_session(
                 seen_ids.add(p.id)
 
         system_prompt = build_system_prompt(
-            person, dept, list(skills), policy_names or None
+            person, dept, list(skills), policy_names or None,
+            rag_query=user_message[:500] if not history_rows else None,
+            company_id=person.company_id,
         )
         tool_defs = build_tool_definitions(list(skills))
 
