@@ -476,10 +476,10 @@ def _polling_loop() -> None:
 
 
 _BOT_COMMANDS = [
-    {"command": "ajanlar",   "description": "Ajan seçim menüsünü aç"},
-    {"command": "degistir",  "description": "Aktif ajanı değiştir"},
-    {"command": "durum",     "description": "Seçili ajan ve oturum bilgisi"},
-    {"command": "onaylar",   "description": "Bekleyen görev ve A2A onayları"},
+    {"command": "ajanlar", "description": "Ajan seçim menüsünü aç"},
+    {"command": "degistir", "description": "Aktif ajanı değiştir"},
+    {"command": "durum", "description": "Seçili ajan ve oturum bilgisi"},
+    {"command": "onaylar", "description": "Bekleyen görev ve A2A onayları"},
 ]
 
 
