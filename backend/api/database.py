@@ -13,6 +13,7 @@ from core.security import decrypt, encrypt
 from database import get_session
 from models import DatabaseConnection, User
 from services.database_service import (
+    ask_database,
     build_schema_context,
     discover_schema,
     execute_query,
@@ -43,6 +44,11 @@ class DBAnnotate(BaseModel):
 class QueryRequest(BaseModel):
     db_id: str
     sql: str
+    limit: int = 200
+
+
+class AskRequest(BaseModel):
+    question: str
     limit: int = 200
 
 
@@ -250,3 +256,86 @@ def schema_context(db_id: str, _: User = Depends(get_current_user)) -> dict:
             raise HTTPException(status_code=404, detail="Database not found")
         ctx = build_schema_context(row.schema_json or "{}", row.examples_json)
         return {"context": ctx, "db_id": db_id, "name": row.name}
+
+
+# ── Text-to-SQL ────────────────────────────────────────────────────────────────
+
+
+@router.post("/{db_id}/ask")
+def ask(
+    db_id: str,
+    body: AskRequest,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Natural language → SQL → result, with self-correction on SQL errors.
+
+    Picks the first active provider key available for the company.
+    Returns the generated SQL alongside query results so the user can
+    review and trust (or edit) what was executed.
+    """
+    from sqlmodel import select as sql_select
+
+    from core.security import decrypt as _decrypt
+    from models import ProviderKey
+
+    with get_session() as session:
+        row = session.get(DatabaseConnection, db_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Database not found")
+        if not row.schema_json:
+            raise HTTPException(
+                status_code=422,
+                detail="Run schema discovery first (POST /databases/{id}/discover)",
+            )
+
+        # Find any active provider key (prefer the first one available)
+        provider_key = session.exec(
+            sql_select(ProviderKey).where(ProviderKey.status == "active")
+        ).first()
+        if not provider_key:
+            raise HTTPException(
+                status_code=422, detail="No active LLM provider key configured"
+            )
+
+        dsn = _decrypt(row.encrypted_dsn)
+        api_key = _decrypt(provider_key.encrypted_key)
+
+    # Map provider → a sensible default model if none stored
+    _default_models = {
+        "anthropic": "claude-haiku-4-5-20251001",
+        "openai": "gpt-4o-mini",
+        "google": "gemini-2.0-flash",
+        "mistral": "mistral-small-latest",
+        "qwen": "qwen-plus",
+    }
+    model = _default_models.get(provider_key.provider, "gpt-4o-mini")
+
+    try:
+        result = ask_database(
+            dsn=dsn,
+            db_type=row.db_type,
+            schema_json=row.schema_json,
+            examples_json=row.examples_json,
+            question=body.question,
+            provider=provider_key.provider,
+            model=model,
+            api_key=api_key,
+            limit=min(body.limit, 500),
+        )
+        logger.info(
+            "text2sql executed",
+            extra={
+                "extra": {
+                    "db_id": db_id,
+                    "attempts": result["attempts"],
+                    "rows": result["row_count"],
+                }
+            },
+        )
+        return result
+    except Exception as e:
+        logger.error("text2sql failed", extra={"extra": {"error": str(e)}})
+        raise HTTPException(
+            status_code=502, detail=f"Could not generate valid SQL: {e}"
+        )

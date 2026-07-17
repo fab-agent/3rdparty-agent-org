@@ -6,6 +6,7 @@ Provides:
   - Schema discovery (tables, columns, types, row counts)
   - Semantic annotation storage/retrieval
   - Safe SELECT-only query execution
+  - Text-to-SQL: natural language → SQL → execute, with self-correction on error
 """
 
 import json
@@ -202,3 +203,103 @@ def _apply_limit(sql: str, limit: int) -> str:
     if "LIMIT" in upper or "FETCH" in upper:
         return sql
     return f"{sql.rstrip(';')} LIMIT {limit}"
+
+
+# ── Text-to-SQL ───────────────────────────────────────────────────────────────
+
+_SQL_BLOCK = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+_SQL_START = re.compile(r"((?:WITH|SELECT)\b.*)", re.DOTALL | re.IGNORECASE)
+
+_TEXT2SQL_SYSTEM = """\
+You are a SQL expert. Generate a single, correct SQL SELECT query that answers \
+the user's question using the schema below.
+
+{schema}
+
+Rules:
+- Return ONLY the raw SQL, no explanation, no markdown fences.
+- Use exact table and column names from the schema.
+- Do NOT add a LIMIT clause unless the user explicitly requests a specific number of rows.
+- Use standard SQL compatible with {db_type}.
+"""
+
+
+def _extract_sql(text: str) -> str:
+    """Pull the SQL out of an LLM response (handles code fences and plain text)."""
+    m = _SQL_BLOCK.search(text)
+    if m:
+        return m.group(1).strip()
+    m = _SQL_START.search(text)
+    if m:
+        return m.group(1).strip()
+    return text.strip()
+
+
+def ask_database(
+    dsn: str,
+    db_type: str,
+    schema_json: str,
+    examples_json: str | None,
+    question: str,
+    provider: str,
+    model: str,
+    api_key: str,
+    limit: int = 200,
+    max_retries: int = 2,
+) -> dict:
+    """
+    Natural language → SQL → execute, with self-correction on SQL errors.
+
+    Self-correction layer:
+      - On SQL execution error the error message and the failing SQL are fed
+        back into the next prompt so the LLM can fix the query.
+      - Up to max_retries correction attempts after the first try.
+      - SELECT-only guard runs before every execution attempt.
+
+    Returns:
+      {sql, columns, rows, row_count, attempts, model}
+    Raises the last exception if all retries are exhausted.
+    """
+    from services.flow_runner import _call_llm  # lazy import to avoid circular
+
+    schema_ctx = build_schema_context(schema_json, examples_json)
+    system_prompt = _TEXT2SQL_SYSTEM.format(schema=schema_ctx, db_type=db_type)
+
+    last_exc: Exception | None = None
+    last_sql: str = ""
+
+    for attempt in range(max_retries + 1):
+        if attempt == 0:
+            user_msg = question
+        else:
+            user_msg = (
+                f"Original question: {question}\n\n"
+                f"Previous SQL attempt:\n{last_sql}\n\n"
+                f"Error: {last_exc}\n\n"
+                f"Please return only the corrected SQL query."
+            )
+
+        raw = _call_llm(
+            provider=provider,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_msg,
+            api_key=api_key,
+        )
+
+        last_sql = _extract_sql(raw)
+
+        try:
+            result = execute_query(dsn, db_type, last_sql, limit=limit)
+            return {
+                "sql": last_sql,
+                "columns": result["columns"],
+                "rows": result["rows"],
+                "row_count": result["row_count"],
+                "attempts": attempt + 1,
+                "model": model,
+            }
+        except Exception as exc:
+            last_exc = exc
+
+    raise last_exc  # type: ignore[misc]
