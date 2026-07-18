@@ -50,6 +50,7 @@ from api.system import router as system_router
 from api.task_requests import router as task_router
 from api.telegram_bot import router as telegram_bot_router
 from api.telegram_config import router as telegram_router
+from api.tenant import router as tenant_router
 from api.users import router as users_router
 from database import get_session, init_db
 from seed import run_seed, seed_company_skills
@@ -117,6 +118,7 @@ app.include_router(skills_router)
 app.include_router(policies_router)
 app.include_router(onboarding_router)
 app.include_router(system_router)
+app.include_router(tenant_router)
 
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────

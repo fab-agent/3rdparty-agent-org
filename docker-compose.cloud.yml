@@ -1,0 +1,57 @@
+# docker-compose.cloud.yml — Alibaba Cloud ECS production deployment
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --build
+#
+# Difference from base:
+#   - No volume mount of source code (use built image)
+#   - Frontend built with VITE_API_URL pointing to the cloud domain
+#   - Named volumes for persistence
+#   - No exposed ports — Nginx reverse-proxy handles all traffic
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agent-backend
+    # Bind only to localhost — Nginx proxies from outside
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - agent_data:/app/data
+      - agent_logs:/app/logs
+    environment:
+      - DATABASE_URL=sqlite:///./data/app.db
+      - ENVIRONMENT=production
+    env_file:
+      - path: ./backend/.env
+        required: true
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Set to your cloud domain — e.g. https://agent.fab.engineering
+        VITE_API_URL: ${VITE_API_URL:-https://agent.fab.engineering}
+    container_name: agent-frontend
+    ports:
+      - "127.0.0.1:5173:3000"
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  agent_data:
+    driver: local
+  agent_logs:
+    driver: local
