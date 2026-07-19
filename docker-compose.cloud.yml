@@ -16,9 +16,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: agent-backend
-    # Bind only to localhost — Nginx proxies from outside
-    ports:
-      - "127.0.0.1:8000:8000"
     volumes:
       - agent_data:/app/data
       - agent_logs:/app/logs
@@ -40,7 +37,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Set to your cloud domain — e.g. https://agent.fab.engineering
         VITE_API_URL: ${VITE_API_URL:-https://agent.fab.engineering}
     container_name: agent-frontend
     ports:
