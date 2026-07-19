@@ -49,6 +49,10 @@ def init_db() -> None:
     else:
         # Existing database: run only the incremental migrations that are missing.
         command.upgrade(alembic_cfg, "head")
+        # Also create any new SQLModel tables not yet covered by Alembic migrations.
+        # create_all uses IF NOT EXISTS so it's safe to call on existing databases.
+        import models  # noqa: F401 — registers all SQLModel tables in metadata
+        SQLModel.metadata.create_all(engine)
 
 
 @contextmanager
