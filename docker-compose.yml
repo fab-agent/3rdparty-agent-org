@@ -1,6 +1,5 @@
 version: '3.8'
 
-# Development: both services with hot-reload, no nginx
 services:
   backend:
     build:
@@ -12,7 +11,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./backend/logs:/app/logs
-      - ./backend:/app
     environment:
       - DATABASE_URL=sqlite:///./data/app.db
       - ENVIRONMENT=development
@@ -32,10 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: 3rdparty-frontend
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "5173:3000"
     environment:
       - VITE_API_URL=http://localhost:8000
     depends_on:
