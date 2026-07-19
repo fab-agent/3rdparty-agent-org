@@ -29,12 +29,12 @@ from sqlmodel import select
 from api.a2a import router as a2a_router
 from api.audit import router as audit_router
 from api.auth import router as auth_router
-from api.demo_auth import router as demo_auth_router
 from api.backup import router as backup_router
 from api.change_requests import router as cr_router
 from api.companies import router as companies_router
 from api.dashboard import router as dashboard_router
 from api.database import router as database_router
+from api.demo_auth import router as demo_auth_router
 from api.departments import router as dept_router
 from api.flows import router as flows_router
 from api.git_sync import router as git_router

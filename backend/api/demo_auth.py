@@ -11,7 +11,7 @@ Role       : executive on the 'demo' company slug
 
 import logging
 import os
-import random
+import secrets
 import smtplib
 import string
 from datetime import datetime, timedelta
@@ -162,7 +162,7 @@ def request_otp(body: OtpRequestBody):
             raise HTTPException(429, f"Lütfen {wait_sec} saniye bekleyin.")
 
     # Generate and store OTP
-    code = "".join(random.choices(string.digits, k=6))
+    code = "".join(secrets.choice(string.digits) for _ in range(6))
     with get_session() as s:
         otp = DemoOtp(
             email=email,

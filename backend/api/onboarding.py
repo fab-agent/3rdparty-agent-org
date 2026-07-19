@@ -18,8 +18,8 @@ from api.auth import get_current_user
 from database import get_session
 from models import Company, User
 from services.onboarding_agent import (
-    build_onboarding_system,
     _get_best_key,
+    build_onboarding_system,
     create_org_from_structure,
     generate_org_structure,
     get_onboarding_session,
