@@ -515,6 +515,18 @@ const dict = {
     dash_quicklink_settings_desc: 'AI sağlayıcıları',
     dash_quicklink_orgtree: 'Org Şeması',
     dash_quicklink_orgtree_desc: 'Hiyerarşi görünümü',
+    // Login
+    login_title: 'Giriş Yapın',
+    login_subtitle: 'Devam etmek için hesabınıza giriş yapın',
+    login_tenant_subtitle: 'çalışma alanına giriş yapın',
+    login_email: 'E-posta',
+    login_email_placeholder: 'ad@sirket.com',
+    login_password: 'Şifre',
+    login_submit: 'Giriş Yap',
+    login_submitting: 'Giriş yapılıyor...',
+    login_forgot: 'Şifremi unuttum → yöneticiden sıfırlama talep et',
+    login_powered_by: 'Powered by',
+    login_error_default: 'Giriş başarısız',
   },
   en: {
     nav_dashboard: 'Dashboard',
@@ -1016,6 +1028,18 @@ const dict = {
     dash_quicklink_settings_desc: 'AI providers',
     dash_quicklink_orgtree: 'Org Chart',
     dash_quicklink_orgtree_desc: 'Hierarchy view',
+    // Login
+    login_title: 'Sign In',
+    login_subtitle: 'Sign in to your account to continue',
+    login_tenant_subtitle: 'workspace — sign in',
+    login_email: 'Email',
+    login_email_placeholder: 'name@company.com',
+    login_password: 'Password',
+    login_submit: 'Sign In',
+    login_submitting: 'Signing in...',
+    login_forgot: 'Forgot password → request reset from admin',
+    login_powered_by: 'Powered by',
+    login_error_default: 'Sign in failed',
   },
 } as const;
 
