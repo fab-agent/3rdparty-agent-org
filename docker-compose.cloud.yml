@@ -40,7 +40,7 @@ services:
         VITE_API_URL: ${VITE_API_URL:-https://agent.fab.engineering}
     container_name: agent-frontend
     ports:
-      - "127.0.0.1:5173:3000"
+      - "127.0.0.1:3000:3000"
     restart: always
     depends_on:
       backend:
