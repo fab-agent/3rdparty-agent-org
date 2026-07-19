@@ -15,7 +15,7 @@ from sqlmodel import select
 from api.audit import log_action
 from api.auth import get_current_user
 from database import get_session
-from models import ChangeRequest, GitConfig, Personnel, User
+from models import AgentConfig, ChangeRequest, GitConfig, Personnel, User
 from schemas import ChangeRequestApprove, ChangeRequestCreate, ChangeRequestReject
 from services.github_commit import commit_change_request
 
@@ -204,6 +204,30 @@ def dept_head_reject(
         return _cr_to_dict(cr)
 
 
+def _apply_proposed_to_db(session, cr: ChangeRequest) -> None:
+    """Write proposed_json changes back to the actual Personnel / AgentConfig records."""
+    proposed = json.loads(cr.proposed_json)
+
+    if cr.change_type == "agent_config":
+        personnel = session.get(Personnel, cr.personnel_id)
+        if not personnel:
+            return
+        for field in ("name", "slug", "title", "role", "department_id"):
+            if field in proposed:
+                setattr(personnel, field, proposed[field])
+        session.add(personnel)
+
+        agent_cfg = session.exec(
+            select(AgentConfig).where(AgentConfig.personnel_id == cr.personnel_id)
+        ).first()
+        if agent_cfg:
+            for field in ("model", "model_version", "status", "responsible_id"):
+                if field in proposed:
+                    setattr(agent_cfg, field, proposed[field])
+            agent_cfg.updated_at = datetime.utcnow()
+            session.add(agent_cfg)
+
+
 # ── Stage 2: Admin Approval → GitHub Commit ───────────────────────────────────
 
 
@@ -252,12 +276,14 @@ def admin_approve(
                 cr.commit_sha = sha
                 cr.commit_url = url
                 cr.status = "committed"
+                _apply_proposed_to_db(session, cr)
             except Exception as e:
                 # Approval still saved, but commit failed — surface error
                 cr.admin_note = f"{body.note or ''}\n[COMMIT ERROR: {str(e)}]".strip()
         else:
-            # No git config — approval saved but no commit
-            cr.status = "committed"  # treat as done, no repo configured
+            # No git config — apply changes directly and mark done
+            _apply_proposed_to_db(session, cr)
+            cr.status = "committed"
 
         cr.updated_at = datetime.utcnow()
         session.add(cr)
