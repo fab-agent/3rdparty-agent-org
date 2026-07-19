@@ -97,7 +97,7 @@
 			// Kick off initial AI greeting
 			await sendInitialGreeting();
 		} catch (e: any) {
-			searchError = e?.message ?? 'Arama hatası';
+			searchError = e?.message ?? i18n.t('ob_error_search');
 		} finally {
 			searching = false;
 		}
@@ -146,7 +146,7 @@
 				streaming = false;
 				messages = [...messages, {
 					role: 'assistant',
-					content: `⚠️ Hata: ${err}`
+					content: `${i18n.t('ob_error_prefix')} ${err}`
 				}];
 			},
 			companyId,
@@ -174,7 +174,7 @@
 			structure = res.structure;
 			phase = 'preview';
 		} catch (e: any) {
-			generateError = e?.message ?? 'Yapı oluşturma hatası';
+			generateError = e?.message ?? i18n.t('ob_error_generate');
 		} finally {
 			generating = false;
 		}
@@ -188,7 +188,7 @@
 			createSummary = res.summary;
 			phase = 'done';
 		} catch (e: any) {
-			createError = e?.message ?? 'Oluşturma hatası';
+			createError = e?.message ?? i18n.t('ob_error_create');
 			phase = 'preview';
 		}
 	}
@@ -232,17 +232,17 @@
 			{/if}
 		</div>
 		<a href="/" class="text-xs text-muted-foreground hover:text-foreground transition-colors">
-			Atla →
+			{i18n.t('ob_skip')} →
 		</a>
 	</header>
 
 	<!-- ── Step indicators ───────────────────────────────────────────────── -->
 	<div class="ob-steps">
 		{#each [
-			['search', 'Araştırma'],
-			['chat',   'Konuşma'],
-			['preview','Önizleme'],
-			['done',   'Tamamlandı'],
+			['search', i18n.t('ob_step_search')],
+			['chat',   i18n.t('ob_step_chat')],
+			['preview',i18n.t('ob_step_preview')],
+			['done',   i18n.t('ob_step_done')],
 		] as [p, label], i}
 			{@const phases = ['search','chat','preview','done']}
 			{@const idx = phases.indexOf(phase)}
@@ -275,9 +275,9 @@
 					<Sparkles class="w-8 h-8 text-primary animate-pulse" />
 				</div>
 				{#if searching}
-					<h2 class="text-xl font-semibold mb-2">Araştırılıyor...</h2>
+					<h2 class="text-xl font-semibold mb-2">{i18n.t('ob_searching')}</h2>
 					<p class="text-muted-foreground text-sm">
-						<span class="font-medium">{companyName}</span> hakkında web araştırması yapılıyor.
+						{i18n.t('ob_searching_desc').replace('{name}', companyName)}
 					</p>
 					<div class="flex gap-1 mt-6">
 						{#each [0,1,2] as i}
@@ -285,9 +285,9 @@
 						{/each}
 					</div>
 				{:else if searchError}
-					<h2 class="text-xl font-semibold mb-2 text-destructive">Hata</h2>
+					<h2 class="text-xl font-semibold mb-2 text-destructive">{i18n.t('ob_search_error_title')}</h2>
 					<p class="text-sm text-muted-foreground mb-4">{searchError}</p>
-					<button class="ob-btn-primary" onclick={startSearch}>Tekrar Dene</button>
+					<button class="ob-btn-primary" onclick={startSearch}>{i18n.t('ob_retry')}</button>
 				{/if}
 			</div>
 
@@ -297,8 +297,8 @@
 				{#if resumeBanner}
 					<div class="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl mt-3 text-sm text-amber-800">
 						<Check class="w-4 h-4 text-amber-600 flex-shrink-0" />
-						Önceki oturumun kaldığı yerden devam ediyoruz.
-						<button class="ml-auto text-xs underline opacity-70 hover:opacity-100" onclick={() => { resumeBanner = false; }}>Kapat</button>
+						{i18n.t('ob_resume_chat')}
+						<button class="ml-auto text-xs underline opacity-70 hover:opacity-100" onclick={() => { resumeBanner = false; }}>{i18n.t('ob_close')}</button>
 					</div>
 				{/if}
 				<!-- Messages -->
@@ -366,11 +366,11 @@
 						<div class="ob-ready-panel">
 							<div class="flex items-center gap-2 text-sm font-medium text-emerald-700">
 								<Check class="w-4 h-4 text-emerald-600 flex-shrink-0" />
-								Yeterli bilgi toplandı — organizasyon yapısı oluşturulsun mu?
+								{i18n.t('ob_ready_msg')}
 							</div>
 							<div class="flex gap-3 mt-3">
 								<button class="ob-btn-outline" onclick={() => { aiSignaledReady = false; }}>
-									Daha fazla konuş
+									{i18n.t('ob_keep_talking')}
 								</button>
 								<button class="ob-btn-primary" onclick={generatePreview} disabled={generating}>
 									{#if generating}
@@ -378,7 +378,7 @@
 									{:else}
 										<Sparkles class="w-4 h-4" />
 									{/if}
-									Yapıyı Oluştur
+									{i18n.t('ob_generate_btn')}
 								</button>
 							</div>
 						</div>
@@ -389,7 +389,7 @@
 								bind:value={userInput}
 								class="ob-textarea"
 								rows="2"
-								placeholder="Cevabınızı yazın..."
+								placeholder={i18n.t('ob_input_placeholder')}
 								disabled={streaming}
 								onkeydown={handleKeydown}
 							></textarea>
@@ -415,14 +415,14 @@
 				{#if resumeBanner}
 					<div class="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl mb-4 text-sm text-amber-800">
 						<Check class="w-4 h-4 text-amber-600 flex-shrink-0" />
-						Önceki oturumun önizleme aşamasından devam ediyoruz — yapı hâlâ hazır, doğrudan oluşturabilirsin.
-						<button class="ml-auto text-xs underline opacity-70 hover:opacity-100" onclick={() => { resumeBanner = false; }}>Kapat</button>
+						{i18n.t('ob_resume_preview')}
+						<button class="ml-auto text-xs underline opacity-70 hover:opacity-100" onclick={() => { resumeBanner = false; }}>{i18n.t('ob_close')}</button>
 					</div>
 				{/if}
 				<div class="mb-6">
-					<h2 class="text-2xl font-bold tracking-tight mb-1">Organizasyon Önizleme</h2>
+					<h2 class="text-2xl font-bold tracking-tight mb-1">{i18n.t('ob_preview_title')}</h2>
 					<p class="text-muted-foreground text-sm">
-						Aşağıdaki yapı oluşturulacak. Onaylayın veya sohbete dönün.
+						{i18n.t('ob_preview_desc')}
 					</p>
 				</div>
 
@@ -430,27 +430,27 @@
 					<div class="rounded-xl border bg-card p-4 flex flex-col items-center gap-2">
 						<div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Building2 class="w-5 h-5 text-blue-600" /></div>
 						<div class="text-2xl font-bold">{structure.departments?.length ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Bölüm</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_dept')}</div>
 					</div>
 					<div class="rounded-xl border bg-card p-4 flex flex-col items-center gap-2">
 						<div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center"><Users class="w-5 h-5 text-green-600" /></div>
 						<div class="text-2xl font-bold">{structure.humans?.length ?? 0}</div>
-						<div class="text-xs text-muted-foreground">İnsan</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_human')}</div>
 					</div>
 					<div class="rounded-xl border bg-card p-4 flex flex-col items-center gap-2">
 						<div class="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center"><Bot class="w-5 h-5 text-violet-600" /></div>
 						<div class="text-2xl font-bold">{structure.agents?.length ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Ajan</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_agent')}</div>
 					</div>
 					<div class="rounded-xl border bg-card p-4 flex flex-col items-center gap-2">
 						<div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center"><Zap class="w-5 h-5 text-amber-600" /></div>
 						<div class="text-2xl font-bold">{structure.company_skills?.length ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Yetenek</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_skill')}</div>
 					</div>
 					<div class="rounded-xl border bg-card p-4 flex flex-col items-center gap-2">
 						<div class="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center"><FileText class="w-5 h-5 text-rose-600" /></div>
 						<div class="text-2xl font-bold">{structure.policies?.length ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Politika</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_policy')}</div>
 					</div>
 				</div>
 
@@ -460,7 +460,7 @@
 					<details class="ob-detail-block">
 						<summary class="ob-detail-summary">
 							<Building2 class="w-4 h-4 text-blue-600" />
-							Bölümler ({structure.departments?.length ?? 0})
+							{i18n.t('ob_section_depts')} ({structure.departments?.length ?? 0})
 						</summary>
 						<div class="pt-3 space-y-2">
 							{#each (structure.departments ?? []) as d}
@@ -481,7 +481,7 @@
 					<details class="ob-detail-block">
 						<summary class="ob-detail-summary">
 							<Bot class="w-4 h-4 text-violet-600" />
-							Ajanlar ({structure.agents?.length ?? 0})
+							{i18n.t('ob_section_agents')} ({structure.agents?.length ?? 0})
 						</summary>
 						<div class="pt-3 space-y-2">
 							{#each (structure.agents ?? []) as ag}
@@ -507,7 +507,7 @@
 					<details class="ob-detail-block">
 						<summary class="ob-detail-summary">
 							<Zap class="w-4 h-4 text-amber-600" />
-							Yetenekler ({structure.company_skills?.length ?? 0})
+							{i18n.t('ob_section_skills')} ({structure.company_skills?.length ?? 0})
 						</summary>
 						<div class="pt-3 grid sm:grid-cols-2 gap-2">
 							{#each (structure.company_skills ?? []) as sk}
@@ -524,7 +524,7 @@
 					<details class="ob-detail-block">
 						<summary class="ob-detail-summary">
 							<FileText class="w-4 h-4 text-rose-600" />
-							Politikalar ({structure.policies?.length ?? 0})
+							{i18n.t('ob_section_policies')} ({structure.policies?.length ?? 0})
 						</summary>
 						<div class="pt-3 space-y-1.5">
 							{#each (structure.policies ?? []) as pol}
@@ -546,11 +546,11 @@
 
 				<div class="flex gap-3 justify-end">
 					<button class="ob-btn-outline" onclick={() => { phase = 'chat'; aiSignaledReady = false; }}>
-						← Sohbete Dön
+						{i18n.t('ob_back_chat')}
 					</button>
 					<button class="ob-btn-primary" onclick={confirmCreate}>
 						<Sparkles class="w-4 h-4" />
-						{totalCount} Kaydı Oluştur
+						{totalCount} {i18n.t('ob_create_btn')}
 					</button>
 				</div>
 			</div>
@@ -561,9 +561,9 @@
 				<div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
 					<Loader2 class="w-8 h-8 text-primary animate-spin" />
 				</div>
-				<h2 class="text-xl font-semibold mb-2">Oluşturuluyor...</h2>
+				<h2 class="text-xl font-semibold mb-2">{i18n.t('ob_creating')}</h2>
 				<p class="text-muted-foreground text-sm">
-					Bölümler, personel, ajanlar, yetenekler ve politikalar veritabanına yazılıyor.
+					{i18n.t('ob_creating_desc')}
 				</p>
 			</div>
 
@@ -573,41 +573,41 @@
 				<div class="w-20 h-20 rounded-2xl bg-emerald-100 flex items-center justify-center mb-6">
 					<Check class="w-10 h-10 text-emerald-600" />
 				</div>
-				<h2 class="text-2xl font-bold mb-1">Kurulum Tamamlandı!</h2>
+				<h2 class="text-2xl font-bold mb-1">{i18n.t('ob_done_title')}</h2>
 				<p class="text-muted-foreground text-sm mb-8">
-					{companyName} organizasyonu başarıyla oluşturuldu.
+					{i18n.t('ob_done_desc').replace('{name}', companyName)}
 				</p>
 
 				<div class="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-10">
 					<div class="flex flex-col items-center gap-1.5 p-4 rounded-xl border bg-card">
 						<div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center"><Building2 class="w-5 h-5 text-blue-600" /></div>
 						<div class="text-2xl font-bold">{createSummary['departments'] ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Bölüm</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_dept')}</div>
 					</div>
 					<div class="flex flex-col items-center gap-1.5 p-4 rounded-xl border bg-card">
 						<div class="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center"><Users class="w-5 h-5 text-green-600" /></div>
 						<div class="text-2xl font-bold">{createSummary['humans'] ?? 0}</div>
-						<div class="text-xs text-muted-foreground">İnsan</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_human')}</div>
 					</div>
 					<div class="flex flex-col items-center gap-1.5 p-4 rounded-xl border bg-card">
 						<div class="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center"><Bot class="w-5 h-5 text-violet-600" /></div>
 						<div class="text-2xl font-bold">{createSummary['agents'] ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Ajan</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_agent')}</div>
 					</div>
 					<div class="flex flex-col items-center gap-1.5 p-4 rounded-xl border bg-card">
 						<div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center"><Zap class="w-5 h-5 text-amber-600" /></div>
 						<div class="text-2xl font-bold">{createSummary['skills'] ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Yetenek</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_skill')}</div>
 					</div>
 					<div class="flex flex-col items-center gap-1.5 p-4 rounded-xl border bg-card">
 						<div class="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center"><FileText class="w-5 h-5 text-rose-600" /></div>
 						<div class="text-2xl font-bold">{createSummary['policies'] ?? 0}</div>
-						<div class="text-xs text-muted-foreground">Politika</div>
+						<div class="text-xs text-muted-foreground">{i18n.t('ob_stat_policy')}</div>
 					</div>
 				</div>
 
 				<button class="ob-btn-primary text-base px-8 py-3" onclick={goToApp}>
-					Uygulamaya Git <ArrowRight class="w-5 h-5 ml-1" />
+					{i18n.t('ob_go_app')} <ArrowRight class="w-5 h-5 ml-1" />
 				</button>
 			</div>
 		{/if}
