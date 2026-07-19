@@ -44,9 +44,9 @@ export const onboardingApi = {
 			'/onboarding/search', { company_name, company_id }
 		),
 
-	generate: (company_name: string, search_context: string, messages: ChatMessage[], company_id?: string) =>
+	generate: (company_name: string, search_context: string, messages: ChatMessage[], company_id?: string, locale = 'tr') =>
 		api.post<{ structure: OrgStructure }>(
-			'/onboarding/generate', { company_name, search_context, messages, company_id }
+			'/onboarding/generate', { company_name, search_context, messages, company_id, locale }
 		),
 
 	create: (company_id: string, structure: OrgStructure) =>
@@ -64,6 +64,7 @@ export const onboardingApi = {
 		onDone: (ready: boolean) => void,
 		onError: (err: string) => void,
 		company_id?: string,
+		locale = 'tr',
 	): () => void {
 		const ctrl = new AbortController();
 
@@ -75,7 +76,7 @@ export const onboardingApi = {
 						'Content-Type': 'application/json',
 						Authorization: `Bearer ${token}`,
 					},
-					body: JSON.stringify({ company_name, search_context, messages, company_id }),
+					body: JSON.stringify({ company_name, search_context, messages, company_id, locale }),
 					signal: ctrl.signal,
 				});
 

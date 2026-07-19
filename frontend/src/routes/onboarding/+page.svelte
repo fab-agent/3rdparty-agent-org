@@ -10,6 +10,7 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { companyStore } from '$lib/stores/company.svelte';
 	import { onboardingApi, type ChatMessage, type OrgStructure } from '$lib/api/onboarding';
+	import { i18n } from '$lib/i18n/index.svelte';
 
 	// ── Phase management ──────────────────────────────────────────────────────
 	// phase: 'search' | 'chat' | 'preview' | 'creating' | 'done'
@@ -149,6 +150,7 @@
 				}];
 			},
 			companyId,
+			i18n.locale,
 		);
 	}
 
@@ -168,7 +170,7 @@
 	async function generatePreview() {
 		generating = true; generateError = '';
 		try {
-			const res = await onboardingApi.generate(companyName, searchContext, messages, companyId);
+			const res = await onboardingApi.generate(companyName, searchContext, messages, companyId, i18n.locale);
 			structure = res.structure;
 			phase = 'preview';
 		} catch (e: any) {

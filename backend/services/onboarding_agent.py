@@ -313,7 +313,7 @@ async def stream_onboarding_chat(
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
-ONBOARDING_SYSTEM = """Sen bir kurumsal yapay zeka organizasyon danışmanısın.
+_ONBOARDING_SYSTEM_TR = """Sen bir kurumsal yapay zeka organizasyon danışmanısın.
 Şirketlerin yapay zeka ajanlarını, departmanlarını, yeteneklerini ve politikalarını kurmasına yardım ediyorsun.
 
 GÖREV AKIŞI:
@@ -334,6 +334,37 @@ ZORUNLU KURAL — <READY_TO_GENERATE/> KULLANIMI:
 
 Üslup: Samimi, profesyonel, kısa ve net. Listeler ve emoji kullanabilirsin.
 HER ZAMAN Türkçe konuş."""
+
+_ONBOARDING_SYSTEM_EN = """You are a corporate AI organization consultant.
+You help companies set up their AI agents, departments, skills, and policies.
+
+TASK FLOW:
+1. Evaluate the web research results about the company and introduce yourself
+2. Collect the following information in sequence (1-2 questions at a time, 3-5 rounds total):
+   a) Team size and main departments/roles
+   b) Most time-consuming repetitive tasks and tools used (Excel, PDF, ERP, CRM...)
+   c) Sensitive data and things AI must never do (compliance, security boundaries)
+   d) Short-term priorities and goals
+3. Based on the user's answers, outline an organization structure
+4. Briefly summarize the structure and emit the <READY_TO_GENERATE/> signal
+
+MANDATORY RULE — <READY_TO_GENERATE/> USAGE:
+- Only use this signal AFTER the user has answered at least 3 questions with real information
+- NEVER use it in your first message, introduction, or before asking questions
+- After sufficient information (team size + repetitive tasks + sensitivity limits) is gathered,
+  append to the END of your last message: <READY_TO_GENERATE/>
+
+Tone: Friendly, professional, concise. Feel free to use lists and emojis.
+ALWAYS respond in English."""
+
+
+def build_onboarding_system(locale: str = "tr") -> str:
+    """Return the onboarding system prompt in the requested language."""
+    return _ONBOARDING_SYSTEM_EN if locale == "en" else _ONBOARDING_SYSTEM_TR
+
+
+# Legacy constant kept for any direct imports
+ONBOARDING_SYSTEM = _ONBOARDING_SYSTEM_TR
 
 STRUCTURE_SYSTEM = """Sen kıdemli bir kurumsal AI organizasyon mimarısın. Verilen onboarding konuşmasına göre şirkete özel, GERÇEKÇİ ve KULLANIMA HAZIR bir organizasyon yapısını JSON formatında üretirsin.
 SADECE geçerli JSON döndür — açıklama, markdown fence veya başka hiçbir metin ekleme.
@@ -639,15 +670,31 @@ async def generate_org_structure(
     provider: str,
     model: str,
     api_key: str,
+    locale: str = "tr",
 ) -> dict:
     """Ask the LLM to generate a structured JSON org from the conversation."""
-    convo_text = "\n".join(
-        f"{'Kullanıcı' if m['role'] == 'user' else 'AI'}: {m['content']}"
-        for m in conversation
-        if m["role"] != "system"
-    )
+    if locale == "en":
+        user_label, ai_label = "User", "AI"
+        convo_text = "\n".join(
+            f"{'User' if m['role'] == 'user' else 'AI'}: {m['content']}"
+            for m in conversation
+            if m["role"] != "system"
+        )
+        prompt = f"""Company name: {company_name}
 
-    prompt = f"""Şirket adı: {company_name}
+Onboarding conversation:
+{convo_text}
+
+Based on the information above, generate the organization structure for this company in JSON format.
+Slugs must be lowercase-kebab with no special characters.
+Return ONLY valid JSON."""
+    else:
+        convo_text = "\n".join(
+            f"{'Kullanıcı' if m['role'] == 'user' else 'AI'}: {m['content']}"
+            for m in conversation
+            if m["role"] != "system"
+        )
+        prompt = f"""Şirket adı: {company_name}
 
 Onboarding konuşması:
 {convo_text}

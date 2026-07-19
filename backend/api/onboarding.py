@@ -18,7 +18,7 @@ from api.auth import get_current_user
 from database import get_session
 from models import Company, User
 from services.onboarding_agent import (
-    ONBOARDING_SYSTEM,
+    build_onboarding_system,
     _get_best_key,
     create_org_from_structure,
     generate_org_structure,
@@ -44,6 +44,7 @@ class ChatRequest(BaseModel):
     search_context: str
     messages: list[dict]  # [{role: user|assistant, content: str}]
     company_id: str | None = None
+    locale: str = "tr"
 
 
 class GenerateRequest(BaseModel):
@@ -51,6 +52,7 @@ class GenerateRequest(BaseModel):
     search_context: str
     messages: list[dict]
     company_id: str | None = None
+    locale: str = "tr"
 
 
 class CreateRequest(BaseModel):
@@ -104,9 +106,10 @@ async def onboarding_chat(body: ChatRequest, _: User = Depends(get_current_user)
     provider, model, api_key = key_info
 
     # Build messages with system prompt and search context prepended
-    system_content = ONBOARDING_SYSTEM
+    system_content = build_onboarding_system(body.locale)
     if body.search_context:
-        system_content += f"\n\nWeb araştırması sonuçları ({body.company_name}):\n{body.search_context}"
+        label = "Web research results" if body.locale == "en" else "Web araştırması sonuçları"
+        system_content += f"\n\n{label} ({body.company_name}):\n{body.search_context}"
 
     full_messages = [{"role": "system", "content": system_content}] + body.messages
 
@@ -157,6 +160,7 @@ async def onboarding_generate(
             provider,
             model,
             api_key,
+            locale=body.locale,
         )
         if body.company_id:
             save_onboarding_session(
