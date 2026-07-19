@@ -79,6 +79,15 @@ export const authStore = {
 		return me;
 	},
 
+	/** Store a JWT received from an external flow (e.g. OTP) and fetch /auth/me */
+	async loginWithToken(token: string): Promise<AuthUser> {
+		_token = token;
+		localStorage.setItem('auth_token', token);
+		const me = await api.get<AuthUser>('/auth/me');
+		_user = me;
+		return me;
+	},
+
 	/** For first-login: user is already authenticated, just needs to set permanent password. */
 	async changePassword(password: string): Promise<void> {
 		await apiChangePassword(password);

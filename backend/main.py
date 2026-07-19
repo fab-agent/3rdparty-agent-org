@@ -29,6 +29,7 @@ from sqlmodel import select
 from api.a2a import router as a2a_router
 from api.audit import router as audit_router
 from api.auth import router as auth_router
+from api.demo_auth import router as demo_auth_router
 from api.backup import router as backup_router
 from api.change_requests import router as cr_router
 from api.companies import router as companies_router
@@ -94,6 +95,7 @@ async def log_requests(request, call_next):
 
 
 app.include_router(auth_router)
+app.include_router(demo_auth_router)
 app.include_router(users_router)
 app.include_router(companies_router)
 app.include_router(dept_router)

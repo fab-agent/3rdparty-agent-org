@@ -440,6 +440,17 @@ class DatabaseConnection(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class DemoOtp(SQLModel, table=True):
+    """6-digit OTP for passwordless demo tenant login."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    email: str = Field(index=True)
+    code: str
+    expires_at: datetime
+    used: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class OnboardingSession(SQLModel, table=True):
     """Persists AI onboarding progress so power/connection loss doesn't reset everything."""
 
