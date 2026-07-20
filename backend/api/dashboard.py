@@ -6,6 +6,7 @@ from sqlmodel import func, select
 from api.auth import get_current_user
 from database import get_session
 from models import (
+    A2ARequest,
     AgentConfig,
     AgentMemory,
     AgentSession,
@@ -275,6 +276,13 @@ def agent_sla(company_id: str | None = None, user: User = Depends(get_current_us
             ).all()
             task_total = len(tasks)
             task_completed = sum(1 for t in tasks if t.status == "completed")
+
+            # Count A2A delegations initiated by this agent as additional tasks
+            a2a_reqs = session.exec(
+                select(A2ARequest).where(A2ARequest.from_agent_id == agent.id)
+            ).all()
+            task_total += len(a2a_reqs)
+            task_completed += sum(1 for r in a2a_reqs if r.status == "completed")
 
             total_ops = flow_success + flow_error + task_total
             completed_ops = flow_success + task_completed

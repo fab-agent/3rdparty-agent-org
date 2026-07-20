@@ -54,6 +54,7 @@
 
 	// ── Provider state ────────────────────────────────────────────────────────
 	const LOCAL_PROVIDER_SLUGS = new Set(['ollama', 'lmstudio']);
+	const HIDDEN_CLOUD_PROVIDERS = new Set(['anthropic', 'google']);
 	const LOCAL_PROVIDER_DEFAULTS: Record<string, string> = {
 		ollama: 'http://localhost:11434/v1',
 		lmstudio: 'http://localhost:1234/v1',
@@ -830,7 +831,7 @@
 						<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('settings_cloud_providers')}</span>
 						<span class="text-xs text-muted-foreground">— {t('settings_cloud_providers_desc')}</span>
 					</div>
-					{#each providerCards.filter(c => !LOCAL_PROVIDER_SLUGS.has(c.provider)) as card (card.provider)}
+					{#each providerCards.filter(c => !LOCAL_PROVIDER_SLUGS.has(c.provider) && !HIDDEN_CLOUD_PROVIDERS.has(c.provider)) as card (card.provider)}
 						{@const isActive = card.status === 'active'}
 						{@const isInvalid = card.status === 'invalid'}
 						{@const isUnconfigured = card.status === 'unconfigured'}

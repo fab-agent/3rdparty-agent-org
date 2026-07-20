@@ -1,6 +1,6 @@
 # Agentic Organization
 
-Self-hosted, open-source platform for companies to manage AI agents as first-class members of their org chart.
+Self-hosted platform for companies to manage AI agents as first-class members of their org chart.
 
 Define agents per personnel, assign skills and policies, run autonomous flows, and onboard your entire organization in a single AI-assisted conversation.
 
@@ -17,10 +17,11 @@ Define agents per personnel, assign skills and policies, run autonomous flows, a
 | **Company Skills Library** — Markdown-based skill definitions assignable to multiple agents | ✅ |
 | **Policies Management** — company / department / agent-scoped policies with Markdown editor | ✅ |
 | Org chart visualization (interactive tree view) | ✅ |
-| AI provider key management (Anthropic, OpenAI, Google, Mistral, Qwen) | ✅ |
+| AI provider key management (OpenAI, Mistral, Qwen, Ollama, LM Studio) | ✅ |
 | **Autonomous Flows** — cron-scheduled agent tasks delivered to inbox | ✅ |
 | **Task Requests** — route tasks to best-matched agent by dept + skill | ✅ |
-| **Agent-to-Agent (A2A) delegation** with human approval | ✅ |
+| **Agent-to-Agent (A2A) delegation** with human approval + auto-compilation | ✅ |
+| **Orchestrator agents** — Council Agent pattern with parallel specialist delegation | ✅ |
 | **Token telemetry** — per-message token tracking across all providers | ✅ |
 | **Long-term agent memory** — session summaries stored and injected into future context | ✅ |
 | **Image generation in flows** — Qwen Image / DALL-E via DashScope task API | ✅ |
@@ -37,13 +38,15 @@ Define agents per personnel, assign skills and policies, run autonomous flows, a
 | Social media agent skills (Instagram Business + WhatsApp Cloud API) | ✅ |
 | Telegram notification integration | ✅ |
 | GitHub / GitLab / Gitea sync (config + policy Markdown files) | ✅ |
-| Live dashboard — company + personal telemetry (tokens, sessions, memories) | ✅ |
+| Live dashboard — company + personal telemetry (tokens, sessions, memories, A2A SLA) | ✅ |
+| Change request workflow — dept-head + admin two-step approval with Git commit | ✅ |
+| ERP / custom database query skills — agents query live databases via SQL | ✅ |
 
 ---
 
 ## AI Onboarding
 
-The standout feature. Instead of manually setting up departments, agents, skills and policies one by one, a conversational AI assistant does it for you:
+Instead of manually setting up departments, agents, skills and policies one by one, a conversational AI assistant does it for you:
 
 1. **Web Search** — the system automatically researches your company online for context
 2. **Guided Chat** — the AI asks 3–5 targeted questions about your team size, recurring workflows, tools used, and data sensitivity constraints
@@ -54,12 +57,27 @@ To start: **Settings → AI ile Kur** (requires at least one active AI provider 
 
 ---
 
+## Agent-to-Agent (A2A) Delegation
+
+The platform supports multi-agent orchestration through a human-in-the-loop delegation flow:
+
+1. An **orchestrator agent** (e.g. Council Agent) receives a task and delegates sub-tasks to specialist agents
+2. A designated human approves each delegation before execution
+3. Specialist agents run in parallel and report results
+4. Results are automatically compiled into an executive report and posted back to the originating session
+
+Flow: `pending_approval → running → completed → [auto-compiled report]`
+
+Human approval is required at the delegation step. Results are auto-completed and compiled without additional approval gates.
+
+---
+
 ## Autonomous Flows
 
 Cron-scheduled agent tasks that run independently and deliver results to the responsible user's inbox.
 
 - Any agent can have one or more flows (e.g., every 15 min, every 30 min)
-- Flows support all providers: Anthropic, OpenAI, Qwen, Mistral, Google
+- Flows support all configured providers: OpenAI, Qwen, Mistral, Ollama, LM Studio
 - Image generation flows route automatically to DashScope task API when an image model is detected
 - Results land in the inbox and update flow telemetry (last run, status, output snippet)
 
@@ -70,7 +88,7 @@ Cron-scheduled agent tasks that run independently and deliver results to the res
 ### Requirements
 
 - Docker + Docker Compose **or** Python 3.11+ and Node.js 20+
-- (Optional) AI provider API key: Anthropic / OpenAI / Google / Mistral / Qwen
+- At least one active AI provider API key (OpenAI, Qwen, Mistral, or a local model via Ollama / LM Studio)
 
 ---
 
@@ -198,7 +216,7 @@ Company-wide skill definitions with full Markdown content. Assign to multiple ag
 
 ### 7. Policies
 
-Create policies scoped to **company**, **department**, or **agent** with a full Markdown editor. Policies created during AI Onboarding appear here automatically.
+Create policies scoped to **company**, **department**, or **agent** with a full Markdown editor.
 
 ### 8. Org Chart
 
@@ -206,35 +224,38 @@ The **Org Chart** page shows the full personnel hierarchy as an interactive tree
 
 ### 9. Autonomous Flows
 
-Under **Personnel → [Agent] → Flows**: create cron schedules (e.g., `*/15 * * * *`) with a prompt. The agent runs automatically and delivers results to the responsible human's inbox.
+Under **Agents → [Agent] → Flows**: create cron schedules (e.g., `*/15 * * * *`) with a prompt. The agent runs automatically and delivers results to the responsible human's inbox.
 
 ### 10. Task Requests
 
-Anyone in the org submits a task via `/task-requests`. The system routes to the best-matched agent by department and skill filter. The responsible human approves execution via `/task-requests/{id}/run`.
+Anyone in the org submits a task via `/tasks`. The system routes to the best-matched agent by department and skill filter.
 
 ### 11. Agent-to-Agent (A2A) Delegation
 
-An agent requests a task from another agent. A designated human must approve before execution and again after reviewing the result.
+Configure **Council Agent** with specialist delegate skills. When given a task, it assigns sub-tasks to specialist agents (Lead Scout, Finance Copilot, CRM Steward, etc.). Humans approve each delegation. Results are automatically compiled into a final executive report.
 
-Flow: `create → pending_approval → approved → running → pending_result_approval → completed`
+View pending delegations under **Jobs → Delegasyon**.
 
 ### 12. AI Provider Management
 
-Under **Settings → AI Providers**:
+Under **Settings → AI Sağlayıcılar**:
 
 | Provider | Models |
 |---|---|
-| Anthropic (Claude) | claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5 |
-| OpenAI (GPT) | gpt-4o, gpt-4o-mini, o1, o3-mini |
-| Google (Gemini) | gemini-2.5-pro, gemini-2.0-flash |
-| Mistral | mistral-large, mistral-small, codestral |
+| OpenAI (GPT) | gpt-4o, gpt-4o-mini, o3-mini |
+| Mistral AI | mistral-large, mistral-small, codestral |
 | Alibaba Qwen | qwen-max, qwen-plus, qwen-turbo, qwen-long, qwen-image-plus |
+| Ollama (Local) | any model running locally |
+| LM Studio (Local) | any model running locally |
 
 Keys are stored encrypted with AES-256 (Fernet) — never returned as plain text.
 
 ### 13. Dashboard
 
-**Göstergeler** shows live company telemetry (agent count, sessions, token usage, memory count) and personal telemetry for the logged-in user (their agents' sessions, token consumption, long-term memory summaries).
+The **Panel** page shows:
+- **Company telemetry** (agent count, sessions, token usage, memory count)
+- **Personal telemetry** (your agents' sessions, token consumption, long-term memory)
+- **Agent SLA table** — per-agent sessions, tokens, flow success, A2A task completion rate
 
 ---
 
@@ -253,14 +274,14 @@ agentic-organization/
 │   │   ├── departments.py      # Department CRUD + tree
 │   │   ├── personnel.py        # Personnel + agent config + org-tree
 │   │   ├── skills.py           # CompanySkill CRUD + AgentSkillLink assign/unassign
-│   │   ├── policies.py         # Policy CRUD
+│   │   ├── policies.py         # Policy management
 │   │   ├── onboarding.py       # AI Onboarding (search / chat / generate / create)
 │   │   ├── sessions.py         # AI sessions + SSE streaming
 │   │   ├── flows.py            # Autonomous flow scheduling (APScheduler)
 │   │   ├── task_requests.py    # Task routing + human approval
-│   │   ├── a2a.py              # Agent-to-Agent delegation flow
+│   │   ├── a2a.py              # Agent-to-Agent delegation + auto-compilation
 │   │   ├── providers.py        # AI provider key management
-│   │   ├── dashboard.py        # Live telemetry + personal stats
+│   │   ├── dashboard.py        # Live telemetry + SLA metrics
 │   │   └── audit.py            # Audit log
 │   ├── core/
 │   │   └── security.py         # Fernet encryption (data/.secret)
@@ -268,6 +289,7 @@ agentic-organization/
 │   │   ├── agent_runtime.py    # AI execution engine (multi-provider, token capture)
 │   │   ├── memory_service.py   # Session summaries → AgentMemory (long-term memory)
 │   │   ├── flow_runner.py      # Cron executor (qwen + image gen support)
+│   │   ├── mcp_client.py       # Built-in skills + A2A delegation executor
 │   │   ├── onboarding_agent.py # Web search + LLM conversation + bulk org creation
 │   │   ├── provider_service.py # Provider testing + model listing
 │   │   └── auth.py             # JWT + bcrypt helpers
@@ -289,7 +311,11 @@ agentic-organization/
             ├── org-chart/      # Interactive org tree with agent detail panel
             ├── personnel/      # Personnel list + side panel
             ├── departments/    # Department management
-            └── settings/       # AI providers, Telegram, social media, backup, flows
+            ├── flows/          # Autonomous flow management
+            ├── tasks/          # Task request routing
+            ├── a2a/            # Delegation queue + approval
+            ├── change-requests/ # Two-step approval workflow
+            └── settings/       # AI providers, Telegram, social media, backup
 ```
 
 ### Data Model
@@ -302,9 +328,10 @@ Company ──< Department ──< Personnel ──── AgentConfig ──< Ag
                                  │         AgentMemory (long-term session summaries)
                                  │
                           Flow (cron schedule → InboxMessage)
-                          TaskRequest (dept+skill routing → human approval → agent run)
-                          A2ARequest (from_agent → to_agent, human approver)
+                          TaskRequest (dept+skill routing → agent run)
+                          A2ARequest (from_agent → to_agent → human approver → compiled report)
                           Policy (scope: company | department | agent)
+                          DatabaseConnection (encrypted DSN for SQL query skills)
 ```
 
 ---
@@ -324,14 +351,12 @@ All endpoints require `Authorization: Bearer <token>` except `/auth/token`, `/au
 # Required
 JWT_SECRET=<random-64-char-hex>
 
-# Telegram (for invite / notifications — replaces email)
+# Telegram (for invite / notifications)
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_ADMIN_CHAT_ID=
 
 # AI Providers (optional — can also be added from Settings page)
-ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
-GOOGLE_API_KEY=AIza...
 MISTRAL_API_KEY=...
 QWEN_API_KEY=sk-...
 
@@ -359,8 +384,9 @@ pytest tests/ -v
 - [x] A2A approver verification — `approver_id` stored and filtered per request
 
 ### Features
-- [x] Onboarding session resume after browser close — `save_onboarding_session` / `get_onboarding_session` implemented
-- [x] Change request workflow for skills and policies — `propose=true` flag on skill/policy update endpoints; full dept-approve → admin-approve flow in `api/change_requests.py`
+- [x] Onboarding session resume after browser close
+- [x] Change request workflow for skills and policies — dept-approve → admin-approve → Git commit
+- [x] A2A auto-compilation — orchestrator results compiled into executive report automatically
 - [ ] Push Notifications UI — WhatsApp/Telegram task alerts (backend infra in place, frontend pending)
 - [ ] Visual Flow Builder — drag-and-drop agent workflow designer with per-step model selection
 - [ ] Agent Marketplace — ready-made templates (Legal Assistant, HR Agent, Finance Analyst) deployable in one click
@@ -370,7 +396,9 @@ pytest tests/ -v
 
 ## License
 
-**MIT + Commons Clause** — Free to use, fork, and self-host for your own organization. Reselling, white-labeling, or offering as a paid service requires a commercial license. Contact [bilgi@kuntaykunt.com](mailto:bilgi@kuntaykunt.com) to discuss.
+**Commons Clause + MIT** — Free to use, fork, and self-host for your own organization. Selling, white-labeling, or offering this software as a hosted or managed service to third parties requires a commercial license.
+
+Contact [bilgi@kuntaykunt.com](mailto:bilgi@kuntaykunt.com) for commercial licensing.
 
 ---
 

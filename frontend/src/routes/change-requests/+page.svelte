@@ -51,7 +51,7 @@
 		return ({
 			submitted: t('cr_filter_pending'),
 			dept_head_approved: t('cr_filter_dept_approved'),
-			admin_approved: 'Admin Onaylandı',
+			admin_approved: t('cr_status_admin_approved'),
 			committed: t('cr_filter_committed'),
 			rejected: t('cr_filter_rejected'),
 		} as Record<string, string>)[s] ?? s;
@@ -64,18 +64,22 @@
 		return 'secondary';
 	}
 
-	function typeLabel(t: string): string {
-		return ({ agent_config: 'Ajan Yapılandırması', skill: 'Skill', policy: 'Politika' })[t] ?? t;
+	function typeLabel(type: string): string {
+		return ({
+			agent_config: t('cr_type_config'),
+			skill: t('cr_type_skill'),
+			policy: t('cr_type_policy'),
+		})[type] ?? type;
 	}
 
 	function relTime(iso: string): string {
 		const diff = Date.now() - new Date(iso).getTime();
 		const m = Math.floor(diff / 60000);
-		if (m < 1) return 'az önce';
-		if (m < 60) return `${m}dk önce`;
+		if (m < 1) return t('cr_rel_just_now');
+		if (m < 60) return `${m}${t('cr_rel_min_ago')}`;
 		const h = Math.floor(m / 60);
-		if (h < 24) return `${h}sa önce`;
-		return `${Math.floor(h / 24)}g önce`;
+		if (h < 24) return `${h}${t('cr_rel_hour_ago')}`;
+		return `${Math.floor(h / 24)}${t('cr_rel_day_ago')}`;
 	}
 
 	async function deptApprove(cr: ChangeRequest) {
@@ -122,7 +126,7 @@
 </script>
 
 <svelte:head>
-	<title>Değişiklik Talepleri • fab.engineering</title>
+	<title>{t('cr_title')} • fab.engineering</title>
 </svelte:head>
 
 <div class="space-y-6 max-w-4xl">
