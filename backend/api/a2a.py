@@ -22,6 +22,7 @@ from models import (
     AgentConfig,
     AgentSession,
     Personnel,
+    SessionMessage,
     User,
 )
 from schemas import A2AApprove, A2AReject, A2ARequestCreate, A2AResultApprove
@@ -296,24 +297,31 @@ def _maybe_compile_results(from_session_id: str) -> None:
 
     _COMPILE_TRIGGERED.add(from_session_id)
 
+    # Build a pre-formatted executive report and write it directly as an assistant
+    # message — avoids routing through the orchestrator agent which would re-delegate.
     parts = [
-        f"### {'✅' if status == 'completed' else '❌'} {name}\n{result}"
+        f"### {'✅' if status == 'completed' else '❌'} {name}\n\n{result}"
         for name, result, status in done
     ]
 
-    compilation_prompt = (
-        "Tüm delegasyon görevleri tamamlandı. Aşağıda her ajandan gelen raporlar yer almaktadır.\n\n"
+    report = (
+        "## 📊 Delegasyon Sonuçları — Yönetici Raporu\n\n"
+        f"*{len(done)} ajan tamamlandı*\n\n"
         + "\n\n---\n\n".join(parts)
         + "\n\n---\n\n"
-        "Bu raporları bütünleştirerek kapsamlı bir **Yönetici Raporu** hazırla:\n"
-        "1. **Yönetici Özeti** — en kritik 3-5 bulgu\n"
-        "2. **Departman Bazlı Bulgular** — her ajandan öne çıkanlar\n"
-        "3. **Ortak Temalar & Riskler**\n"
-        "4. **Önerilen Aksiyonlar** — öncelik sırasıyla"
+        "_Tüm delegasyon görevleri tamamlandı. Yukarıdaki raporları inceleyebilir, "
+        "detayları sormak için mesaj yazabilirsiniz._"
     )
 
     try:
-        asyncio.run(_run_agent_task(from_session_id, compilation_prompt))
+        with get_session() as session:
+            msg = SessionMessage(
+                session_id=from_session_id,
+                role="assistant",
+                content=report,
+            )
+            session.add(msg)
+            session.commit()
     except Exception as e:
         import traceback
         print(f"[A2A Compile] {e}\n{traceback.format_exc()}")

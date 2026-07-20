@@ -72,7 +72,7 @@
 
 	let selectedAgent = $state<PersonnelItem | null>(null);
 	let agentMenuOpen = $state(false);
-	let infoPanelOpen = $state(true);
+	let infoPanelOpen = $state(false);
 	let agentSkills = $state<Array<{ id: string; name: string; version: string; description: string | null; skill_type: string; is_active: boolean }>>([]);
 
 	let input = $state('');
@@ -587,18 +587,24 @@
 	<!-- Main chat column -->
 	<div class="flex-1 flex flex-col min-w-0">
 		{#if activeSession}
-			<!-- Header -->
-			<div class="px-6 py-4 border-b border-border flex items-center gap-3 flex-shrink-0">
-				<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-					<Bot class="w-4 h-4 text-primary" />
-				</div>
-				<div>
-					<div class="font-semibold text-sm">{selectedAgent?.name ?? t('chat_agent_fallback')}</div>
-					{#if selectedAgent?.title}
-						<div class="text-xs text-muted-foreground">{selectedAgent.title}</div>
-					{/if}
-				</div>
-				<div class="ml-auto flex items-center gap-2">
+			<!-- Header — click agent avatar/name to open info drawer -->
+			<div class="px-4 py-3 border-b border-border flex items-center gap-3 flex-shrink-0">
+				<button
+					class="flex items-center gap-2.5 hover:opacity-75 transition-opacity min-w-0"
+					onclick={() => selectedAgent && (infoPanelOpen = true)}
+					title={t('chat_show_info')}
+				>
+					<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+						<Bot class="w-4 h-4 text-primary" />
+					</div>
+					<div class="text-left min-w-0">
+						<div class="font-semibold text-sm truncate">{selectedAgent?.name ?? t('chat_agent_fallback')}</div>
+						{#if selectedAgent?.title}
+							<div class="text-xs text-muted-foreground truncate">{selectedAgent.title}</div>
+						{/if}
+					</div>
+				</button>
+				<div class="ml-auto flex items-center gap-2 flex-shrink-0">
 					{#if polling}
 						<span class="text-xs text-emerald-600 flex items-center gap-1.5">
 							<RefreshCw class="w-3 h-3 animate-spin" />
@@ -865,114 +871,110 @@
 		{/if}
 	</div>
 
-	<!-- ── Agent Info Panel ───────────────────────────────────────────────── -->
-	{#if selectedAgent && infoPanelOpen}
-		<div class="w-72 border-l border-border flex flex-col flex-shrink-0 bg-muted/10 overflow-y-auto">
-			<!-- Agent card -->
-			<div class="p-4 border-b border-border">
-				<div class="flex items-center justify-between mb-3">
-					<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('chat_info_title')}</span>
-					<button
-						class="text-muted-foreground hover:text-foreground transition-colors"
-						onclick={() => (infoPanelOpen = false)}
-					>
-						<X class="w-3.5 h-3.5" />
-					</button>
-				</div>
-				<div class="flex items-center gap-2.5">
-					<div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-						<Bot class="w-4.5 h-4.5 text-primary" />
-					</div>
-					<div class="min-w-0">
-						<div class="font-semibold text-sm truncate">{selectedAgent.name}</div>
-						{#if selectedAgent.title}
-							<div class="text-xs text-muted-foreground truncate">{selectedAgent.title}</div>
-						{/if}
-					</div>
-				</div>
+	</div>
+</div>
 
-				{#if selectedAgent.agent_config}
-					{@const cfg = selectedAgent.agent_config}
-					<div class="mt-3 flex flex-wrap gap-1.5">
-						<span class="px-2 py-0.5 rounded-full text-xs bg-muted border border-border font-mono">
-							{cfg.model}
-						</span>
-						<span class="px-2 py-0.5 rounded-full text-xs border font-medium
-							{cfg.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
-							 cfg.status === 'draft'  ? 'bg-amber-50 text-amber-700 border-amber-200' :
-							                          'bg-muted text-muted-foreground border-border'}">
-							{cfg.status === 'active' ? t('status_active') : cfg.status === 'draft' ? t('status_draft') : t('status_inactive')}
-						</span>
+<!-- ── Agent Info Slide-over ─────────────────────────────────────────────── -->
+{#if selectedAgent && infoPanelOpen}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="fixed inset-0 z-40 bg-black/20"
+		onclick={() => (infoPanelOpen = false)}
+	></div>
+	<div class="fixed top-0 right-0 h-full w-72 z-50 bg-background border-l border-border shadow-xl flex flex-col overflow-y-auto">
+		<!-- Agent card -->
+		<div class="p-4 border-b border-border">
+			<div class="flex items-center justify-between mb-3">
+				<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('chat_info_title')}</span>
+				<button
+					class="text-muted-foreground hover:text-foreground transition-colors"
+					onclick={() => (infoPanelOpen = false)}
+				>
+					<X class="w-3.5 h-3.5" />
+				</button>
+			</div>
+			<div class="flex items-center gap-2.5">
+				<div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+					<Bot class="w-5 h-5 text-primary" />
+				</div>
+				<div class="min-w-0">
+					<div class="font-semibold text-sm truncate">{selectedAgent.name}</div>
+					{#if selectedAgent.title}
+						<div class="text-xs text-muted-foreground truncate">{selectedAgent.title}</div>
+					{/if}
+				</div>
+			</div>
+
+			{#if selectedAgent.agent_config}
+				{@const cfg = selectedAgent.agent_config}
+				<div class="mt-3 flex flex-wrap gap-1.5">
+					<span class="px-2 py-0.5 rounded-full text-xs bg-muted border border-border font-mono">
+						{cfg.model}
+					</span>
+					<span class="px-2 py-0.5 rounded-full text-xs border font-medium
+						{cfg.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
+						 cfg.status === 'draft'  ? 'bg-amber-50 text-amber-700 border-amber-200' :
+						                          'bg-muted text-muted-foreground border-border'}">
+						{cfg.status === 'active' ? t('status_active') : cfg.status === 'draft' ? t('status_draft') : t('status_inactive')}
+					</span>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Skills -->
+		{#if agentSkills.length > 0}
+			<div class="p-4 border-b border-border">
+				<div class="flex items-center gap-1.5 mb-2.5">
+					<Zap class="w-3.5 h-3.5 text-primary" />
+					<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('chat_tools_skills')}</span>
+				</div>
+				<div class="space-y-1.5">
+					{#each agentSkills as skill}
+						<div class="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-muted/40 border border-border/60">
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center gap-1.5">
+									<span class="text-xs font-medium truncate">{skill.name}</span>
+									{#if !skill.is_active}
+										<span class="text-xs text-muted-foreground">{t('chat_skill_inactive')}</span>
+									{/if}
+								</div>
+								{#if skill.description}
+									<div class="text-xs text-muted-foreground mt-0.5 leading-snug">{skill.description}</div>
+								{/if}
+							</div>
+							<span class="flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide
+								{skill.skill_type === 'builtin' ? 'bg-blue-50 text-blue-600' :
+								 skill.skill_type === 'mcp'     ? 'bg-purple-50 text-purple-600' :
+								 skill.skill_type === 'http'    ? 'bg-green-50 text-green-600' :
+								                                   'bg-orange-50 text-orange-600'}">
+								{skill.skill_type}
+							</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Department -->
+		{#if selectedAgent.department_name}
+			<div class="p-4">
+				<div class="flex items-center gap-1.5 mb-2.5">
+					<Shield class="w-3.5 h-3.5 text-primary" />
+					<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('chat_department')}</span>
+				</div>
+				<div class="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40 border border-border/60 mb-2">
+					<span class="text-xs font-medium">{selectedAgent.department_name}</span>
+				</div>
+				{#if selectedAgent.manager_name}
+					<div class="text-xs text-muted-foreground">
+						{t('chat_manager')} {selectedAgent.manager_name}
 					</div>
 				{/if}
 			</div>
-
-			<!-- Skills -->
-			{#if agentSkills.length > 0}
-				<div class="p-4 border-b border-border">
-					<div class="flex items-center gap-1.5 mb-2.5">
-						<Zap class="w-3.5 h-3.5 text-primary" />
-						<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('chat_tools_skills')}</span>
-					</div>
-					<div class="space-y-1.5">
-						{#each agentSkills as skill}
-							<div class="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-background border border-border/60">
-								<div class="flex-1 min-w-0">
-									<div class="flex items-center gap-1.5">
-										<span class="text-xs font-medium truncate">{skill.name}</span>
-										{#if !skill.is_active}
-											<span class="text-xs text-muted-foreground">{t('chat_skill_inactive')}</span>
-										{/if}
-									</div>
-									{#if skill.description}
-										<div class="text-xs text-muted-foreground mt-0.5 leading-snug">{skill.description}</div>
-									{/if}
-								</div>
-								<span class="flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide
-									{skill.skill_type === 'builtin' ? 'bg-blue-50 text-blue-600' :
-									 skill.skill_type === 'mcp'     ? 'bg-purple-50 text-purple-600' :
-									 skill.skill_type === 'http'    ? 'bg-green-50 text-green-600' :
-									                                   'bg-orange-50 text-orange-600'}">
-									{skill.skill_type}
-								</span>
-							</div>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
-			<!-- Department -->
-			{#if selectedAgent.department_name}
-				<div class="p-4">
-					<div class="flex items-center gap-1.5 mb-2.5">
-						<Shield class="w-3.5 h-3.5 text-primary" />
-						<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('chat_department')}</span>
-					</div>
-					<div class="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-background border border-border/60 mb-2">
-						<span class="text-xs font-medium">{selectedAgent.department_name}</span>
-					</div>
-					{#if selectedAgent.manager_name}
-						<div class="text-xs text-muted-foreground">
-							{t('chat_manager')} {selectedAgent.manager_name}
-						</div>
-					{/if}
-				</div>
-			{/if}
-		</div>
-	{:else if selectedAgent && !infoPanelOpen}
-		<!-- Collapsed toggle -->
-		<div class="w-8 border-l border-border flex flex-col items-center pt-4 flex-shrink-0 bg-muted/10">
-			<button
-				class="text-muted-foreground hover:text-foreground transition-colors p-1"
-				onclick={() => (infoPanelOpen = true)}
-				title={t('chat_show_info')}
-			>
-				<Info class="w-4 h-4" />
-			</button>
-		</div>
-	{/if}
+		{/if}
 	</div>
-</div>
+{/if}
 
 <!-- Hidden file input -->
 <input
