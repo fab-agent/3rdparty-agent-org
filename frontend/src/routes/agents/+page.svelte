@@ -352,6 +352,7 @@
 		builtin_fn: 'web_search',
 		fn_code: '',
 		db_id: '',
+		a2a_agent_id: '',
 	});
 
 	function addCustomSkill() {
@@ -361,7 +362,10 @@
 
 		let config_json: string | undefined;
 		if (skill_type === 'builtin') {
-			config_json = JSON.stringify({ function_name: customSkill.builtin_fn });
+			const cfg: Record<string, string> = { function_name: customSkill.builtin_fn };
+			if (customSkill.builtin_fn === 'delegate_to_agent' && customSkill.a2a_agent_id)
+				cfg.to_agent_id = customSkill.a2a_agent_id;
+			config_json = JSON.stringify(cfg);
 		} else if (skill_type === 'mcp') {
 			config_json = JSON.stringify({
 				url: customSkill.mcp_url,
@@ -384,7 +388,7 @@
 			skill_type,
 			config_json,
 		}];
-		customSkill = { ...customSkill, name: '', description: '', mcp_url: '', http_url: '', fn_code: '', db_id: '' };
+		customSkill = { ...customSkill, name: '', description: '', mcp_url: '', http_url: '', fn_code: '', db_id: '', a2a_agent_id: '' };
 	}
 
 	// ── AI skill suggestion ───────────────────────────────────────────────────
@@ -825,6 +829,14 @@
 								{/each}
 							{/if}
 						</select>
+						{#if customSkill.builtin_fn === 'delegate_to_agent'}
+							<select class="select-input text-xs h-8 mb-2" bind:value={customSkill.a2a_agent_id}>
+								<option value="">{t('skill_a2a_select_ph')}</option>
+								{#each agents.filter(a => a.id !== editingId && a.agent_config?.status === 'active') as a}
+									<option value={a.id}>{a.name}{a.title ? ` — ${a.title}` : ''}</option>
+								{/each}
+							</select>
+						{/if}
 					{/if}
 
 					{#if customSkill.skill_type === 'mcp'}
