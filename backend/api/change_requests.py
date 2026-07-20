@@ -15,7 +15,7 @@ from sqlmodel import select
 from api.audit import log_action
 from api.auth import get_current_user
 from database import get_session
-from models import AgentConfig, ChangeRequest, GitConfig, Personnel, User
+from models import AgentConfig, ChangeRequest, GitConfig, Personnel, Skill, User
 from schemas import ChangeRequestApprove, ChangeRequestCreate, ChangeRequestReject
 from services.github_commit import commit_change_request
 
@@ -205,7 +205,7 @@ def dept_head_reject(
 
 
 def _apply_proposed_to_db(session, cr: ChangeRequest) -> None:
-    """Write proposed_json changes back to the actual Personnel / AgentConfig records."""
+    """Write proposed_json changes back to the actual Personnel / AgentConfig / Skill records."""
     proposed = json.loads(cr.proposed_json)
 
     if cr.change_type == "agent_config":
@@ -226,6 +226,26 @@ def _apply_proposed_to_db(session, cr: ChangeRequest) -> None:
                     setattr(agent_cfg, field, proposed[field])
             agent_cfg.updated_at = datetime.utcnow()
             session.add(agent_cfg)
+
+            # Sync per-agent skills
+            if "skills" in proposed:
+                existing = session.exec(
+                    select(Skill).where(Skill.agent_id == agent_cfg.id)
+                ).all()
+                for s in existing:
+                    session.delete(s)
+                for s in proposed["skills"]:
+                    session.add(
+                        Skill(
+                            agent_id=agent_cfg.id,
+                            name=s.get("name", ""),
+                            version=s.get("version", "1.0"),
+                            description=s.get("description"),
+                            skill_type=s.get("skill_type", "builtin"),
+                            config_json=s.get("config_json"),
+                            is_active=s.get("is_active", True),
+                        )
+                    )
 
 
 # ── Stage 2: Admin Approval → GitHub Commit ───────────────────────────────────
