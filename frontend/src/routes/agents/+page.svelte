@@ -56,11 +56,12 @@
 	];
 
 	const SKILL_TYPES = [
-		{ value: 'builtin',  label: 'Dahili',     hint: 'Platform hazır araçları' },
-		{ value: 'mcp',      label: 'MCP',         hint: 'Model Context Protocol sunucusu' },
-		{ value: 'http',     label: 'HTTP API',    hint: 'REST webhook veya API' },
-		{ value: 'function', label: 'Fonksiyon',   hint: 'Özel Python kodu (run(args) → str)' },
-		{ value: 'database', label: 'Veritabanı',  hint: 'SQL sorgu — semantik şema ile' },
+		{ value: 'builtin',  labelKey: 'skill_type_builtin'  as const, hintKey: 'skill_hint_builtin'  as const },
+		{ value: 'mcp',      labelKey: 'skill_type_mcp'      as const, hintKey: 'skill_hint_mcp'      as const },
+		{ value: 'http',     labelKey: 'skill_type_http'     as const, hintKey: 'skill_hint_http'     as const },
+		{ value: 'function', labelKey: 'skill_type_function' as const, hintKey: 'skill_hint_function' as const },
+		{ value: 'database', labelKey: 'skill_type_database' as const, hintKey: 'skill_hint_database' as const },
+		{ value: 'a2a',      labelKey: 'skill_type_a2a'      as const, hintKey: 'skill_hint_a2a'      as const },
 	];
 
 	// Loaded dynamically from backend — single source of truth
@@ -352,6 +353,7 @@
 		builtin_fn: 'web_search',
 		fn_code: '',
 		db_id: '',
+		a2a_agent_id: '',
 	});
 
 	function addCustomSkill() {
@@ -375,6 +377,8 @@
 			config_json = JSON.stringify({ code: customSkill.fn_code });
 		} else if (skill_type === 'database') {
 			config_json = JSON.stringify({ db_id: customSkill.db_id });
+		} else if (skill_type === 'a2a') {
+			config_json = JSON.stringify({ to_agent_id: customSkill.a2a_agent_id });
 		}
 
 		form.selectedSkills = [...form.selectedSkills, {
@@ -384,7 +388,7 @@
 			skill_type,
 			config_json,
 		}];
-		customSkill = { ...customSkill, name: '', description: '', mcp_url: '', http_url: '', fn_code: '', db_id: '' };
+		customSkill = { ...customSkill, name: '', description: '', mcp_url: '', http_url: '', fn_code: '', db_id: '', a2a_agent_id: '' };
 	}
 
 	// ── AI skill suggestion ───────────────────────────────────────────────────
@@ -798,9 +802,9 @@
 								class="type-chip"
 								class:type-chip-on={customSkill.skill_type === st.value}
 								onclick={() => (customSkill.skill_type = st.value)}
-								title={st.hint}
+								title={t(st.hintKey)}
 							>
-								{st.label}
+								{t(st.labelKey)}
 							</button>
 						{/each}
 					</div>
@@ -816,7 +820,7 @@
 						<select class="select-input text-xs h-8 mb-2" bind:value={customSkill.builtin_fn}
 								disabled={builtinToolsLoading}>
 							{#if builtinToolsLoading}
-								<option value="">Yükleniyor…</option>
+								<option value="">{t('skill_builtin_loading')}</option>
 							{:else}
 								{#each builtinTools as f}
 									<option value={f.value}>
@@ -829,7 +833,7 @@
 
 					{#if customSkill.skill_type === 'mcp'}
 						<div class="space-y-2 mb-2">
-							<Input bind:value={customSkill.mcp_url} placeholder="MCP Sunucu URL (https://...)" class="text-xs h-8 font-mono" />
+							<Input bind:value={customSkill.mcp_url} placeholder="MCP Server URL (https://...)" class="text-xs h-8 font-mono" />
 							<div class="grid grid-cols-2 gap-2">
 								<select class="select-input text-xs h-8" bind:value={customSkill.mcp_transport}>
 									<option value="sse">SSE</option>
@@ -837,13 +841,13 @@
 									<option value="stdio">stdio</option>
 								</select>
 								<select class="select-input text-xs h-8" bind:value={customSkill.mcp_auth_type}>
-									<option value="none">Auth yok</option>
-									<option value="api_key">API Key</option>
-									<option value="bearer">Bearer Token</option>
+									<option value="none">{t('skill_mcp_auth_none')}</option>
+									<option value="api_key">{t('skill_mcp_auth_apikey')}</option>
+									<option value="bearer">{t('skill_mcp_auth_bearer')}</option>
 								</select>
 							</div>
 							{#if customSkill.mcp_auth_type !== 'none'}
-								<Input bind:value={customSkill.mcp_auth_value} placeholder="API Key / Token değeri" class="text-xs h-8 font-mono" />
+								<Input bind:value={customSkill.mcp_auth_value} placeholder={t('skill_mcp_auth_val_ph')} class="text-xs h-8 font-mono" />
 							{/if}
 						</div>
 					{/if}
@@ -863,26 +867,40 @@
 						<textarea
 							class="textarea-input text-xs font-mono mb-2"
 							bind:value={customSkill.fn_code}
-							placeholder="def run(args: dict) -> str:&#10;    # args içindeki parametrelere erişin&#10;    value = args.get('input', '')&#10;    return f'Sonuç: &#123;value&#125;'"
+							placeholder="def run(args: dict) -> str:&#10;    value = args.get('input', '')&#10;    return f'Result: ' + value"
 							rows="6"
 						></textarea>
 						<p class="text-xs text-muted-foreground mb-2">
-							Fonksiyon <code>run(args: dict) → str</code> imzasına sahip olmalı. Güvenli ortamda çalışır (5 sn timeout).
+							{t('skill_fn_hint')}
 						</p>
 					{/if}
 
 					{#if customSkill.skill_type === 'database'}
 						<div class="space-y-1.5 mb-2">
 							<select class="select-input text-xs h-8" bind:value={customSkill.db_id}>
-								<option value="">Veritabanı seçin...</option>
+								<option value="">{t('skill_db_select_ph')}</option>
 								{#each databases as db}
 									<option value={db.id}>{db.name} ({db.db_type}) {db.status === 'ok' ? '✓' : '⚠'}</option>
 								{/each}
 							</select>
 							{#if databases.length === 0}
 								<p class="text-xs text-muted-foreground">
-									Henüz veritabanı eklenmemiş — <a href="/settings" class="underline">Ayarlar → Veritabanları</a>
+									{t('skill_db_empty')} <a href="/settings" class="underline">{t('skill_db_empty_link')}</a>
 								</p>
+							{/if}
+						</div>
+					{/if}
+
+					{#if customSkill.skill_type === 'a2a'}
+						<div class="space-y-1.5 mb-2">
+							<select class="select-input text-xs h-8" bind:value={customSkill.a2a_agent_id}>
+								<option value="">{t('skill_a2a_select_ph')}</option>
+								{#each agents.filter(a => a.id !== editingId && a.agent_config?.status === 'active') as a}
+									<option value={a.id}>{a.name} {a.title ? `— ${a.title}` : ''}</option>
+								{/each}
+							</select>
+							{#if agents.filter(a => a.id !== editingId && a.agent_config?.status === 'active').length === 0}
+								<p class="text-xs text-muted-foreground">{t('skill_a2a_empty')}</p>
 							{/if}
 						</div>
 					{/if}
@@ -897,7 +915,7 @@
 						<div class="text-xs text-muted-foreground">{t('agent_selected_skills')} ({form.selectedSkills.length}):</div>
 						{#each form.selectedSkills as skill}
 							{@const cfg = (() => { try { return skill.config_json ? JSON.parse(skill.config_json) : {}; } catch { return {}; } })()}
-							{@const typeLabel = skill.skill_type === 'builtin' ? 'Dahili' : skill.skill_type === 'mcp' ? 'MCP' : skill.skill_type === 'http' ? 'HTTP' : skill.skill_type === 'function' ? 'Fonksiyon' : skill.skill_type === 'database' ? 'Veritabanı' : skill.skill_type ?? ''}
+							{@const typeLabel = SKILL_TYPES.find(s => s.value === skill.skill_type) ? t(SKILL_TYPES.find(s => s.value === skill.skill_type)!.labelKey) : (skill.skill_type ?? '')}
 							<div class="selected-skill-row flex-col !items-start gap-1 py-2.5">
 								<div class="flex items-center justify-between w-full">
 									<div class="flex items-center gap-2 min-w-0 flex-wrap">
