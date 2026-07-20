@@ -133,6 +133,7 @@
 
 	const isPublicPage = $derived(PUBLIC_ROUTES.some(r => $page.url.pathname.startsWith(r)));
 	const yapiActive   = $derived(['/departments','/personnel','/agents','/skills','/policies'].some(p => $page.url.pathname.startsWith(p)));
+	const isChat       = $derived($page.url.pathname.startsWith('/chat'));
 
 	// ── Company.md panel ──────────────────────────────────────────────────────
 	type Goal = { id: number; text: string; done: boolean };
@@ -221,10 +222,10 @@
 {#if isPublicPage}
 	{@render children()}
 {:else}
-<div class="min-h-screen bg-background">
+<div class="h-screen flex flex-col bg-background overflow-hidden">
 
 	<!-- ── Top Navigation ────────────────────────────────────────────────────── -->
-	<div class="relative z-30 border-b bg-card">
+	<div class="relative z-30 border-b bg-card flex-shrink-0">
 		<div class="max-w-screen-2xl mx-auto">
 			<div class="flex items-center justify-between px-6 h-14">
 
@@ -359,7 +360,7 @@
 		</div>
 	</div>
 
-	<div class="max-w-screen-2xl mx-auto flex relative">
+	<div class="flex flex-1 overflow-hidden relative">
 
 		<!-- Click-outside overlay for dropdowns -->
 		{#if companyMenuOpen || langMenuOpen}
@@ -378,7 +379,7 @@
 		<aside class={[
 			'border-r bg-card z-40 overflow-y-auto flex flex-col',
 			'fixed inset-y-0 left-0 w-72 transition-all duration-200 ease-in-out',
-			'lg:static lg:inset-y-auto lg:left-auto lg:min-h-[calc(100vh-3.5rem)]',
+			'lg:static lg:inset-y-auto lg:left-auto',
 			sidebarCollapsed ? 'lg:w-16' : 'lg:w-60',
 			sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
 		].join(' ')}>
@@ -509,7 +510,7 @@
 		</aside>
 
 		<!-- ── Main Content ─────────────────────────────────────────────────────── -->
-		<div class="flex-1 min-w-0 p-8">
+		<div class={['flex-1 min-w-0', isChat ? 'overflow-hidden' : 'overflow-y-auto p-8'].join(' ')}>
 			{@render children()}
 		</div>
 	</div>
