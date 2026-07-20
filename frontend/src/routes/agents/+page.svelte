@@ -61,7 +61,6 @@
 		{ value: 'http',     labelKey: 'skill_type_http'     as const, hintKey: 'skill_hint_http'     as const },
 		{ value: 'function', labelKey: 'skill_type_function' as const, hintKey: 'skill_hint_function' as const },
 		{ value: 'database', labelKey: 'skill_type_database' as const, hintKey: 'skill_hint_database' as const },
-		{ value: 'a2a',      labelKey: 'skill_type_a2a'      as const, hintKey: 'skill_hint_a2a'      as const },
 	];
 
 	// Loaded dynamically from backend — single source of truth
@@ -353,7 +352,6 @@
 		builtin_fn: 'web_search',
 		fn_code: '',
 		db_id: '',
-		a2a_agent_id: '',
 	});
 
 	function addCustomSkill() {
@@ -377,8 +375,6 @@
 			config_json = JSON.stringify({ code: customSkill.fn_code });
 		} else if (skill_type === 'database') {
 			config_json = JSON.stringify({ db_id: customSkill.db_id });
-		} else if (skill_type === 'a2a') {
-			config_json = JSON.stringify({ to_agent_id: customSkill.a2a_agent_id });
 		}
 
 		form.selectedSkills = [...form.selectedSkills, {
@@ -388,7 +384,7 @@
 			skill_type,
 			config_json,
 		}];
-		customSkill = { ...customSkill, name: '', description: '', mcp_url: '', http_url: '', fn_code: '', db_id: '', a2a_agent_id: '' };
+		customSkill = { ...customSkill, name: '', description: '', mcp_url: '', http_url: '', fn_code: '', db_id: '' };
 	}
 
 	// ── AI skill suggestion ───────────────────────────────────────────────────
@@ -891,19 +887,6 @@
 						</div>
 					{/if}
 
-					{#if customSkill.skill_type === 'a2a'}
-						<div class="space-y-1.5 mb-2">
-							<select class="select-input text-xs h-8" bind:value={customSkill.a2a_agent_id}>
-								<option value="">{t('skill_a2a_select_ph')}</option>
-								{#each agents.filter(a => a.id !== editingId && a.agent_config?.status === 'active') as a}
-									<option value={a.id}>{a.name} {a.title ? `— ${a.title}` : ''}</option>
-								{/each}
-							</select>
-							{#if agents.filter(a => a.id !== editingId && a.agent_config?.status === 'active').length === 0}
-								<p class="text-xs text-muted-foreground">{t('skill_a2a_empty')}</p>
-							{/if}
-						</div>
-					{/if}
 
 					<Button size="sm" variant="outline" onclick={addCustomSkill} disabled={!customSkill.name.trim()} class="h-8 px-3 text-xs w-full">
 						<Plus class="w-3 h-3" /> {t('add')}
