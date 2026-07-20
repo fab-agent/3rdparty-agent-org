@@ -247,6 +247,9 @@ def reject_request(req_id: str, body: A2AReject, _: User = Depends(get_current_u
 
 # ── Background execution ──────────────────────────────────────────────────────
 
+# Tracks sessions that already triggered compilation (prevents double-run)
+_COMPILE_TRIGGERED: set[str] = set()
+
 
 async def _run_agent_task(session_id: str, task: str) -> str:
     """Run the agent and collect the full text response."""
@@ -259,17 +262,78 @@ async def _run_agent_task(session_id: str, task: str) -> str:
     return "".join(text_parts)
 
 
+def _maybe_compile_results(from_session_id: str) -> None:
+    """
+    When all A2A delegations from a session finish, feed results back to the
+    originating Council Agent session and generate a compiled final report.
+    """
+    if from_session_id in _COMPILE_TRIGGERED:
+        return
+
+    with get_session() as session:
+        reqs = session.exec(
+            select(A2ARequest).where(A2ARequest.from_session_id == from_session_id)
+        ).all()
+
+        if not reqs:
+            return
+
+        # Any still in flight?
+        blocking = [r for r in reqs if r.status in ("pending_approval", "running")]
+        if blocking:
+            return
+
+        # Collect results
+        done = []
+        for r in reqs:
+            if not r.result:
+                continue
+            agent = session.get(Personnel, r.to_agent_id)
+            done.append((agent.name if agent else "Ajan", r.result, r.status))
+
+        if not done:
+            return
+
+    _COMPILE_TRIGGERED.add(from_session_id)
+
+    parts = [
+        f"### {'✅' if status == 'completed' else '❌'} {name}\n{result}"
+        for name, result, status in done
+    ]
+
+    compilation_prompt = (
+        "Tüm delegasyon görevleri tamamlandı. Aşağıda her ajandan gelen raporlar yer almaktadır.\n\n"
+        + "\n\n---\n\n".join(parts)
+        + "\n\n---\n\n"
+        "Bu raporları bütünleştirerek kapsamlı bir **Yönetici Raporu** hazırla:\n"
+        "1. **Yönetici Özeti** — en kritik 3-5 bulgu\n"
+        "2. **Departman Bazlı Bulgular** — her ajandan öne çıkanlar\n"
+        "3. **Ortak Temalar & Riskler**\n"
+        "4. **Önerilen Aksiyonlar** — öncelik sırasıyla"
+    )
+
+    try:
+        asyncio.run(_run_agent_task(from_session_id, compilation_prompt))
+    except Exception as e:
+        import traceback
+        print(f"[A2A Compile] {e}\n{traceback.format_exc()}")
+
+
 def _execute_a2a_task(req_id: str) -> None:
     """
     Background task: create a temporary session for the target agent,
-    run the task, store the result, set status to pending_result_approval.
+    run the task, auto-complete the request, then trigger compilation
+    if all sibling delegations from the same session are done.
     """
+    from_session_id_copy: str | None = None
+
     with get_session() as session:
         req = session.get(A2ARequest, req_id)
         if not req or req.status != "running":
             return
 
-        # Create ephemeral session for target agent
+        from_session_id_copy = req.from_session_id
+
         ephemeral = AgentSession(
             personnel_id=req.to_agent_id,
             title=f"A2A: {req.task[:60]}",
@@ -279,12 +343,10 @@ def _execute_a2a_task(req_id: str) -> None:
         session.refresh(ephemeral)
         ephemeral_id = ephemeral.id
 
-    # Build the task message including context
     full_task = req.task
     if req.context:
         full_task = f"{req.task}\n\nBağlam:\n{req.context}"
 
-    # Run async in a new event loop (background thread)
     try:
         result = asyncio.run(_run_agent_task(ephemeral_id, full_task))
     except Exception as e:
@@ -294,7 +356,38 @@ def _execute_a2a_task(req_id: str) -> None:
         req = session.get(A2ARequest, req_id)
         if req:
             req.result = result or "[Boş yanıt]"
-            req.status = "pending_result_approval"
+            req.status = "completed"          # auto-approve result
+            req.result_approved_at = datetime.utcnow()
             req.updated_at = datetime.utcnow()
             session.add(req)
             session.commit()
+
+    # Trigger compilation once all sibling delegations finish
+    if from_session_id_copy:
+        _maybe_compile_results(from_session_id_copy)
+
+
+# ── Delegation status for chat UI ─────────────────────────────────────────────
+
+
+@router.get("/sessions/{session_id}/delegation-status")
+def session_delegation_status(
+    session_id: str, _: User = Depends(get_current_user)
+):
+    """Return counts of A2A requests originating from a session."""
+    with get_session() as session:
+        reqs = session.exec(
+            select(A2ARequest).where(A2ARequest.from_session_id == session_id)
+        ).all()
+
+    total     = len(reqs)
+    pending   = sum(1 for r in reqs if r.status in ("pending_approval", "running"))
+    completed = sum(1 for r in reqs if r.status == "completed")
+    rejected  = sum(1 for r in reqs if r.status == "rejected")
+    return {
+        "total":     total,
+        "pending":   pending,
+        "completed": completed,
+        "rejected":  rejected,
+        "all_done":  total > 0 and pending == 0,
+    }

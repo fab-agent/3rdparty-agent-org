@@ -61,6 +61,15 @@ export const a2aApi = {
 
 	reject: (id: string, approver_id: string, reason?: string) =>
 		api.post<A2ARequest>(`/a2a/requests/${id}/reject`, { approver_id, reason }),
+
+	delegationStatus: (session_id: string) =>
+		api.get<{
+			total: number;
+			pending: number;
+			completed: number;
+			rejected: number;
+			all_done: boolean;
+		}>(`/a2a/sessions/${session_id}/delegation-status`),
 };
 
 export function statusLabel(s: A2AStatus): string {

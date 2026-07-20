@@ -33,6 +33,7 @@
 	import { providers as providersApi, type ProviderStatus } from '$lib/api/providers';
 	import { companyStore } from '$lib/stores/company.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { a2aApi } from '$lib/api/a2a';
 
 	const LAST_SESSION_KEY = 'chat:lastSessionId';
 	const POLL_INTERVAL_MS = 3000;
@@ -90,6 +91,11 @@
 	let polling = $state(false);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+	// Delegation result polling
+	let delegationPending = $state(false);
+	let delegationPollTimer: ReturnType<typeof setInterval> | null = null;
+	let delegationCountText = $state('');
+
 	let messagesEl = $state<HTMLElement | null>(null);
 	let inputEl = $state<HTMLTextAreaElement | null>(null);
 	let abortController: AbortController | null = null;
@@ -118,6 +124,7 @@
 	$effect(() => {
 		if (companyStore.active) {
 			stopPolling();
+			stopDelegationPolling();
 			activeSession = null;
 			messages = [];
 			selectedAgent = null;
@@ -164,6 +171,7 @@
 
 	async function openSession(s: Session) {
 		stopPolling();
+		stopDelegationPolling();
 		activeSession = s;
 		localStorage.setItem(LAST_SESSION_KEY, s.id);
 		const detail = await sessionsApi.get(s.id);
@@ -227,6 +235,49 @@
 			pollTimer = null;
 		}
 		polling = false;
+	}
+
+	function stopDelegationPolling() {
+		if (delegationPollTimer !== null) {
+			clearInterval(delegationPollTimer);
+			delegationPollTimer = null;
+		}
+		delegationPending = false;
+		delegationCountText = '';
+	}
+
+	function startDelegationPolling(sessionId: string) {
+		stopDelegationPolling();
+		delegationPending = true;
+
+		delegationPollTimer = setInterval(async () => {
+			try {
+				const status = await a2aApi.delegationStatus(sessionId);
+				if (status.total === 0) {
+					stopDelegationPolling();
+					return;
+				}
+				delegationCountText = `${status.completed}/${status.total}`;
+				if (status.all_done) {
+					stopDelegationPolling();
+					// Give the backend a moment to write the compilation message, then poll for it
+					startPolling(sessionId);
+				}
+			} catch {
+				stopDelegationPolling();
+			}
+		}, POLL_INTERVAL_MS);
+	}
+
+	async function checkAndStartDelegationPolling(sessionId: string) {
+		try {
+			const status = await a2aApi.delegationStatus(sessionId);
+			if (status.total > 0 && !status.all_done) {
+				startDelegationPolling(sessionId);
+			}
+		} catch {
+			// ignore — not a fatal error
+		}
 	}
 
 	// ── File upload ───────────────────────────────────────────────────────────
@@ -352,6 +403,8 @@
 						s.id === activeSession!.id ? { ...s, title: detail.title } : s
 					);
 					await scrollToBottom();
+					// Check if orchestrator delegated tasks — if so, wait for results
+					await checkAndStartDelegationPolling(activeSession.id);
 				} else if (event.type === 'error') {
 					streamError = event.message ?? t('chat_err_unknown');
 					streamingText = '';
@@ -699,6 +752,14 @@
 			<!-- Input -->
 			<div class="px-6 py-4 border-t border-border flex-shrink-0">
 
+				<!-- Delegation waiting banner -->
+				{#if delegationPending}
+					<div class="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-400">
+						<Loader2 class="w-3.5 h-3.5 flex-shrink-0 animate-spin" />
+						<span>Delegasyon sonuçları bekleniyor{delegationCountText ? ` (${delegationCountText} tamamlandı)` : ''}…</span>
+					</div>
+				{/if}
+
 				<!-- File upload error -->
 				{#if fileUploadError}
 					<div class="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive">
@@ -740,7 +801,7 @@
 						type="button"
 						class="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
 						title={t('chat_file_attach_title')}
-						disabled={streaming || polling}
+						disabled={streaming || polling || delegationPending}
 						onclick={() => fileInputEl?.click()}
 					>
 						{#if fileUploading}
@@ -756,7 +817,7 @@
 						onkeydown={handleKeydown}
 						placeholder={t('chat_input_ph')}
 						rows={1}
-						disabled={streaming || polling}
+						disabled={streaming || polling || delegationPending}
 						class="flex-1 bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground min-h-[20px] max-h-[120px] leading-5 disabled:opacity-50"
 						style="height: auto; overflow-y: hidden;"
 						oninput={(e) => {
@@ -768,7 +829,7 @@
 					<Button
 						size="sm"
 						onclick={send}
-						disabled={(!input.trim() && pendingAttachments.length === 0) || streaming || polling}
+						disabled={(!input.trim() && pendingAttachments.length === 0) || streaming || polling || delegationPending}
 						class="rounded-xl h-8 w-8 p-0 flex-shrink-0"
 					>
 						<Send class="w-3.5 h-3.5" />
